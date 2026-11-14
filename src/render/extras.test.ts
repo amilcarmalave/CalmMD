@@ -78,4 +78,9 @@ describe('image sizes', () => {
     expect([both.getAttribute('width'), both.getAttribute('height')]).toEqual(['300', '200']);
     expect(dom('![A | B](a.png)').querySelector('img')!.getAttribute('width')).toBeNull();
   });
+  it('turns |center and |right into a class', () => {
+    const img = dom('![A photo|300|center](a.png)').querySelector('img')!;
+    expect([img.className, img.getAttribute('width'), img.getAttribute('alt')]).toEqual(['img-center', '300', 'A photo']);
+    expect(dom('![x|right](a.png)').querySelector('img')!.className).toBe('img-right');
+  });
 });

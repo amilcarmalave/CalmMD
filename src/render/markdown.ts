@@ -188,9 +188,10 @@ function renderers(md: MarkdownIt) {
     tok.attrSet('src', resolveImageSrc(raw, envOf(env)));
     // Size after a "|" in the alt text (core/imageSize.ts): it becomes width/height, not alt text.
     const size = parseAltSize(tok.content);
-    if (size.width) {
-      tok.attrSet('width', String(size.width));
+    if (size.width || size.align) {
+      if (size.width) tok.attrSet('width', String(size.width));
       if (size.height) tok.attrSet('height', String(size.height));
+      if (size.align === 'center' || size.align === 'right') tok.attrJoin('class', `img-${size.align}`);
       const Text = tok.constructor as new (type: string, tag: string, nesting: number) => Token;
       const alt = new Text('text', '', 0);
       alt.content = size.alt;

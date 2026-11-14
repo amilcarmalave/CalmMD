@@ -205,6 +205,7 @@ export class ImageWidget extends WidgetType {
     img.alt = size.alt;
     img.title = size.alt;
     if (size.width) img.style.width = `${size.width}px`;
+    if (size.align === 'center' || size.align === 'right') wrap.classList.add(`align-${size.align}`);
     img.decoding = 'async';
     img.src = view.state.facet(liveConfig).resolveImage(this.src);
     // Height changes when the image arrives. Let CodeMirror re-measure so the scroll doesn't jump.

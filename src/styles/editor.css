@@ -398,6 +398,15 @@
   display: block;
   opacity: 0.85;
 }
+/* Alignment: the wrapper shrinks to the image (so the resize handle stays on its corner). */
+.pane-editor .cm-live .cm-live-image.align-center,
+.pane-editor .cm-live .cm-live-image.align-right {
+  display: table;
+  margin-left: auto;
+}
+.pane-editor .cm-live .cm-live-image.align-center {
+  margin-right: auto;
+}
 .pane-editor .cm-live .cm-live-image.broken {
   padding: 0.1em 0.5em;
   border-radius: 4px;

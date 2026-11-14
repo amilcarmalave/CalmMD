@@ -6,7 +6,7 @@ import type { Platform } from '../platform/types';
 import type { MenuItem } from '../ui/ContextMenu';
 import type { CommandRegistry } from './commands';
 import { resolveLocalPath } from './links';
-import { IMAGE_SIZE_PRESETS, parseAltSize, withAltSize } from '../core/imageSize';
+import { IMAGE_SIZE_PRESETS, parseAltSize, withAltOptions, type ImageAlign } from '../core/imageSize';
 
 export interface EditorMenuDeps {
   registry: CommandRegistry;
@@ -116,11 +116,13 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
     const marks = node.getChildren('LinkMark');
     const local = resolveLocalPath(src, deps.docPath);
     const altText = () => (marks.length >= 2 ? view.state.sliceDoc(marks[0].to, marks[1].from) : '');
-    const setSize = (w: number | null) => {
+    const setAlt = (opts: { width?: number | null; align?: ImageAlign | null }) => {
       if (marks.length < 2) return;
-      view.dispatch({ changes: { from: marks[0].to, to: marks[1].from, insert: withAltSize(altText(), w) }, userEvent: 'input.resize' });
+      view.dispatch({ changes: { from: marks[0].to, to: marks[1].from, insert: withAltOptions(altText(), opts) }, userEvent: 'input.resize' });
       view.focus();
     };
+    const setSize = (width: number | null) => setAlt({ width });
+    const align = () => parseAltSize(altText()).align ?? 'left';
     specific.push(
       { label: 'Edit Alt Text', disabled: marks.length < 2, action: () => select(marks[0].to, marks[1].from) },
       { label: 'Replace Image…', disabled: !url || !deps.replaceImage, action: () => url && deps.replaceImage?.(url.from, url.to) },
@@ -133,6 +135,14 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
         action: () => setSize(p.width),
       })),
       { label: 'Original Size', checked: !parseAltSize(altText()).width, disabled: marks.length < 2, action: () => setSize(null) },
+      'separator',
+      { heading: 'Align' },
+      ...(['left', 'center', 'right'] as const).map((a) => ({
+        label: a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right',
+        checked: align() === a,
+        disabled: marks.length < 2,
+        action: () => setAlt({ align: a === 'left' ? null : a }),
+      })),
       'separator',
       { label: 'Edit Image Path', disabled: !url, action: () => url && select(url.from, url.to) },
       { label: 'Copy Image Path', disabled: !src, action: () => copy(local ?? src, 'Path copied') },

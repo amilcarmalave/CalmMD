@@ -522,7 +522,22 @@
 }
 .md-body p > img:only-child {
   display: block;
-  margin: 1.4em auto;
+  margin: 1.4em 0;
+}
+/* Alignment from the alt text (`![Photo|center](…)`); left is the default, as on GitHub. */
+.md-body img.img-center,
+.md-body img.img-right {
+  display: block;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+.md-body img.img-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+.md-body img.img-right {
+  margin-left: auto;
+  margin-right: 0;
 }
 
 /* ---------- Footnotes ---------- */
