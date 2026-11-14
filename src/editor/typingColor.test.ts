@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { setTypingColor, typingColor, typingColorField, typingColorInput } from './typingColor';
 
+// jsdom has no layout: CodeMirror measures text ranges a moment after a view is created, so give
+// Range the two methods it calls, and destroy views so no measurement runs after a test ends.
+beforeAll(() => {
+  const empty = Object.assign([], { item: () => null }) as unknown as DOMRectList;
+  Range.prototype.getClientRects = () => empty;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+});
+const views: EditorView[] = [];
+afterEach(() => views.splice(0).forEach((v) => v.destroy()));
+
 function view(doc: string, cursor = doc.length) {
-  return new EditorView({ state: EditorState.create({ doc, selection: { anchor: cursor }, extensions: [typingColor] }) });
+  const v = new EditorView({ state: EditorState.create({ doc, selection: { anchor: cursor }, extensions: [typingColor] }) });
+  views.push(v);
+  return v;
 }
 
 describe('typing colour', () => {
