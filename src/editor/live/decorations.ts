@@ -3,6 +3,7 @@ import { StateEffect, StateField, type EditorState, type Extension, type Range, 
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { analyzeBlocks, analyzeInline } from './analyze';
 import { liveConfig, type LiveConfig } from './config';
+import { paragraphKeymap } from '../paragraphs';
 import { BulletWidget, DiagramWidget, EmbedWidget, HrWidget, HtmlBlockWidget, ImageWidget, MathWidget, TableWidget, TaskWidget } from './widgets';
 
 /** Forces live decorations to rebuild (for example after the colour scheme changes, for diagrams). */
@@ -188,6 +189,7 @@ export function livePreview(config: LiveConfig): Extension {
     inlinePlugin,
     blockField,
     handlers,
+    paragraphKeymap,
     EditorView.editorAttributes.of({ class: 'cm-live' }),
   ];
 }

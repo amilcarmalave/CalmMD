@@ -18,6 +18,10 @@ describe('live mode: extended syntax', () => {
     expect(visible('a \\*literal\\* b')).toBe('a *literal* b');
     expect(visible('a \\‸*literal\\* b')).toBe('a \\*literal* b');
   });
+  it('hides the backslash of a hard line break away from the cursor', () => {
+    expect(visible('one\\\ntwo\n\nend')).toBe('one\ntwo\n\nend');
+    expect(visible('one‸\\\ntwo')).toBe('one\\\ntwo');
+  });
   it('renders reference links with their definition as the target', () => {
     const src = 'See [the site][ref] and [ref].\n\n[ref]: https://example.com';
     expect(visible(src).split('\n')[0]).toBe('See the site and ref.');

@@ -181,6 +181,13 @@ export function analyzeInline(state: EditorState, from: number, to: number): Liv
           return false;
         }
 
+        case 'HardBreak': {
+          // "\" at the end of a line (Shift+Enter): the break shows, the backslash doesn't.
+          if (doc.sliceString(ref.from, ref.from + 1) === '\\' && !touches(state, ref.from, ref.from + 1))
+            out.push({ kind: 'hide', from: ref.from, to: ref.from + 1 });
+          return false;
+        }
+
         case 'Blockquote': {
           // GitHub alerts: a tinted, titled quote. The marker shows as a small label.
           const para = node.firstChild?.nextSibling;
