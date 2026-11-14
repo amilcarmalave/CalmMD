@@ -6,10 +6,9 @@
 # SHA256SUMS, and runs it silently. Files fetched this way aren't marked "downloaded from the
 # internet", so SmartScreen doesn't interrupt. Nothing here needs admin rights.
 #
-# Before launch: set $Repo to the public repository ("owner/name"). See packaging/README.md.
 
 $ErrorActionPreference = 'Stop'
-$Repo = 'OWNER/calmmd'
+$Repo = 'amilcarmalave/CalmMD'
 
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
 Write-Host "Finding the latest CalmMD release..."

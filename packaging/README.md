@@ -1,7 +1,7 @@
 # Packaging and distribution
 
-Everything needed to ship CalmMD through each channel. `OWNER/calmmd` is a placeholder for the public
-GitHub repository: replace it everywhere before the first release (`grep -r OWNER packaging`).
+Everything needed to ship CalmMD through each channel, from the repository
+[amilcarmalave/CalmMD](https://github.com/amilcarmalave/CalmMD).
 
 ## Every release
 
@@ -18,8 +18,8 @@ GitHub repository: replace it everywhere before the first release (`grep -r OWNE
 | GitHub Releases | (CI) | Automatic. Direct downloads; SmartScreen/Gatekeeper warn on first open |
 | Microsoft Store | `msix/` | `npm run app:build`, then `pwsh packaging/msix/build-msix.ps1 -Version X.Y.Z`; upload the `.msix` in Partner Center. The Store signs MSIX packages, so no certificate is needed (EXE/MSI submissions would need our own signing) |
 | winget | `winget/README.md` | `wingetcreate update CalmMD.CalmMD …` after each release |
-| Scoop | `scoop/calmmd.json` | Lives in our own bucket repo (`OWNER/scoop-calmmd`, `bucket/calmmd.json`). `checkver`/`autoupdate` let Scoop's tooling bump it |
-| Homebrew | `homebrew/calmmd.rb` | Lives in our own tap (`OWNER/homebrew-calmmd`, `Casks/calmmd.rb`). Bump `version` and `sha256` |
+| Scoop | `scoop/calmmd.json` | Lives in our own bucket repo (`amilcarmalave/scoop-calmmd`, `bucket/calmmd.json`). `checkver`/`autoupdate` let Scoop's tooling bump it |
+| Homebrew | `homebrew/calmmd.rb` | Lives in our own tap (`amilcarmalave/homebrew-calmmd`, `Casks/calmmd.rb`). Bump `version` and `sha256` |
 | Install scripts | `install.ps1`, `install.sh` | Host them at the website root (`calmmd.app/install.ps1`). They verify `SHA256SUMS` |
 
 ### Microsoft Store, first time

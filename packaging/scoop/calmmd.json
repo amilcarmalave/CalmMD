@@ -1,15 +1,15 @@
 {
   "version": "0.1.0",
   "description": "Markdown, calmly. A calm Markdown editor with live preview, PDF export and Spaces.",
-  "homepage": "https://github.com/OWNER/calmmd",
+  "homepage": "https://github.com/amilcarmalave/CalmMD",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/OWNER/calmmd/releases/download/v0.1.0/CalmMD_0.1.0_x64-setup.exe#/setup.exe",
+      "url": "https://github.com/amilcarmalave/CalmMD/releases/download/v0.1.0/CalmMD_0.1.0_x64-setup.exe#/setup.exe",
       "hash": "REPLACE_WITH_SHA256_FROM_SHA256SUMS"
     },
     "arm64": {
-      "url": "https://github.com/OWNER/calmmd/releases/download/v0.1.0/CalmMD_0.1.0_arm64-setup.exe#/setup.exe",
+      "url": "https://github.com/amilcarmalave/CalmMD/releases/download/v0.1.0/CalmMD_0.1.0_arm64-setup.exe#/setup.exe",
       "hash": "REPLACE_WITH_SHA256_FROM_SHA256SUMS"
     }
   },
@@ -24,9 +24,9 @@
   "checkver": "github",
   "autoupdate": {
     "architecture": {
-      "64bit": { "url": "https://github.com/OWNER/calmmd/releases/download/v$version/CalmMD_$version_x64-setup.exe#/setup.exe" },
-      "arm64": { "url": "https://github.com/OWNER/calmmd/releases/download/v$version/CalmMD_$version_arm64-setup.exe#/setup.exe" }
+      "64bit": { "url": "https://github.com/amilcarmalave/CalmMD/releases/download/v$version/CalmMD_$version_x64-setup.exe#/setup.exe" },
+      "arm64": { "url": "https://github.com/amilcarmalave/CalmMD/releases/download/v$version/CalmMD_$version_arm64-setup.exe#/setup.exe" }
     },
-    "hash": { "url": "https://github.com/OWNER/calmmd/releases/download/v$version/SHA256SUMS", "regex": "$sha256\\s+$basename" }
+    "hash": { "url": "https://github.com/amilcarmalave/CalmMD/releases/download/v$version/SHA256SUMS", "regex": "$sha256\\s+$basename" }
   }
 }

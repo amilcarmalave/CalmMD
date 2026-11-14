@@ -8,10 +8,9 @@
 # Linux → ~/.local/bin/calmmd (AppImage) plus a menu entry. Files fetched with curl aren't
 # quarantined, so Gatekeeper doesn't interrupt.
 #
-# Before launch: set REPO to the public repository ("owner/name"). See packaging/README.md.
 set -eu
 
-REPO="OWNER/calmmd"
+REPO="amilcarmalave/CalmMD"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "error: $*" >&2; exit 1; }

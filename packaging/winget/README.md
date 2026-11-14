@@ -6,9 +6,9 @@ hand-write them: after a release, run Microsoft's `wingetcreate` with the instal
 ```powershell
 winget install wingetcreate
 # First time (creates the package):
-wingetcreate new https://github.com/OWNER/calmmd/releases/download/v0.1.0/CalmMD_0.1.0_x64-setup.exe
+wingetcreate new https://github.com/amilcarmalave/CalmMD/releases/download/v0.1.0/CalmMD_0.1.0_x64-setup.exe
 # Every release after that:
-wingetcreate update CalmMD.CalmMD --version 0.2.0 --urls https://github.com/OWNER/calmmd/releases/download/v0.2.0/CalmMD_0.2.0_x64-setup.exe --submit
+wingetcreate update CalmMD.CalmMD --version 0.2.0 --urls https://github.com/amilcarmalave/CalmMD/releases/download/v0.2.0/CalmMD_0.2.0_x64-setup.exe --submit
 ```
 
 Answers for `wingetcreate new`:
