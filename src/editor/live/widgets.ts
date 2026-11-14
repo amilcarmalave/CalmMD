@@ -3,6 +3,7 @@ import katex from 'katex';
 import { diagramFor } from '../../render/diagrams';
 import { activateEmbed, embedPageUrl, parseEmbed } from '../../render/embeds';
 import { liveConfig } from './config';
+import { altRangeAt, MIN_IMAGE_WIDTH, parseAltSize, withAltSize } from '../../core/imageSize';
 
 /** Rendered TeX. Inline or display. */
 export class MathWidget extends WidgetType {
@@ -200,8 +201,10 @@ export class ImageWidget extends WidgetType {
     const wrap = document.createElement('span');
     wrap.className = this.companion ? 'cm-live-image cm-live-image-companion' : 'cm-live-image';
     const img = document.createElement('img');
-    img.alt = this.alt;
-    img.title = this.alt;
+    const size = parseAltSize(this.alt);
+    img.alt = size.alt;
+    img.title = size.alt;
+    if (size.width) img.style.width = `${size.width}px`;
     img.decoding = 'async';
     img.src = view.state.facet(liveConfig).resolveImage(this.src);
     // Height changes when the image arrives. Let CodeMirror re-measure so the scroll doesn't jump.
@@ -224,11 +227,60 @@ export class ImageWidget extends WidgetType {
       view.requestMeasure();
     };
     wrap.append(img);
+    if (!this.companion) wrap.append(resizeHandle(view, wrap, img));
     return wrap;
   }
-  ignoreEvent() {
-    return false;
+  ignoreEvent(e: Event) {
+    // The resize handle handles its own pointer events; other clicks place the cursor (CodeMirror).
+    return !!(e.target as Element | null)?.closest?.('.cm-live-image-handle');
   }
+}
+
+/**
+ * A corner handle that resizes an image by dragging; the width is written into the alt text when
+ * the drag ends (`![alt|300](…)`). Double-click the handle to go back to the natural size.
+ */
+function resizeHandle(view: EditorView, wrap: HTMLElement, img: HTMLImageElement): HTMLElement {
+  const handle = document.createElement('span');
+  handle.className = 'cm-live-image-handle';
+  handle.title = 'Drag to resize · double-click for the original size';
+  const write = (width: number | null) => {
+    const pos = view.posAtDOM(wrap);
+    const r = altRangeAt(view.state.doc.toString(), pos);
+    if (!r) return;
+    view.dispatch({ changes: { from: r.from, to: r.to, insert: withAltSize(r.alt, width) }, userEvent: 'input.resize' });
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      // synthetic or already-released pointers can't be captured; the drag still works while over the handle
+    }
+    const startX = e.clientX;
+    const startW = img.getBoundingClientRect().width;
+    const maxW = (wrap.parentElement?.getBoundingClientRect().width ?? 2000) - 8;
+    wrap.classList.add('resizing');
+    const move = (ev: PointerEvent) => {
+      img.style.width = `${Math.round(Math.min(maxW, Math.max(MIN_IMAGE_WIDTH, startW + ev.clientX - startX)))}px`;
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      wrap.classList.remove('resizing');
+      const w = parseFloat(img.style.width);
+      if (Math.abs(w - startW) >= 2) write(w);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+  });
+  handle.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    write(null);
+  });
+  return handle;
 }
 
 /** A raw HTML block (with any Markdown inside it), rendered and sanitised like the preview. */

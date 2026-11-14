@@ -68,3 +68,14 @@ describe('wiki links', () => {
     expect(dom('[[<b>x</b>]]').querySelector('a.wikilink')!.innerHTML).toBe('&lt;b&gt;x&lt;/b&gt;');
   });
 });
+
+describe('image sizes', () => {
+  it('turns ![alt|300](…) into a width and clean alt text', () => {
+    const img = dom('![A photo|300](a.png)').querySelector('img')!;
+    expect(img.getAttribute('width')).toBe('300');
+    expect(img.getAttribute('alt')).toBe('A photo');
+    const both = dom('![x|300x200](a.png)').querySelector('img')!;
+    expect([both.getAttribute('width'), both.getAttribute('height')]).toEqual(['300', '200']);
+    expect(dom('![A | B](a.png)').querySelector('img')!.getAttribute('width')).toBeNull();
+  });
+});

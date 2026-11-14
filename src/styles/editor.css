@@ -507,3 +507,29 @@
 .pane-editor .cm-live .cm-live-image-locate:hover {
   border-color: var(--accent);
 }
+
+/* Image resize handle (Live mode): bottom-right corner, shown on hover. */
+.pane-editor .cm-live .cm-live-image {
+  position: relative;
+}
+.pane-editor .cm-live .cm-live-image-handle {
+  position: absolute;
+  right: -5px;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 2px solid var(--accent);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+  touch-action: none;
+}
+.pane-editor .cm-live .cm-live-image:hover .cm-live-image-handle,
+.pane-editor .cm-live .cm-live-image.resizing .cm-live-image-handle {
+  opacity: 1;
+}
+.pane-editor .cm-live .cm-live-image.resizing img {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+}

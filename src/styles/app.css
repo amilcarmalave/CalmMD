@@ -1647,3 +1647,23 @@ button {
   border-radius: 0;
   background: transparent;
 }
+
+/* Image resize handle (preview), placed over the hovered image's corner. */
+.pane-preview {
+  position: relative;
+}
+.preview-image-handle {
+  position: absolute;
+  z-index: 5;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.preview-image-handle[hidden] {
+  display: none;
+}

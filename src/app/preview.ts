@@ -6,6 +6,7 @@ import { patchChildren, rememberOriginal } from '../render/patch';
 import { ScrollSync } from '../sync/scrollSync';
 import type { Platform } from '../platform/types';
 import { openLink as openLinkWith } from './links';
+import { previewImageResize } from './previewImageResize';
 
 export interface PreviewDeps {
   view: EditorView;
@@ -28,6 +29,7 @@ export function createPreview(deps: PreviewDeps) {
   const { view, platform, scroller, content } = deps;
   const renderer = createRenderer();
   const sync = new ScrollSync(view, scroller, content);
+  const stopResize = previewImageResize(view, scroller, content);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastRendered: string | null = null;
 
@@ -132,6 +134,7 @@ export function createPreview(deps: PreviewDeps) {
     },
     dispose() {
       clearTimeout(timer);
+      stopResize();
       sync.dispose();
     },
   };
