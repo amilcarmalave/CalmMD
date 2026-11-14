@@ -210,8 +210,8 @@ src-tauri/
   the top-of-viewport source line matches to within 0.03 lines in both directions.
 
 ### Git workflow
-Each milestone gets its own branch (`m1-shell`, `m2-preview`, …), each branched from the previous
-milestone. `main` holds the docs baseline. Commit messages use the imperative mood with a short subject.
+`main` is always releasable. Work happens on short-lived feature branches merged by pull request.
+Commit messages use the imperative mood with a short subject.
 
 ## Testing notes
 - `documents.test.ts` covers conflicts, CRLF/BOM round-trips, draft restore, and closing behaviour
