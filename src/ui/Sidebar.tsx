@@ -16,6 +16,8 @@ export interface SidebarProps {
   explorer: Explorer;
   activePath: string | null;
   openFile: (path: string) => void;
+  /** Read-only preview of any file (Space). */
+  quickView: (path: string) => void;
   openMenu: (e: MouseEvent, items: MenuItem[]) => void;
   revealLabel: string;
   reveal: (path: string) => void;
@@ -105,7 +107,7 @@ function Files(props: SidebarProps) {
             'separator' as const,
             { label: 'Open as Root Folder', action: () => ex.setRoot(path) },
           ]
-        : [{ label: 'Open', action: () => props.openFile(path) }, { label: 'New File Here', action: () => ex.setEditing({ kind: 'new-file', dir: parent }) }, 'separator' as const]),
+        : [{ label: 'Open', action: () => props.openFile(path) }, { label: 'Quick View', hint: 'Space', action: () => props.quickView(path) }, { label: 'New File Here', action: () => ex.setEditing({ kind: 'new-file', dir: parent }) }, 'separator' as const]),
       { label: ex.isFavorite(path) ? 'Remove from Favorites' : 'Add to Favorites', action: () => ex.toggleFavorite(path, isDir) },
       { label: 'Rename…', hint: 'F2', action: () => ex.setEditing({ kind: 'rename', path, isDir }) },
       { label: props.revealLabel, action: () => props.reveal(path) },
@@ -136,7 +138,7 @@ function Files(props: SidebarProps) {
             ...(parent && !samePath(parent, root) ? [{ label: `Go Up to “${basename(parent) || parent}”`, action: () => ex.openParent() }] : []),
             { label: ex.isFavorite(root) ? 'Remove from Favorites' : 'Add to Favorites', action: () => ex.toggleFavorite(root, true) },
             { label: props.revealLabel, action: () => props.reveal(root) },
-            { label: st.showAllFiles ? 'Show Markdown Files Only' : 'Show All Files', action: () => ex.setShowAllFiles(!st.showAllFiles) },
+            { label: st.showAllFiles ? 'Show Notes Only' : 'Show All Files', action: () => ex.setShowAllFiles(!st.showAllFiles) },
             { label: 'Refresh', action: () => ex.refresh() },
             'separator' as const,
             { label: 'Close Folder', action: () => ex.setRoot(null) },
@@ -342,7 +344,10 @@ function Row(props: RowProps & { name: string; path: string; isDir: boolean; dep
       onClick={() => !renaming() && activate()}
       onKeyDown={(e) => {
         if (renaming()) return;
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === ' ' && !props.isDir) {
+          e.preventDefault();
+          props.quickView(props.path);
+        } else if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           activate();
         } else if (e.key === 'F2') {

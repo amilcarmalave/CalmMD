@@ -53,9 +53,11 @@ describe('recent folders', () => {
 });
 
 describe('explorer', () => {
-  it('lists folders first in natural order, Markdown only by default', async () => {
+  it('lists folders first in natural order, and can hide everything but notes', async () => {
     const { ex } = setup();
     await ex.setRoot('/r');
+    expect(ex.visible(ex.state.entries['/r']).map((e) => e.name)).toContain('img.png');
+    ex.setShowAllFiles(false);
     expect(ex.visible(ex.state.entries['/r']).map((e) => e.name)).toEqual(['notes', 'a.md', 'b.md']);
     await ex.toggle('/r/notes');
     expect(ex.state.entries['/r/notes'].map((e) => e.name)).toEqual(['Chapter 2.md', 'Chapter 10.md']);

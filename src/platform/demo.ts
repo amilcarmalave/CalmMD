@@ -62,6 +62,12 @@ const FILES: Record<string, string> = {
   '/Notes/Projects/Thesis/Chapter 1.md': '# Chapter 1\n\n## Introduction\n',
   '/Notes/Projects/Thesis/Chapter 2.md': '# Chapter 2\n',
   '/Notes/Projects/Thesis/Chapter 10.md': '# Chapter 10\n',
+  // Non-note files, for the file list and Quick view. Images are data URLs in the memory platform.
+  '/Notes/assets/sunrise.svg': `data:image/svg+xml;utf8,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f2a44"/><stop offset="1" stop-color="#3b4a72"/></linearGradient></defs><rect width="1200" height="600" fill="url(#g)"/><circle cx="930" cy="170" r="90" fill="#e8a23b"/><path d="M0 470 Q300 360 600 450 T1200 420 V600 H0z" fill="#faf8f4" opacity=".9"/></svg>',
+  )}`,
+  '/Notes/Projects/Thesis/results.csv': 'Trial,Words,Minutes,Notes\n1,1200,45,"Morning, quiet"\n2,860,30,Afternoon\n3,1530,60,"Long ""flow"" session"\n',
+  '/Notes/Projects/settings.json': '{\n  "theme": "snow",\n  "fontScale": 1.1,\n  "spaces": ["Thesis", "Journal"]\n}\n',
 };
 
 export function createDemoPlatform(params: URLSearchParams) {

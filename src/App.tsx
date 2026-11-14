@@ -35,6 +35,8 @@ import { notePicker } from './editor/notePicker';
 import { linksTo, parseWiki, resolveWiki, type Backlink } from './core/noteLinks';
 import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
+import { QuickView } from './ui/QuickView';
+import { fileKind } from './core/fileKinds';
 import welcomeText from './assets/welcome.md?raw';
 import guideText from './assets/markdown-guide.md?raw';
 import { isEmbeddableUrl } from './render/embeds';
@@ -246,6 +248,15 @@ export default function App(props: { platform: Platform }) {
     ),
   );
 
+  // ---------- Quick view ----------
+  const [quickView, setQuickView] = createSignal<string | null>(null);
+  /** Notes open in the editor; anything else opens in Quick view. */
+  function openFileOrView(path: string) {
+    if (fileKind(path) === 'note') void docs.openPaths([path]);
+    else setQuickView(path);
+  }
+  createEffect(() => explorer.setShowAllFiles(settings.showAllFiles));
+
   // ---------- Images ----------
   /** Inserts image links at the cursor, each on its own line when the line already has text. */
   function insertImageLinks(links: (string | null)[]) {
@@ -358,6 +369,7 @@ export default function App(props: { platform: Platform }) {
     onRenamed: (from, to) => docs.renamePaths(from, to),
     onTrashed: (path) => docs.closeWithin(path),
     openFile: (path) => void docs.openPaths([path]),
+    onShowAllFiles: (on) => update({ showAllFiles: on }),
   });
 
   // ---------- Sidebar and outline ----------
@@ -1364,7 +1376,10 @@ export default function App(props: { platform: Platform }) {
       const rest = paths.filter((p) => !isImagePath(p));
       if (images.length && activeDoc() && showsEditor(mode())) void insertImagePaths(images);
       else rest.push(...images);
-      if (rest.length) void docs.openPaths(rest);
+      const notes = rest.filter((p) => fileKind(p) === 'note');
+      if (notes.length) void docs.openPaths(notes);
+      const other = rest.find((p) => fileKind(p) !== 'note');
+      if (other && !notes.length) setQuickView(other);
     });
     platform.onOpenPaths((paths) => void docs.openPaths(paths));
     platform.onBroadcast('spaces', async () => {
@@ -1443,6 +1458,7 @@ export default function App(props: { platform: Platform }) {
           }
           if (ui === 'spaces') document.querySelector<HTMLButtonElement>('.space-switcher')?.click();
           if (ui === 'pro') setProDialog({ feature: 'customColors' });
+          if (ui.startsWith('qv:')) setQuickView(ui.slice(3));
           if (ui === 'search') {
             registry.run('view.search');
             setTimeout(() => {
@@ -1510,7 +1526,8 @@ export default function App(props: { platform: Platform }) {
             width={sidebar.width}
             explorer={explorer}
             activePath={activeDoc()?.path ?? null}
-            openFile={(p) => void docs.openPaths([p])}
+            openFile={(p) => openFileOrView(p)}
+            quickView={(p) => setQuickView(p)}
             openMenu={menu.open}
             openMenuAt={menu.openAt}
             revealLabel={revealLabel}
@@ -1679,6 +1696,20 @@ export default function App(props: { platform: Platform }) {
       </Show>
       <Show when={proDialog()}>
         {(d) => <ProDialog pro={pro} feature={d().feature} openExternal={(u) => void platform.openExternal(u)} onClose={() => setProDialog(null)} />}
+      </Show>
+      <Show when={quickView()}>
+        {(p) => (
+          <QuickView
+            path={p()}
+            assetUrl={(x) => platform.assetUrl(x)}
+            readText={(x) => platform.readTextFile(x).then((r) => r.text)}
+            stat={(x) => platform.stat(x)}
+            openWithDefault={(x) => void platform.openPath(x).catch((e) => notify(String(e)))}
+            reveal={(x) => void platform.revealPath(x).catch((e) => notify(String(e)))}
+            revealLabel={revealLabel}
+            onClose={() => setQuickView(null)}
+          />
+        )}
       </Show>
       <ConfirmDialog />
       <menu.ContextMenuHost />

@@ -1530,3 +1530,120 @@ button {
 .check-row .pro-badge {
   margin-left: 6px;
 }
+
+/* ---------- Quick view ---------- */
+.quickview-backdrop {
+  padding: 32px;
+}
+.quickview {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: min(86vh, 100%);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: rise-in var(--dur) var(--ease);
+}
+.quickview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.quickview-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.quickview-title strong {
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quickview-title span {
+  color: var(--fg-faint);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quickview-close {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+.quickview-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+.qv-image-wrap {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: repeating-conic-gradient(var(--surface) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px;
+}
+.qv-image-wrap img {
+  max-width: 100%;
+  max-height: calc(86vh - 110px);
+  cursor: zoom-in;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+.qv-image-wrap.zoom {
+  place-items: start;
+}
+.qv-image-wrap.zoom img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+.qv-pdf {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.qv-code {
+  margin: 0;
+  padding: 16px 20px;
+  font: 13px/1.6 var(--font-mono);
+  color: var(--fg);
+  white-space: pre;
+  tab-size: 4;
+}
+.qv-table-wrap.md-body {
+  max-width: none;
+  margin: 0;
+  padding: 16px 20px;
+  font-size: 14px;
+}
+.qv-table-wrap table {
+  display: table;
+  width: auto;
+}
+.qv-card {
+  padding: 48px 24px;
+  text-align: center;
+}
+.qv-note {
+  color: var(--fg-muted);
+  padding: 0 20px;
+}
+.qv-code-wrap.md-body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.qv-code-wrap.md-body pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}

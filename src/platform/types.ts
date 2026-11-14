@@ -60,6 +60,8 @@ export interface Platform {
   /** Moves to the OS trash. Never deletes permanently. */
   trashPath(path: string): Promise<void>;
   revealPath(path: string): Promise<void>;
+  /** Opens a file with the app the OS associates with it. */
+  openPath(path: string): Promise<void>;
 
   openFileDialog(): Promise<string[]>;
   /** Pick image files (Insert Image from File…). */

@@ -27,7 +27,15 @@ export async function preloadLanguages(markdown: string): Promise<void> {
  */
 export function highlightToHtml(code: string, lang: string, onLoaded?: () => void): string {
   if (!lang) return escapeHtml(code);
-  const desc = LanguageDescription.matchLanguageName(languages, lang, true);
+  return highlightWith(LanguageDescription.matchLanguageName(languages, lang, true), code, onLoaded);
+}
+
+/** Like highlightToHtml, choosing the grammar from a file name ("config.yaml", "main.rs"). */
+export function highlightFileToHtml(code: string, fileName: string, onLoaded?: () => void): string {
+  return highlightWith(LanguageDescription.matchFilename(languages, fileName.replace(/^.*[\\/]/, '')), code, onLoaded);
+}
+
+function highlightWith(desc: LanguageDescription | null, code: string, onLoaded?: () => void): string {
   if (!desc) return escapeHtml(code);
 
   if (!desc.support) {

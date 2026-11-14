@@ -17,6 +17,7 @@
     "dialog:allow-ask",
     "opener:allow-open-url",
     "opener:allow-reveal-item-in-dir",
+    { "identifier": "opener:allow-open-path", "allow": [{ "path": "**" }] },
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-write-html"

@@ -43,6 +43,8 @@ export interface Settings {
   /** Text zoom for the editor and preview (Mod+= / Mod+-). */
   fontScale: number;
   fontFamily: FontChoice;
+  /** The file list shows every file (notes first-class, others dimmed), or notes only. */
+  showAllFiles: boolean;
   /** Where pasted and dropped images are saved (links are always relative). */
   imageFolder: ImageFolderMode;
   spellcheck: boolean;
@@ -117,6 +119,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontScale: 1,
   fontFamily: 'style',
   imageFolder: 'document',
+  showAllFiles: true,
   spellcheck: true,
   spellLang: 'auto',
 };
@@ -169,6 +172,7 @@ export function parseSettings(raw: string | null): Settings {
     if (typeof s.slashCommands === 'boolean') out.slashCommands = s.slashCommands;
     if (typeof s.fontScale === 'number' && s.fontScale >= 0.7 && s.fontScale <= 1.8) out.fontScale = s.fontScale;
     if (s.imageFolder === 'document' || s.imageFolder === 'root') out.imageFolder = s.imageFolder;
+    if (typeof s.showAllFiles === 'boolean') out.showAllFiles = s.showAllFiles;
     if ((FONT_CHOICES as readonly string[]).includes(s.fontFamily as string)) out.fontFamily = s.fontFamily!;
     if (typeof s.spellcheck === 'boolean') out.spellcheck = s.spellcheck;
     if (typeof s.spellLang === 'string' && /^(auto|[a-z]{2,3}(-[A-Z]{2})?)$/.test(s.spellLang)) out.spellLang = s.spellLang;

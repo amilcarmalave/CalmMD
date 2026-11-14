@@ -161,6 +161,7 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async printPdf() {
       throw new Error('NO_BROWSER');
     },
+    async openPath() {},
     async readImageDataUrl(path) {
       const text = store.getItem('fs:' + path);
       if (text === null) throw new Error('File not found');

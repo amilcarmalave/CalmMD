@@ -4,7 +4,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type { SearchHit } from '../core/search';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
 
@@ -85,6 +85,7 @@ export function createTauriPlatform(): Platform {
     renamePath: (from, to) => invoke<void>('rename_path', { from, to }),
     trashPath: (path) => invoke<void>('trash_path', { path }),
     revealPath: (path) => revealItemInDir(path),
+    openPath: (path) => openPath(path),
 
     async openFolderDialog() {
       const picked = await open({ directory: true, multiple: false });

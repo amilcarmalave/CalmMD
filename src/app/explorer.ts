@@ -23,6 +23,8 @@ export interface ExplorerDeps {
   onRenamed: (from: string, to: string) => void;
   onTrashed: (path: string) => void;
   openFile: (path: string) => void;
+  /** Called when the user switches between all files and notes only (the app persists it). */
+  onShowAllFiles?: (on: boolean) => void;
 }
 
 const FAVORITES_KEY = 'favorites';
@@ -66,7 +68,7 @@ export function createExplorer(deps: ExplorerDeps) {
     showAllFiles: boolean;
     /** Recently opened root folders (all windows), most recent first. */
     recent: string[];
-  }>({ root: null, entries: {}, expanded: {}, favorites: [], editing: null, showAllFiles: false, recent: [] });
+  }>({ root: null, entries: {}, expanded: {}, favorites: [], editing: null, showAllFiles: true, recent: [] });
 
   let fileCache: { root: string; files: Promise<string[]> } | null = null;
 
@@ -327,7 +329,10 @@ export function createExplorer(deps: ExplorerDeps) {
     rename,
     trash,
     setEditing: (e: Editing) => setState('editing', e),
-    setShowAllFiles: (on: boolean) => setState('showAllFiles', on),
+    setShowAllFiles: (on: boolean) => {
+      setState('showAllFiles', on);
+      deps.onShowAllFiles?.(on);
+    },
     expandedList: () =>
       Object.entries(unwrap(state.expanded))
         .filter(([, open]) => open)
