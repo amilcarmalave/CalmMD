@@ -8,8 +8,10 @@
 A beautiful, open-source Markdown editor for macOS, Windows and Linux. It has power features and stays quiet.</p>
 
 <p align="center">
+  <a href="https://amilcarmalave.github.io/CalmMD/">Website</a> ·
   <a href="../../releases/latest">Download</a> ·
   <a href="#features">Features</a> ·
+  <a href="#supporter-extras">Supporter extras</a> ·
   <a href="#building-from-source">Build from source</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -24,7 +26,7 @@ Format, Tools), and also in the toolbar, the command palette, the right-click me
 select text, and `/` commands.
 
 - **Live mode** renders Markdown as you type. The syntax comes back only where your cursor is, and
-  lines never jump when it does.
+  lines never jump when it does. Enter starts a new paragraph, so the file reads the same on GitHub.
 - **Split view with scroll sync that's actually accurate.** Every rendered block is mapped to its
   source lines and interpolated in between, so images, tables and code stay aligned in both directions.
 - **PDFs worth sending.** Page numbers, running headers, a table of contents with real page numbers,
@@ -38,8 +40,9 @@ select text, and `/` commands.
 |---|---|
 | **Four views** | Source · Live · Split · Preview (`Ctrl/⌘+E` to cycle) |
 | **Writing** | GFM tables, task lists, footnotes, `==highlight==`, sub/superscript, GitHub-style callouts, front matter, inline and block HTML, KaTeX math, Mermaid diagrams, syntax-highlighted code, video embeds |
-| **Images** | Paste or drop images: they're saved in an `assets` folder next to the document (or in the folder root) and linked relatively, so the folder can be moved or shared |
-| **Files** | File explorer with a folder switcher (recent folders, go up), favorites for files and folders, outline, tabs that come back after a restart |
+| **Images** | Paste or drop images: they're saved in an `assets` folder next to the document (or in the folder root) and linked relatively, so the folder can be moved or shared. Drag the corner to resize, align left, center or right; both are stored in standard Markdown (`![Photo\|300\|center](photo.png)`) |
+| **Files** | File explorer with every file in the folder (notes first, others open in a Quick view for images, PDFs, CSV and code), a folder switcher, favorites, outline, tabs that come back after a restart |
+| **Links and search** | Search in folder (`Ctrl/⌘+Shift+F`), links between notes with a `[[` picker, `[[Wiki links]]`, and "Linked from" for the open note |
 | **Spaces** | Save a window (folder, tabs, layout, view mode) as a Space; switch from the top of the sidebar or with `Ctrl/⌘+Alt+O`; open Spaces in their own windows |
 | **Finding things** | Command palette (`Ctrl/⌘+Shift+P`), go to file (`Ctrl/⌘+P`), line (`:`), heading (`@`) |
 | **Editing help** | Adaptive right-click menus (links, images, code, tables), selection bubble, `/` block menu, table editing with auto-aligned columns |
@@ -105,6 +108,21 @@ Themes apply to the preview, Live mode and every export.
 | Toggle task | `Mod+Enter` | Switch Space | `Mod+Alt+O` |
 | Highlight | `Mod+Shift+M` | All shortcuts | `F1` |
 
+## Supporter extras
+
+CalmMD is free, and everything needed to write, organise and share stays free. A one-time **$6
+Supporter** payment helps the project and unlocks some thank-you extras:
+
+- **File history**: earlier versions of each file, saved when you close it or when you ask, with a
+  side-by-side comparison and one-click restore. Versions stay on your computer, never in your folders.
+- **Any colour** for highlights and text, beyond the 12 included
+- **PDF cover page** and **PDF templates** (Report, Academic, Minimal)
+- **Five more colour themes**: Rosé, Parchment, Fjord, Nightshade and Forest
+- **Share bundles**: a document with its images as one file or a .zip
+
+Supporter keys work offline and on up to three of your devices. See the [website](https://amilcarmalave.github.io/CalmMD/)
+for details.
+
 ## Download
 
 Get the latest build for your platform from [Releases](../../releases/latest):
@@ -113,6 +131,7 @@ Get the latest build for your platform from [Releases](../../releases/latest):
 - **macOS**: `.dmg` (Apple silicon and Intel)
 - **Linux**: `.AppImage`, `.deb` or `.rpm`
 
+> The first public release is on its way. Until then, build from source (below).
 > Builds are currently unsigned, so your OS may warn the first time you open CalmMD.
 
 ## Building from source
@@ -131,7 +150,9 @@ handy for UI work. Add `?demo` to the URL for a showcase document.
 
 ## Privacy
 
-CalmMD makes no network requests of its own: no telemetry, update pings or accounts. Remote images in
+CalmMD makes no network requests of its own: no telemetry, update pings or accounts. The one exception
+is a Supporter key, which is checked with the store (Lemon Squeezy) when you activate it and about once a
+month after; nothing about your documents is sent. Remote images in
 your documents load as you'd expect. Video embeds stay inert until you click them, and then use
 YouTube's privacy-enhanced domain.
 
