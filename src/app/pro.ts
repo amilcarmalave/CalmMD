@@ -15,8 +15,9 @@ export const PRO_FEATURES: Record<string, { title: string; detail: string; soon?
   pdfTemplates: { title: 'PDF templates', detail: 'Report, Academic and Minimal page designs for exported PDFs.' },
   premiumThemes: { title: 'Extra themes', detail: 'Five more colour themes: Rosé, Parchment, Fjord, Nightshade and Forest.' },
   shareBundles: { title: 'Share bundles', detail: 'Share a document with its images as one file or a .zip.' },
+  fileHistory: { title: 'File history', detail: 'Earlier versions of each file, saved when you close it or when you ask. Compare and restore.' },
 };
-export type ProFeature = 'customColors' | 'pdfCover' | 'pdfTemplates' | 'premiumThemes' | 'shareBundles';
+export type ProFeature = 'customColors' | 'pdfCover' | 'pdfTemplates' | 'premiumThemes' | 'shareBundles' | 'fileHistory';
 
 const KEY = 'license';
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));

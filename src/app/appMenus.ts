@@ -46,6 +46,8 @@ export function appMenus(c: MenuContext): TopMenu[] {
       sep,
       cmd('file.save'),
       cmd('file.saveAs'),
+      proItem(c, 'history.save', 'Save Version…'),
+      cmd('history.show'),
       sep,
       sub('Share', () => [
         proItem(c, 'share.zip', 'As .zip with Images…'),

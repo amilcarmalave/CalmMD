@@ -3,7 +3,7 @@
  * folders, and the sidebar layout. M6 wraps this into named Spaces.
  */
 
-export type SidebarView = 'files' | 'outline' | 'search';
+export type SidebarView = 'files' | 'outline' | 'search' | 'history';
 
 export interface SessionTab {
   /** A file on disk. */
@@ -65,7 +65,7 @@ export function parseSession(raw: string | null): Session {
     expanded: Array.isArray(s.expanded) ? s.expanded.filter((e): e is string => typeof e === 'string') : [],
     sidebar: {
       open: typeof sb.open === 'boolean' ? sb.open : DEFAULT_SESSION.sidebar.open,
-      view: sb.view === 'outline' || sb.view === 'search' ? sb.view : 'files',
+      view: sb.view === 'outline' || sb.view === 'search' || sb.view === 'history' ? sb.view : 'files',
       width: Math.min(480, Math.max(180, num(sb.width, DEFAULT_SESSION.sidebar.width))),
     },
     ...(s.viewMode && ['source', 'live', 'split', 'preview'].includes(s.viewMode) ? { viewMode: s.viewMode } : {}),

@@ -55,10 +55,12 @@ export function isMarkdownPath(p: string): boolean {
 
 /** Compares paths the way the OS would, case-insensitively for Windows-style paths. */
 export function samePath(a: string, b: string): boolean {
-  const norm = (p: string) => {
-    const windowsish = /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
-    const s = p.replace(/\\/g, '/').replace(/\/+$/, '');
-    return windowsish ? s.toLowerCase() : s;
-  };
-  return norm(a) === norm(b);
+  return pathKey(a) === pathKey(b);
+}
+
+/** A path in a form that's equal for every spelling of the same file (forward slashes; lowercase on Windows). */
+export function pathKey(p: string): string {
+  const windowsish = /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\');
+  const s = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  return windowsish ? s.toLowerCase() : s;
 }

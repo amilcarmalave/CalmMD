@@ -36,6 +36,10 @@ import { linksTo, parseWiki, resolveWiki, type Backlink } from './core/noteLinks
 import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
+import { HistoryPanel, versionTime } from './ui/HistoryPanel';
+import { VersionView } from './ui/VersionView';
+import { createHistory, type Version } from './app/history';
+import { minimalChange } from './core/text';
 import { fileKind } from './core/fileKinds';
 import welcomeText from './assets/welcome.md?raw';
 import guideText from './assets/markdown-guide.md?raw';
@@ -350,6 +354,7 @@ export default function App(props: { platform: Platform }) {
     notify,
     draftOwner,
     beforeSaveAs: (text, from, to) => assets.relocate(text, from, to),
+    onClosing: (path, opened, current) => captureOnClose(path, opened, current),
   });
   const store = docs.store;
   const activeDoc = createMemo(() => store.docs.find((d) => d.id === store.activeId));
@@ -366,7 +371,10 @@ export default function App(props: { platform: Platform }) {
     platform,
     confirm,
     notify,
-    onRenamed: (from, to) => docs.renamePaths(from, to),
+    onRenamed: (from, to) => {
+      docs.renamePaths(from, to);
+      void history.rename(from, to).then(() => setHistoryRev((n) => n + 1));
+    },
     onTrashed: (path) => docs.closeWithin(path),
     openFile: (path) => void docs.openPaths([path]),
     onShowAllFiles: (on) => update({ showAllFiles: on }),
@@ -682,6 +690,89 @@ export default function App(props: { platform: Platform }) {
   };
   registry.register([{ id: 'help.pro', title: 'Become a Supporter…', category: 'Help', run: () => setProDialog({}) }]);
 
+  // ---------- File history (Pro) ----------
+  const history = createHistory({ platform });
+  const [historyRev, setHistoryRev] = createSignal(0);
+  const [versionView, setVersionView] = createSignal<{ path: string; version: Version; text: string } | null>(null);
+
+  /** A changed file closed: keep how it was when opened (if that's new) and how it is now. */
+  async function captureOnClose(path: string, opened: string, current: string) {
+    if (!pro.isPro() || !settings.historyOnClose) return;
+    if (opened.trim()) await history.save(path, opened);
+    await history.save(path, current);
+    setHistoryRev((n) => n + 1);
+  }
+
+  async function saveVersion() {
+    const d = activeDoc();
+    if (!requirePro('fileHistory') || !d || !view) return;
+    if (!d.path) {
+      notify('Save this document to a file first');
+      return;
+    }
+    const path = d.path;
+    const name = await prompt({
+      title: 'Save Version',
+      message: 'Keep the current text in this file’s history. A name is optional; named versions are never removed automatically.',
+      placeholder: 'For example: Sent to Sam',
+      primary: 'Save Version',
+      allowEmpty: true,
+    });
+    if (name === null) return;
+    const v = await history.save(path, view.state.doc.toString(), name || null).catch((e) => {
+      notify(`Couldn’t save the version: ${e instanceof Error ? e.message : String(e)}`);
+      return undefined;
+    });
+    if (v === undefined) return;
+    setHistoryRev((n) => n + 1);
+    notify(v ? 'Version saved' : 'Nothing changed since the last version');
+  }
+
+  async function openVersion(path: string, version: Version) {
+    const text = await history.read(path, version.id);
+    if (text === null) {
+      notify('That version couldn’t be read');
+      setHistoryRev((n) => n + 1);
+      return;
+    }
+    setVersionView({ path, version, text });
+  }
+
+  async function restoreVersion() {
+    const vv = versionView();
+    const d = activeDoc();
+    if (!vv || !view || !d?.path || !samePath(d.path, vv.path)) return;
+    const current = view.state.doc.toString();
+    // Nothing is lost: the text being replaced becomes a version first.
+    await history.save(vv.path, current);
+    const change = minimalChange(current, vv.text);
+    if (change) view.dispatch({ changes: change, userEvent: 'input.restore', scrollIntoView: true });
+    setVersionView(null);
+    setHistoryRev((n) => n + 1);
+    notify(`Restored the version from ${versionTime(vv.version.savedAt)}. Undo brings your text back.`);
+    view.focus();
+  }
+
+  async function deleteVersion() {
+    const vv = versionView();
+    if (!vv) return;
+    const choice = await confirm({
+      title: 'Delete this version?',
+      message: `“${vv.version.name ?? versionTime(vv.version.savedAt)}” will be removed from this file’s history. This can’t be undone.`,
+      primary: 'Delete Version',
+      destructive: 'primary',
+    });
+    if (choice !== 'primary') return;
+    await history.remove(vv.path, vv.version.id);
+    setVersionView(null);
+    setHistoryRev((n) => n + 1);
+  }
+
+  registry.register([
+    { id: 'history.save', title: 'Save Version…', category: 'File', run: () => void saveVersion() },
+    { id: 'history.show', title: 'Show File History', category: 'File', run: () => setSidebar({ open: true, view: 'history' }) },
+  ]);
+
   // ---------- Share bundles (Pro) ----------
   const dataUrlBytes = (url: string) => {
     const b64 = url.slice(url.indexOf(',') + 1);
@@ -915,6 +1006,7 @@ export default function App(props: { platform: Platform }) {
 
   /** Leaves the current Space or session (everything is saved) and clears the window. */
   async function leaveCurrent() {
+    await docs.takeClosingVersions();
     await docs.flushAll();
     await flushSession();
     sessionReady = false; // nothing saves while the window is between sessions
@@ -1368,6 +1460,7 @@ export default function App(props: { platform: Platform }) {
     });
 
     platform.onCloseRequested(async () => {
+      await docs.takeClosingVersions();
       await Promise.all([docs.flushAll(), flushSettings(), flushSession()]);
     });
     platform.onFileDrop((paths) => {
@@ -1549,6 +1642,19 @@ export default function App(props: { platform: Platform }) {
                 focusRequest={searchFocus()}
               />
             }
+            historyPanel={
+              <HistoryPanel
+                path={activeDoc()?.path ?? null}
+                isPro={pro.isPro()}
+                revision={historyRev()}
+                list={(p) => history.list(p)}
+                onSave={() => void saveVersion()}
+                onOpen={(v) => activeDoc()?.path && void openVersion(activeDoc()!.path!, v)}
+                saveOnClose={settings.historyOnClose}
+                setSaveOnClose={(on) => update({ historyOnClose: on })}
+                onSupporter={() => setProDialog({ feature: 'fileHistory' })}
+              />
+            }
             recentSpaces={recentSpaces()}
             onOpenSpace={(id) => void switchSpace(id)}
           />
@@ -1696,6 +1802,19 @@ export default function App(props: { platform: Platform }) {
       </Show>
       <Show when={proDialog()}>
         {(d) => <ProDialog pro={pro} feature={d().feature} openExternal={(u) => void platform.openExternal(u)} onClose={() => setProDialog(null)} />}
+      </Show>
+      <Show when={versionView()}>
+        {(vv) => (
+          <VersionView
+            path={vv().path}
+            version={vv().version}
+            versionText={vv().text}
+            currentText={view?.state.doc.toString() ?? ''}
+            onRestore={() => void restoreVersion()}
+            onDelete={() => void deleteVersion()}
+            onClose={() => setVersionView(null)}
+          />
+        )}
       </Show>
       <Show when={quickView()}>
         {(p) => (

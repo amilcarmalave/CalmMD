@@ -38,6 +38,8 @@ export interface SidebarProps {
   onBacklink: (b: Backlink) => void;
   /** The Search tab's content (built by the app, which owns the search). */
   searchPanel: JSX.Element;
+  /** The History tab's content (versions of the active file). */
+  historyPanel: JSX.Element;
 }
 
 /** Opens a menu just below the element that was clicked. */
@@ -73,6 +75,9 @@ export function Sidebar(props: SidebarProps) {
           <button role="tab" aria-selected={props.view === 'search'} classList={{ active: props.view === 'search' }} onClick={() => props.setView('search')}>
             Search
           </button>
+          <button role="tab" aria-selected={props.view === 'history'} classList={{ active: props.view === 'history' }} onClick={() => props.setView('history')}>
+            History
+          </button>
         </div>
       </div>
       <div class="sidebar-body">
@@ -86,6 +91,7 @@ export function Sidebar(props: SidebarProps) {
         <Show when={props.view === 'outline'}>
           <Outline {...props} />
         </Show>
+        <Show when={props.view === 'history'}>{props.historyPanel}</Show>
       </div>
     </aside>
   );

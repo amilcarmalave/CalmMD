@@ -12,6 +12,8 @@ export interface PromptRequest {
   value?: string;
   placeholder?: string;
   primary: string;
+  /** An empty answer is allowed and resolves to "" (cancel is still null). */
+  allowEmpty?: boolean;
 }
 
 interface PendingPrompt extends PromptRequest {
@@ -120,7 +122,7 @@ function PromptView(props: { req: PendingPrompt; answer: (v: string | null) => v
   });
   const submit = () => {
     const v = input.value.trim();
-    props.answer(v ? v : null);
+    props.answer(v ? v : props.req.allowEmpty ? '' : null);
   };
 
   return (

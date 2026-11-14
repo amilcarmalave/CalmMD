@@ -22,6 +22,45 @@ function setup(files: Record<string, string> = {}, opts: { confirm?: ConfirmChoi
   return { platform, docs, notify, type };
 }
 
+describe('documents: handing closed files to file history', () => {
+  const withHistory = (files: Record<string, string>) => {
+    const calls: [string, string, string][] = [];
+    const platform = createMemoryPlatform({ files });
+    const docs = createDocuments({
+      platform,
+      makeState: (text) => EditorState.create({ doc: text }),
+      confirm: async () => 'cancel',
+      notify: () => {},
+      autosaveIdleMs: 10,
+      onClosing: async (path, opened, current) => void calls.push([path, opened, current]),
+    });
+    const type = (id: string, insert: string) => {
+      docs.syncState(id, EditorState.create({ doc: docs.textOf(id) + insert }));
+      docs.touch(id);
+    };
+    return { docs, calls, type };
+  };
+
+  it('reports a changed file when its tab closes, with the text as opened and as closed', async () => {
+    const { docs, calls, type } = withHistory({ '/a.md': 'one', '/b.md': 'two' });
+    await docs.openPaths(['/a.md', '/b.md']);
+    const [a, b] = docs.store.docs.map((d) => d.id);
+    type(a, '!');
+    await docs.close(a);
+    await docs.close(b);
+    expect(calls).toEqual([['/a.md', 'one', 'one!']]);
+  });
+
+  it('reports every changed file once when the window closes', async () => {
+    const { docs, calls, type } = withHistory({ '/a.md': 'one' });
+    await docs.openPaths(['/a.md']);
+    type(docs.store.activeId!, '!');
+    await docs.takeClosingVersions();
+    await docs.takeClosingVersions();
+    expect(calls).toEqual([['/a.md', 'one', 'one!']]);
+  });
+});
+
 describe('documents', () => {
   it('starts with one empty untitled document', async () => {
     const { docs } = setup();

@@ -51,6 +51,11 @@ export interface DocumentsDeps {
    * for example to move pasted images next to the new file. Resolves to the new text or null.
    */
   beforeSaveAs?: (text: string, from: string | null, to: string) => Promise<string | null>;
+  /**
+   * A file is closing (its tab, or every tab via `takeClosingVersions`): its text when it was
+   * opened and now, for file history. Only called when the two differ.
+   */
+  onClosing?: (path: string, opened: string, current: string) => Promise<void>;
 }
 
 const DRAFT_PREFIX = 'draft/';
@@ -71,6 +76,8 @@ interface DocRuntime {
   scrollTop: number | null;
   /** Line at the top of the viewport, which is what survives a restart. */
   topLine: number;
+  /** The text as opened (or as last handed to file history). */
+  openedText: string;
 }
 
 export function docName(d: Pick<DocMeta, 'path' | 'untitledIndex'>): string {
@@ -179,7 +186,7 @@ export function createDocuments(deps: DocumentsDeps) {
     });
     let state = deps.makeState(init.text);
     if (init.cursor) state = state.update({ selection: { anchor: Math.min(init.cursor, state.doc.length) } }).state;
-    runtime.set(id, { state, autosaver, scrollTop: null, topLine: init.topLine ?? 0 });
+    runtime.set(id, { state, autosaver, scrollTop: null, topLine: init.topLine ?? 0, openedText: init.text });
     // Insert right after the active tab, like browsers do.
     const at = store.activeId ? store.docs.findIndex((d) => d.id === store.activeId) + 1 : store.docs.length;
     setStore('docs', (docs) => [...docs.slice(0, at), meta, ...docs.slice(at)]);
@@ -338,8 +345,24 @@ export function createDocuments(deps: DocumentsDeps) {
       });
       if (choice !== 'secondary') return false;
     }
+    const closing = find(id);
+    const current = textOf(id);
+    if (closing?.path && current !== r.openedText) await deps.onClosing?.(closing.path, r.openedText, current).catch(() => undefined);
     discard(id);
     return true;
+  }
+
+  /** Every open file whose text changed since it was opened (quitting, switching Spaces); marks them as handed over. */
+  async function takeClosingVersions() {
+    for (const d of store.docs) {
+      const r = runtime.get(d.id);
+      if (!d.path || !r) continue;
+      const current = d.id === store.activeId && view ? view.state.doc.toString() : r.state.doc.toString();
+      if (current === r.openedText) continue;
+      const opened = r.openedText;
+      r.openedText = current;
+      await deps.onClosing?.(d.path, opened, current).catch(() => undefined);
+    }
   }
 
   async function resolveConflict(id: string): Promise<boolean> {
@@ -376,6 +399,7 @@ export function createDocuments(deps: DocumentsDeps) {
       const { text: raw, mtimeMs } = await platform.readTextFile(meta.path);
       const decoded = decodeFromDisk(raw);
       replaceContent(id, decoded.text);
+      runtime.get(id)!.openedText = decoded.text;
       patch(id, { conflict: false, mtimeMs, eol: decoded.eol, bom: decoded.bom });
       runtime.get(id)!.autosaver.markSaved();
       await platform.kvDelete(draftKey(id));
@@ -551,6 +575,7 @@ export function createDocuments(deps: DocumentsDeps) {
     loadTheirs,
     checkExternalChanges,
     flushAll,
+    takeClosingVersions,
     restore,
     snapshot,
     renamePaths,
