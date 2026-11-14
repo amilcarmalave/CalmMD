@@ -64,6 +64,13 @@ describe('setHeading', () => {
 });
 
 describe('toggleLineKind', () => {
+  it('puts the cursor after a new marker, so typing goes into the item', () => {
+    expect(apply('‸', (s) => toggleLineKind(s, 'bullet'))).toBe('- ‸');
+    expect(apply('‸', (s) => toggleLineKind(s, 'task'))).toBe('- [ ] ‸');
+    expect(apply('‸one', (s) => toggleLineKind(s, 'ordered'))).toBe('1. ‸one');
+    expect(apply('‸', (s) => toggleLineKind(s, 'quote'))).toBe('> ‸');
+    expect(apply('‸', (s) => setHeading(s, 2))).toBe('## ‸');
+  });
   it('adds and removes bullets across lines', () => {
     expect(apply('[one\ntwo]', (s) => toggleLineKind(s, 'bullet'))).toBe('- [one\n- two]');
     expect(apply('[- one\n- two]', (s) => toggleLineKind(s, 'bullet'))).toBe('[one\ntwo]');

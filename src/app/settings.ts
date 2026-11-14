@@ -12,6 +12,12 @@ export type DocStyle = (typeof DOC_STYLES)[number];
 export type PreviewTheme = DocStyle | `user:${string}`;
 export type ColorScheme = 'system' | 'light' | 'dark';
 /** Reading font: the document style's own, or one of these for every style. */
+/** How wide the text column is (the side margins follow). */
+export const TEXT_WIDTHS = ['narrow', 'standard', 'wide', 'full'] as const;
+export type TextWidth = (typeof TEXT_WIDTHS)[number];
+/** Multiplier on the document style's own measure. Full is clamped by the minimum margins. */
+export const TEXT_WIDTH_SCALE: Record<TextWidth, number> = { narrow: 0.85, standard: 1, wide: 1.3, full: 100 };
+
 export const FONT_CHOICES = ['style', 'sans', 'serif', 'mono', 'system'] as const;
 export type FontChoice = (typeof FONT_CHOICES)[number];
 
@@ -43,6 +49,7 @@ export interface Settings {
   /** Text zoom for the editor and preview (Mod+= / Mod+-). */
   fontScale: number;
   fontFamily: FontChoice;
+  textWidth: TextWidth;
   /** The file list shows every file (notes first-class, others dimmed), or notes only. */
   showAllFiles: boolean;
   /** File history (Supporter): save a version when a changed file closes. Off = only Save Version. */
@@ -120,6 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   slashCommands: true,
   fontScale: 1,
   fontFamily: 'style',
+  textWidth: 'standard',
   imageFolder: 'document',
   showAllFiles: true,
   historyOnClose: true,
@@ -178,6 +186,7 @@ export function parseSettings(raw: string | null): Settings {
     if (typeof s.showAllFiles === 'boolean') out.showAllFiles = s.showAllFiles;
     if (typeof s.historyOnClose === 'boolean') out.historyOnClose = s.historyOnClose;
     if ((FONT_CHOICES as readonly string[]).includes(s.fontFamily as string)) out.fontFamily = s.fontFamily!;
+    if ((TEXT_WIDTHS as readonly string[]).includes(s.textWidth as string)) out.textWidth = s.textWidth!;
     if (typeof s.spellcheck === 'boolean') out.spellcheck = s.spellcheck;
     if (typeof s.spellLang === 'string' && /^(auto|[a-z]{2,3}(-[A-Z]{2})?)$/.test(s.spellLang)) out.spellLang = s.spellLang;
   } catch {

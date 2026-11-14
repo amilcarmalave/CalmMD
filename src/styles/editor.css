@@ -11,7 +11,7 @@
   container-type: inline-size;
 }
 .pane-editor .cm-content {
-  --pad: max(28px, calc((100cqw - var(--measure)) / 2));
+  --pad: max(28px, calc((100cqw - var(--measure) * var(--measure-scale, 1)) / 2));
 }
 .pane-editor .cm-editor .cm-line {
   padding: 0 var(--pad);
@@ -21,7 +21,7 @@
     --pad: 28px;
   }
   .pane-editor .cm-editor .cm-line {
-    padding: 0 max(28px, calc((100% - var(--measure)) / 2));
+    padding: 0 max(28px, calc((100% - var(--measure) * var(--measure-scale, 1)) / 2));
   }
 }
 
@@ -40,6 +40,11 @@
 .pane-editor .cm-live .cm-content {
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
+}
+
+/* A blank line between paragraphs: the preview's paragraph gap, not a whole empty line. */
+.pane-editor .cm-live .cm-line.cm-live-gap {
+  line-height: var(--md-gap, 1em);
 }
 
 .pane-editor .cm-live .cm-line.cm-live-heading {

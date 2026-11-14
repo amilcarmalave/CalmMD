@@ -122,6 +122,16 @@ src-tauri/
 - **Files must read the same on GitHub.** Never render single newlines as breaks. Instead Enter in a top-level
   paragraph writes a blank line and Shift+Enter a trailing `\` hard break (`editor/paragraphs.ts`, Live mode only;
   lists, quotes and code keep the usual Enter). The analyzer hides the backslash of a `HardBreak`.
+  Live mode draws a blank line between top-level blocks at the preview's paragraph gap (`cm-live-gap`, full height
+  under the cursor), so Enter doesn't look like an empty line.
+- **Line prefixes move the cursor.** Headings, lists and quotes (`editor/format.ts`) map the selection with assoc 1,
+  so a cursor at the start of the line ends up after the new marker.
+- **.txt files are plain text.** `isPlainTextPath`: the tab shows in Source mode with no Markdown language
+  (a per-state compartment), no toolbar, and the view switch disabled. The window's chosen mode is kept for other tabs.
+- **Text width** (View → Text Width) scales each document style's measure with `--measure-scale` (editor and preview,
+  not exports).
+- **Saved files appear in the sidebar.** `platform/savedFiles.ts` wraps the platform: a path picked in a save dialog
+  refreshes its folder once written (Save As, exports, share bundles).
 - Measured: 2,201 lines with 200 tables at a 4 ms median and 7 ms max per keystroke, including
   decoration and DOM update.
 

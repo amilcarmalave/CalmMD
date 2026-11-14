@@ -79,7 +79,13 @@ export function setHeading(state: EditorState, level: number): TransactionSpec {
     const prefix = allSame || level === 0 ? '' : '#'.repeat(level) + ' ';
     return { from: l.from, to: l.from + (m ? m[0].length : 0), insert: indent + prefix };
   });
-  return { changes, scrollIntoView: true };
+  return prefixed(state, changes);
+}
+
+/** Line prefix changes, with cursors at the start of a line moved after the new prefix so typing goes into it. */
+function prefixed(state: EditorState, changes: { from: number; to?: number; insert: string }[]): TransactionSpec {
+  const set = state.changes(changes);
+  return { changes: set, selection: state.selection.map(set, 1), scrollIntoView: true };
 }
 
 export type LineKind = 'bullet' | 'ordered' | 'task' | 'quote';
@@ -117,7 +123,7 @@ export function toggleLineKind(state: EditorState, kind: LineKind): TransactionS
     const insert = remove ? indent : indent + prefixOf(kind, i++);
     return { from: l.from, to: l.from + (m ? m[0].length : indent.length), insert };
   });
-  return { changes, scrollIntoView: true };
+  return prefixed(state, changes);
 }
 
 /** `[text](url)`: selects "url" for typing. A selected URL becomes the target with the cursor in the text. */

@@ -30,7 +30,12 @@ export interface EditorExtensionOptions {
   onUpdate: (update: ViewUpdate) => void;
   /** App-provided extensions (command keymap, slash commands). These take precedence. */
   extra?: Extension[];
+  /** Replaces the Markdown language (for example with a compartment holding it). */
+  language?: Extension;
 }
+
+/** GFM base. Fenced code gets language highlighting, and its grammars load lazily. */
+export const markdownSupport: Extension = markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: true, extensions: [mathSyntax, ...syntaxExtras] });
 
 export function editorExtensions(opts: EditorExtensionOptions): Extension[] {
   return [
@@ -44,7 +49,7 @@ export function editorExtensions(opts: EditorExtensionOptions): Extension[] {
     EditorState.allowMultipleSelections.of(true),
     EditorView.lineWrapping,
     // GFM base. Fenced code gets language highlighting, and its grammars load lazily.
-    markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: true, extensions: [mathSyntax, ...syntaxExtras] }),
+    opts.language ?? markdownSupport,
     calmHighlighting,
     search({ top: true }),
     keymap.of([...searchKeymap, ...historyKeymap, indentWithTab, ...defaultKeymap]),

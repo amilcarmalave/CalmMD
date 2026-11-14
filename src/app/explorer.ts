@@ -147,8 +147,13 @@ export function createExplorer(deps: ExplorerDeps) {
     await Promise.all(dirs.map(load));
   }
 
+  /** Reloads one folder if it's loaded, however its path is spelled (a save dialog's path, say). */
   async function refreshDir(dir: string) {
-    if (state.entries[dir]) await load(dir);
+    const key = Object.keys(unwrap(state.entries)).find((k) => samePath(k, dir));
+    if (key) {
+      fileCache = null;
+      await load(key);
+    }
   }
 
   // ---------- Favorites ----------

@@ -53,6 +53,11 @@ export function isMarkdownPath(p: string): boolean {
   return /\.(md|markdown|mdown|mkd|mdx|txt)$/i.test(p);
 }
 
+/** Plain text files: they open as text, without Markdown rendering. */
+export function isPlainTextPath(p: string): boolean {
+  return /.txt$/i.test(p);
+}
+
 /** Compares paths the way the OS would, case-insensitively for Windows-style paths. */
 export function samePath(a: string, b: string): boolean {
   return pathKey(a) === pathKey(b);

@@ -6,6 +6,21 @@ import { mathSyntax } from '../mathSyntax';
 import { syntaxExtras } from '../syntaxExtras';
 import { analyzeBlocks, analyzeInline, type LiveItem } from './analyze';
 
+describe('live mode: paragraph gaps', () => {
+  const gaps = (src: string) =>
+    run(src)
+      .items.filter((i) => i.kind === 'line' && i.cls === 'cm-live-gap')
+      .map((i) => (i as { at: number }).at);
+  it('marks blank lines between blocks, except where the cursor is', () => {
+    expect(gaps('one\n\ntwo\n\nthree‸')).toEqual([4, 9]);
+    expect(gaps('one\n‸\ntwo')).toEqual([]);
+  });
+  it('leaves blank lines inside code and lists alone', () => {
+    expect(gaps('‸```\na\n\nb\n```\nend')).toEqual([]);
+    expect(gaps('‸- a\n\n- b\nend')).toEqual([]);
+  });
+});
+
 describe('live mode: extended syntax', () => {
   const marks = (src: string, cls: string) =>
     run(src).items.filter((i): i is Extract<LiveItem, { kind: 'mark' }> => i.kind === 'mark' && i.cls.includes(cls));
@@ -269,7 +284,7 @@ describe('tables', () => {
   it('shows table source when the cursor is inside', () => {
     const s = state('intro\n\n| a | ‸b |\n|---|---|\n| 1 | 2 |');
     expect(analyzeBlocks(s)).toEqual([]);
-    const lines = analyzeInline(s, 0, s.doc.length).filter((i) => i.kind === 'line');
+    const lines = analyzeInline(s, 0, s.doc.length).filter((i) => i.kind === 'line' && i.cls !== 'cm-live-gap');
     expect(lines).toHaveLength(3);
   });
 });

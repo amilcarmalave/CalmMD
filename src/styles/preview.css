@@ -19,7 +19,7 @@
 }
 
 .md-body {
-  max-width: var(--md-measure);
+  max-width: calc(var(--md-measure) * var(--measure-scale, 1));
   margin: 0 auto;
   padding: 48px 32px 40vh;
   font-family: var(--md-font);

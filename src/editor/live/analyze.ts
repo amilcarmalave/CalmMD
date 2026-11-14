@@ -445,7 +445,24 @@ export function analyzeInline(state: EditorState, from: number, to: number): Liv
     },
   });
   pairInlineHtml(state, htmlTags, out);
+  blankGaps(state, from, to, out);
   return out;
+}
+
+/**
+ * Blank lines between blocks draw as a short paragraph gap, as in the preview, so Enter (which
+ * writes one to start a new paragraph) doesn't leave a full empty line. The line under the cursor
+ * keeps its full height. Blank lines inside code, lists and quotes are left alone.
+ */
+function blankGaps(state: EditorState, from: number, to: number, out: LiveItem[]) {
+  const doc = state.doc;
+  const tree = syntaxTree(state);
+  for (let pos = from; pos <= to; ) {
+    const line = doc.lineAt(pos);
+    if (line.number > 1 && line.number < doc.lines && !line.text.trim() && tree.resolve(line.from, 1).name === 'Document' && !touches(state, line.from, line.to))
+      out.push({ kind: 'line', at: line.from, cls: 'cm-live-gap' });
+    pos = line.to + 1;
+  }
 }
 
 /** <kbd>x</kbd>, <mark>x</mark>, …: hide the tags and style the content, like the preview does. */

@@ -15,7 +15,7 @@ import { createExporter, type ExportPrefs } from './app/exporter';
 import { BUILTIN_THEMES, isBuiltinTheme, loadUserThemes, type UserTheme } from './app/themes';
 import type { BaseTheme } from './export/build';
 import { ExportDialog } from './ui/ExportDialog';
-import { createSettings, SPELL_LANGUAGES, VIEW_MODES, type PreviewTheme, type ViewMode } from './app/settings';
+import { createSettings, SPELL_LANGUAGES, TEXT_WIDTH_SCALE, VIEW_MODES, type PreviewTheme, type ViewMode } from './app/settings';
 import { appMenus } from './app/appMenus';
 import { COLOR_THEMES, type ColorTheme } from './app/colorThemes';
 import { NATIVE_EDIT_ITEMS, resolveMenu, type ResolvedEntry, type TopMenu } from './app/menuModel';
@@ -47,9 +47,10 @@ import { isEmbeddableUrl } from './render/embeds';
 import { BRAND } from './brand';
 import { formatBinding } from './core/keys';
 import { extractHeadings, headingIndexAt, type Heading } from './core/outline';
-import { basename, dirname, isWithin, joinPath, samePath, stem } from './core/paths';
+import { basename, dirname, isPlainTextPath, isWithin, joinPath, samePath, stem } from './core/paths';
+import { notifySavedFiles } from './platform/savedFiles';
 import { countStats, type TextStats } from './core/stats';
-import { editorExtensions, isUserEdit } from './editor/extensions';
+import { editorExtensions, isUserEdit, markdownSupport } from './editor/extensions';
 import { scrollLineToTop } from './editor/geometry';
 import { livePreview, refreshLive } from './editor/live/decorations';
 import { slashCommands, type SlashItem } from './editor/slash';
@@ -72,7 +73,8 @@ const showsEditor = (m: ViewMode) => m !== 'preview';
 const showsPreview = (m: ViewMode) => m === 'split' || m === 'preview';
 
 export default function App(props: { platform: Platform }) {
-  const platform = props.platform;
+  // Files saved through a save dialog (Save As, exports) show in the Files sidebar right away.
+  const platform = notifySavedFiles(props.platform, (path) => void explorer.refreshDir(dirname(path)));
   const isMac = platform.isMac;
   const { settings, update, load: loadSettings, flush: flushSettings } = createSettings(platform);
   const [message, setMessage] = createSignal<{ text: string; action?: { label: string; run: () => void } } | null>(null);
@@ -112,7 +114,10 @@ export default function App(props: { platform: Platform }) {
   };
 
   // View mode is per window (and saved with its Space). The setting is the default for new windows.
-  const [mode, setModeSignal] = createSignal<ViewMode>(settings.viewMode);
+  const [chosenMode, setModeSignal] = createSignal<ViewMode>(settings.viewMode);
+  // Plain text files (.txt) always show as text in the editor, whatever the window's mode.
+  const plainText = () => isPlainTextPath(activeDoc()?.path ?? '');
+  const mode = (): ViewMode => (plainText() ? 'source' : chosenMode());
 
   let messageTimer: ReturnType<typeof setTimeout> | undefined;
   const notify = (text: string, action?: { label: string; run: () => void }) => {
@@ -161,8 +166,12 @@ export default function App(props: { platform: Platform }) {
     ];
   };
 
+  // Markdown or plain text, per editor state (set when a document becomes active).
+  const languageCompartment = new Compartment();
+  const languageFor = () => (plainText() ? [] : markdownSupport);
   const extensions = editorExtensions({
     onUpdate,
+    language: languageCompartment.of(markdownSupport),
     extra: [
       registry.editorKeymap(isMac),
       slashCommands(slashItems, () => settings.slashCommands, [
@@ -340,6 +349,8 @@ export default function App(props: { platform: Platform }) {
     const effects: StateEffect<unknown>[] = [];
     const want = liveFor(mode());
     if (liveCompartment.get(view.state) !== want) effects.push(liveCompartment.reconfigure(want));
+    const language = languageFor();
+    if (languageCompartment.get(view.state) !== language) effects.push(languageCompartment.reconfigure(language));
     const spell = spellFor();
     if (spellCompartment.get(view.state) !== spell) effects.push(spellCompartment.reconfigure(spell));
     if (effects.length) view.dispatch({ effects });
@@ -973,7 +984,7 @@ export default function App(props: { platform: Platform }) {
     root: explorer.state.root,
     expanded: explorer.expandedList(),
     sidebar: { ...sidebar },
-    viewMode: mode(),
+    viewMode: chosenMode(),
   });
   const flushSession = async () => {
     clearTimeout(sessionTimer);
@@ -986,7 +997,7 @@ export default function App(props: { platform: Platform }) {
   /** Applies a session to this window: layout, folder, tabs. */
   async function loadSession(session: Session, launchPaths: string[] = []) {
     setSidebar(session.sidebar);
-    if (session.viewMode && session.viewMode !== mode()) {
+    if (session.viewMode && session.viewMode !== chosenMode()) {
       setModeSignal(session.viewMode);
       applyLiveMode();
     }
@@ -1209,6 +1220,7 @@ export default function App(props: { platform: Platform }) {
 
   // ---------- View modes ----------
   function setMode(next: ViewMode) {
+    if (plainText()) return notify('Text files show as plain text. Markdown views are for .md files.');
     const prev = mode();
     if (next === prev || !view || !preview) return;
     const sync = preview.sync;
@@ -1278,6 +1290,7 @@ export default function App(props: { platform: Platform }) {
   });
   createEffect(() => {
     document.documentElement.style.setProperty('--font-scale', String(settings.fontScale));
+    document.documentElement.style.setProperty('--measure-scale', String(TEXT_WIDTH_SCALE[settings.textWidth]));
     requestAnimationFrame(() => {
       view?.requestMeasure();
       preview?.sync.refresh();
@@ -1285,6 +1298,9 @@ export default function App(props: { platform: Platform }) {
   });
   createEffect(on(() => settings.previewTheme, () => preview?.sync.refresh(), { defer: true }));
   createEffect(on(() => settings.scrollSync, (enabled) => preview?.sync.setEnabled(enabled)));
+
+  // Saved under a new name (Save As to .txt, say): Markdown views on or off for this tab.
+  createEffect(on(plainText, () => queueMicrotask(applyLiveMode), { defer: true }));
 
   // Tab switch: recount and re-render. activeId changes just before the view swaps state, so wait a tick.
   createEffect(
@@ -1662,7 +1678,7 @@ export default function App(props: { platform: Platform }) {
         </Show>
         <div class="main-col">
           <TabStrip docs={docs} newTabHint={hint('file.new')} />
-          <Show when={settings.toolbarVisible && showsEditor(mode())}>
+          <Show when={settings.toolbarVisible && showsEditor(mode()) && !plainText()}>
             <Toolbar
               items={settings.toolbarItems}
               registry={registry}
@@ -1746,7 +1762,7 @@ export default function App(props: { platform: Platform }) {
               userThemes={userThemes()}
               openThemesFolder={() => void openThemesFolder()}
             />
-            <ViewSwitch mode={mode()} onChange={setMode} modKey={isMac ? '⌘' : 'Ctrl'} />
+            <ViewSwitch mode={mode()} onChange={setMode} modKey={isMac ? '⌘' : 'Ctrl'} disabled={plainText()} />
           </>
         }
       />

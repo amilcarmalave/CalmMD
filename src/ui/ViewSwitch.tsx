@@ -10,16 +10,24 @@ const META: Record<ViewMode, { label: string; key: string; icon: () => JSX.Eleme
 };
 
 /** The view-mode control in the status bar (labels appear when there's room). */
-export function ViewSwitch(props: { mode: ViewMode; onChange: (m: ViewMode) => void; modKey: string }) {
+export function ViewSwitch(props: { mode: ViewMode; onChange: (m: ViewMode) => void; modKey: string; disabled?: boolean }) {
   return (
-    <div class="segmented" role="radiogroup" aria-label="View mode">
+    <div
+      class="segmented"
+      classList={{ disabled: !!props.disabled }}
+      role="radiogroup"
+      aria-label="View mode"
+      aria-disabled={props.disabled || undefined}
+      title={props.disabled ? 'Text files show as plain text' : undefined}
+    >
       <For each={VIEW_MODES}>
         {(m) => (
           <button
             role="radio"
             aria-checked={props.mode === m}
             aria-label={META[m].label}
-            title={`${META[m].label}  ${props.modKey}+Alt+${META[m].key}`}
+            title={props.disabled ? undefined : `${META[m].label}  ${props.modKey}+Alt+${META[m].key}`}
+            disabled={props.disabled}
             classList={{ active: props.mode === m }}
             onClick={() => props.onChange(m)}
           >

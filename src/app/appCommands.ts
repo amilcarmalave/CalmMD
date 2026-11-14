@@ -23,7 +23,14 @@ import type { Documents } from './documents';
 import type { Explorer } from './explorer';
 import type { SidebarView } from './session';
 import { COLOR_THEMES, type ColorTheme } from './colorThemes';
-import type { ColorScheme, FontChoice, Settings, ViewMode } from './settings';
+import type { ColorScheme, FontChoice, Settings, TextWidth, ViewMode } from './settings';
+
+export const WIDTH_LABELS: [TextWidth, string][] = [
+  ['narrow', 'Narrow'],
+  ['standard', 'Standard'],
+  ['wide', 'Wide'],
+  ['full', 'Full Width'],
+];
 
 export const FONT_LABELS: [FontChoice, string][] = [
   ['style', 'From Document Style'],
@@ -307,6 +314,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
     { id: 'view.zoomIn', title: 'Zoom In', category: 'View', keys: 'Mod+=', run: zoom(1.1) },
     { id: 'view.zoomOut', title: 'Zoom Out', category: 'View', keys: 'Mod+-', run: zoom(1 / 1.1) },
     { id: 'view.zoomReset', title: 'Reset Zoom', category: 'View', keys: 'Mod+0', run: zoom(null) },
+    ...WIDTH_LABELS.map(([w, label]): Command => ({ id: `width.${w}`, title: `Text Width: ${label}`, category: 'Appearance', run: () => ctx.update({ textWidth: w }) })),
     ...FONT_LABELS.map(([f, label]): Command => ({ id: `font.${f}`, title: `Font: ${label}`, category: 'Appearance', run: () => ctx.update({ fontFamily: f }) })),
     ...BUILTIN_THEMES.map((t): Command => ({ id: `theme.${t.id}`, title: `Document Style: ${t.label}`, category: 'Appearance', run: () => ctx.update({ previewTheme: t.id }) })),
     ...COLOR_THEMES.map((t): Command => ({ id: `colortheme.${t.id}`, title: `Color Theme: ${t.label}`, category: 'Appearance', run: () => ctx.pickColorTheme(t) })),

@@ -556,6 +556,13 @@ button {
   width: 15px;
   height: 15px;
 }
+/* A .txt tab: the view modes don't apply. */
+.statusbar .segmented.disabled {
+  opacity: 0.45;
+}
+.statusbar .segmented.disabled button {
+  pointer-events: none;
+}
 .statusbar .segmented {
   background: var(--hairline);
   padding: 2px;

@@ -4,7 +4,7 @@ import { COLOR_THEMES, type ColorTheme } from './colorThemes';
 import { act, cmd, sep, sub, type MenuEntry, type TopMenu } from './menuModel';
 import { SPELL_LANGUAGES, type Settings, type ViewMode } from './settings';
 import { BUILTIN_THEMES } from './themes';
-import { FONT_LABELS } from './appCommands';
+import { FONT_LABELS, WIDTH_LABELS } from './appCommands';
 
 export interface MenuContext {
   settings: Settings;
@@ -132,6 +132,7 @@ export function appMenus(c: MenuContext): TopMenu[] {
         cmd('theme.reload'),
       ]),
       sub('Font', () => FONT_LABELS.map(([f, label]) => cmd(`font.${f}`, { label, checked: () => c.settings.fontFamily === f }))),
+      sub('Text Width', () => WIDTH_LABELS.map(([w, label]) => cmd(`width.${w}`, { label, checked: () => c.settings.textWidth === w }))),
       sep,
       cmd('view.zoomIn'),
       cmd('view.zoomOut'),
