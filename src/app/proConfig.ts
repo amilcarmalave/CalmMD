@@ -13,5 +13,18 @@ export const PRO_CONFIG = {
   productId: null as number | null,
 };
 
-/** Accepted by the in-memory platform only (browser dev build and tests). */
+/**
+ * Accepted by the browser dev build and tests, and by desktop builds made with
+ * VITE_SUPPORTER_TEST=1 (local testing only; release builds never set it).
+ */
 export const DEV_TEST_KEY = 'CALMMD-TEST-PRO-KEY';
+
+/** What the licence server would answer for the test key (one device slot, "dev-instance"). */
+export function testLicenseReply(action: 'activate' | 'validate' | 'deactivate', params: [string, string][]): unknown {
+  const p = Object.fromEntries(params);
+  const valid = p.license_key === DEV_TEST_KEY;
+  const meta = { store_id: PRO_CONFIG.storeId ?? 1, product_id: PRO_CONFIG.productId ?? 1, customer_email: 'test@example.com', customer_name: 'Test User' };
+  if (action === 'activate') return valid ? { activated: true, error: null, instance: { id: 'dev-instance' }, meta } : { activated: false, error: 'license_key not found.' };
+  if (action === 'validate') return valid ? { valid: true, error: null, meta } : { valid: false, error: 'license_key not found.' };
+  return { deactivated: valid, error: valid ? null : 'license_key not found.' };
+}

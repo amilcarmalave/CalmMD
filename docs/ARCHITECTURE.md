@@ -119,6 +119,9 @@ src-tauri/
 - Inside block widgets, reset `white-space: normal` (CM content is pre-wrap).
 - Theme variables (`--md-*`) are on `:root` with `[data-preview-theme]` overrides. Never redefine them
   on `.md-body`, or nested widgets reset to Paper.
+- **Files must read the same on GitHub.** Never render single newlines as breaks. Instead Enter in a top-level
+  paragraph writes a blank line and Shift+Enter a trailing `\` hard break (`editor/paragraphs.ts`, Live mode only;
+  lists, quotes and code keep the usual Enter). The analyzer hides the backslash of a `HardBreak`.
 - Measured: 2,201 lines with 200 tables at a 4 ms median and 7 ms max per keystroke, including
   decoration and DOM update.
 
@@ -271,6 +274,22 @@ Commit messages use the imperative mood with a short subject.
   memory platform fakes the server and accepts `DEV_TEST_KEY`. Menus mark locked items with a "Pro" hint
   (`proItem` in appMenus). PDF cover page: `core/cover.ts` + `ExportOptions.cover`; in PDFs it's a named page
   (`page: cover`) without header or page number, and its title is a `<p>` so heading rules skip it.
+- Image size and alignment live in the alt text (`core/imageSize.ts`): `![alt|300](…)`, `|300x200`, `|center`,
+  `|right`, in either order. The renderer turns them into width/height and `img-center`/`img-right`; Live mode puts
+  `align-*` on the widget. Drag handles (Live: `widgets.ts` `resizeHandle`; preview: `app/previewImageResize.ts`,
+  which finds the source by `data-line-start` + image index) and the image menu all write through `withAltOptions`.
+- All files show in the sidebar (`settings.showAllFiles`); non-notes open in Quick view (`ui/QuickView.tsx`,
+  `core/fileKinds.ts`): images, PDFs (iframe, `frame-src asset:` in the CSP), text/code, CSV/TSV, details.
+- File history (Supporter, `app/history.ts` + tests, `core/diff.ts` Myers line diff): versions live in the kv store,
+  never in the user's folders. `history/map` maps `pathKey(path)` → a random file id, so renames (`explorer.onRenamed`)
+  only touch the map; `history/<id>/index` lists versions and `history/<id>/<version>` holds the text. Unnamed
+  versions are deduped against the latest and pruned to 50; named ones are kept. Capture: `documents` remembers each
+  file's text as opened and calls `onClosing(path, opened, current)` when a changed tab closes, and
+  `takeClosingVersions()` on window close and Space switches; App saves "opened" (if new) and "current" when
+  `settings.historyOnClose` is on. Restore first saves the current text, then applies a `minimalChange` (undoable).
+- Supporter test key in desktop builds: `VITE_SUPPORTER_TEST=1 npm run tauri build` makes `tauri.ts` answer
+  `DEV_TEST_KEY` locally (`testLicenseReply`). Vite inlines the flag, so release builds don't contain the branch.
+  Never set it in CI.
 - Zoom: `settings.fontScale` (status bar control, Mod+=/-/0, Ctrl/Cmd+wheel). Font: `settings.fontFamily` sets
   `data-font` on <html>, which overrides the document style font (preview.css). Exports still use the style font.
 - Browser demo: `?demo&md=<base64url>` opens any document; `&ui=appearance|menu:View/Color Theme|spaces|folder`

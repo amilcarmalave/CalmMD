@@ -7,6 +7,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type { SearchHit } from '../core/search';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
+import { DEV_TEST_KEY, testLicenseReply } from '../app/proConfig';
 
 const MARKDOWN_FILTERS = [
   { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
@@ -117,7 +118,12 @@ export function createTauriPlatform(): Platform {
     writeBinaryFile: (path, data) => invoke<void>('write_binary_file', data, { headers: { path: encodeURIComponent(path) } }),
     copyFile: (from, to) => invoke<void>('copy_file', { from, to }),
     pendingAssetsDir: () => invoke<string>('pending_assets_dir'),
-    licenseRequest: (action, params) => invoke<unknown>('license_request', { action, params }),
+    licenseRequest: (action, params) =>
+      // Local test builds only: the test key works without the licence server. Vite replaces the
+      // flag at build time, so release builds don't contain this branch at all.
+      import.meta.env.VITE_SUPPORTER_TEST === '1' && params.some(([k, v]) => k === 'license_key' && v === DEV_TEST_KEY)
+        ? Promise.resolve(testLicenseReply(action, params))
+        : invoke<unknown>('license_request', { action, params }),
     findPandoc: () => invoke<string | null>('find_pandoc'),
     pandocConvert: (markdown, out, resourceDir) => invoke<void>('pandoc_convert', { markdown, out, resourceDir }),
     themesDir: () => invoke<string>('themes_dir'),

@@ -1,6 +1,6 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
-import { DEV_TEST_KEY } from '../app/proConfig';
+import { testLicenseReply } from '../app/proConfig';
 import type { DirEntry, Platform, StatResult } from './types';
 
 export interface MemoryPlatformOptions {
@@ -186,12 +186,7 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     // A stand-in licence server: only the test key works, with one device slot per instance id.
     async licenseRequest(action, params) {
-      const p = Object.fromEntries(params);
-      const valid = p.license_key === DEV_TEST_KEY;
-      const meta = { store_id: 1, product_id: 1, customer_email: 'test@example.com', customer_name: 'Test User' };
-      if (action === 'activate') return valid ? { activated: true, error: null, instance: { id: 'dev-instance' }, meta } : { activated: false, error: 'license_key not found.' };
-      if (action === 'validate') return valid ? { valid: true, error: null, meta } : { valid: false, error: 'license_key not found.' };
-      return { deactivated: valid, error: valid ? null : 'license_key not found.' };
+      return testLicenseReply(action, params);
     },
     async pendingAssetsDir() {
       return '/appdata/pending-assets';
