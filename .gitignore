@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-site/
+coverage/
+.vite/
+*.tsbuildinfo
+src-tauri/target/
+src-tauri/gen/
+
+# Logs and temp files
+*.log
+npm-debug.log*
+*.tmp
+*.calmmd-tmp
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.p12
+
+# Local notes and tool settings (not part of the project)
+notes/
+CLAUDE.md
+.claude/
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

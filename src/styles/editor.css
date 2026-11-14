@@ -1,0 +1,509 @@
+/*
+ * Editor layout and live-mode typography. These are plain CSS, not CodeMirror themes, so they can
+ * use @supports and container units. Selectors start with `.pane-editor .cm-editor` to beat
+ * CodeMirror's injected base theme.
+ */
+
+/* ---------- Centred column ---------- */
+/* --pad is the side gutter. Line padding (not content padding) keeps clicks in the margins
+   working and selection rectangles inside the column. */
+.pane-editor .cm-scroller {
+  container-type: inline-size;
+}
+.pane-editor .cm-content {
+  --pad: max(28px, calc((100cqw - var(--measure)) / 2));
+}
+.pane-editor .cm-editor .cm-line {
+  padding: 0 var(--pad);
+}
+@supports not (width: 1cqw) {
+  .pane-editor .cm-content {
+    --pad: 28px;
+  }
+  .pane-editor .cm-editor .cm-line {
+    padding: 0 max(28px, calc((100% - var(--measure)) / 2));
+  }
+}
+
+/* ---------- Live mode: the preview theme's typography, inside the editor ---------- */
+.pane-editor .cm-editor.cm-live {
+  --measure: var(--md-measure);
+  --font-source: var(--md-font);
+  --editor-font-size: var(--md-size);
+  --editor-line-height: var(--md-leading);
+  /* Heading size is set on the line, so the token spans must not scale again. */
+  --cm-h1: 1em;
+  --cm-h2: 1em;
+  --cm-h3: 1em;
+  --live-code-bg: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+.pane-editor .cm-live .cm-content {
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+}
+
+.pane-editor .cm-live .cm-line.cm-live-heading {
+  font-family: var(--md-heading-font);
+  color: var(--fg-strong);
+  line-height: 1.28;
+  padding-top: 0.55em;
+  padding-bottom: 0.12em;
+  text-wrap: balance;
+}
+.pane-editor .cm-live .cm-line.cm-live-h1 {
+  font-size: 2.05em;
+  letter-spacing: -0.015em;
+  padding-top: 0.35em;
+}
+.pane-editor .cm-live .cm-line.cm-live-h2 {
+  font-size: 1.5em;
+  letter-spacing: -0.01em;
+}
+.pane-editor .cm-live .cm-line.cm-live-h3 {
+  font-size: 1.22em;
+}
+.pane-editor .cm-live .cm-line.cm-live-h4 {
+  font-size: 1.05em;
+}
+.pane-editor .cm-live .cm-line.cm-live-h5,
+.pane-editor .cm-live .cm-line.cm-live-h6 {
+  font-size: 0.95em;
+  color: var(--fg-muted);
+}
+.pane-editor .cm-live .cm-line.cm-live-setext-mark {
+  font-size: 0.8em;
+  color: var(--fg-faint);
+  line-height: 1.2;
+}
+[data-preview-theme='studio'] .cm-live .cm-line.cm-live-h1 {
+  font-size: 1.9em;
+  letter-spacing: -0.022em;
+}
+[data-preview-theme='github'] .cm-live .cm-line.cm-live-h1,
+[data-preview-theme='github'] .cm-live .cm-line.cm-live-h2 {
+  font-weight: 600;
+  letter-spacing: 0;
+  /* A rule under the text, drawn inside the column (the line itself spans the gutters). */
+  background: linear-gradient(var(--hairline-strong), var(--hairline-strong)) no-repeat;
+  background-size: calc(100% - 2 * var(--pad)) 1px;
+  background-position: var(--pad) 100%;
+  padding-bottom: 0.3em;
+}
+[data-preview-theme='github'] .cm-live .cm-line.cm-live-h1 {
+  font-size: 2em;
+}
+[data-preview-theme='clear'] .cm-live .cm-line.cm-live-heading {
+  font-weight: 600;
+}
+[data-preview-theme='clear'] .cm-live .cm-line.cm-live-h1 {
+  font-size: 2.2em;
+}
+[data-preview-theme='typewriter'] .cm-live .cm-line.cm-live-h1,
+[data-preview-theme='typewriter'] .cm-live .cm-line.cm-live-h2 {
+  font-size: 1.3em;
+  letter-spacing: 0;
+}
+
+/* Links: styled in place. Mod+click opens. */
+.pane-editor .cm-live .cm-live-link,
+.pane-editor .cm-live .cm-live-link * {
+  color: var(--link);
+}
+.pane-editor .cm-live .cm-live-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+}
+
+.pane-editor .cm-live .cm-live-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.12em 0.32em;
+  border-radius: 4px;
+  background: var(--live-code-bg);
+  color: var(--code-fg);
+}
+
+/* Code blocks: translucent background so the selection layer still shows through. */
+.pane-editor .cm-live .cm-line.cm-live-codeblock {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.62;
+  padding-left: calc(var(--pad) + 16px);
+  padding-right: calc(var(--pad) + 16px);
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--pad);
+  background: var(--live-code-bg);
+  pointer-events: none;
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock-first::before {
+  top: 6px;
+  border-radius: 8px 8px 0 0;
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock-last::before {
+  bottom: 6px;
+  border-radius: 0 0 8px 8px;
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock-first.cm-live-codeblock-last::before {
+  border-radius: 8px;
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock-first {
+  padding-top: 8px;
+}
+.pane-editor .cm-live .cm-line.cm-live-codeblock-last {
+  padding-bottom: 8px;
+}
+.pane-editor .cm-live .cm-line.cm-live-fence {
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+.pane-editor .cm-live .cm-line.cm-live-fence * {
+  color: var(--fg-faint);
+}
+/* The language name sits as a small label in the block's top-right corner. */
+.pane-editor .cm-live .cm-live-code-lang {
+  position: absolute;
+  right: calc(var(--pad) + 12px);
+  top: 8px;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  line-height: 1.4;
+}
+
+/* Quotes */
+.pane-editor .cm-live .cm-line.cm-live-quote {
+  position: relative;
+  color: var(--fg-muted);
+  padding-left: calc(var(--pad) + 18px);
+}
+.pane-editor .cm-live .cm-line.cm-live-quote::before {
+  content: '';
+  position: absolute;
+  left: var(--pad);
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--hairline-strong);
+}
+/* Nested quotes: one bar per level. */
+.pane-editor .cm-live .cm-line.cm-live-quote-2 {
+  padding-left: calc(var(--pad) + 36px);
+}
+.pane-editor .cm-live .cm-line.cm-live-quote-2::before {
+  box-shadow: 18px 0 0 var(--hairline-strong);
+}
+.pane-editor .cm-live .cm-line.cm-live-quote-3 {
+  padding-left: calc(var(--pad) + 54px);
+}
+.pane-editor .cm-live .cm-line.cm-live-quote-3::before {
+  box-shadow: 18px 0 0 var(--hairline-strong), 36px 0 0 var(--hairline-strong);
+}
+
+/* Callouts (> [!NOTE] …): tinted quote, coloured bar, small label. */
+.pane-editor .cm-live .cm-line.cm-live-callout {
+  --callout: var(--callout-note);
+  color: var(--fg);
+  background: linear-gradient(to right, transparent var(--pad), color-mix(in srgb, var(--callout) 7%, transparent) var(--pad), color-mix(in srgb, var(--callout) 7%, transparent) calc(100% - var(--pad)), transparent calc(100% - var(--pad)));
+}
+.pane-editor .cm-live .cm-line.cm-live-callout::before {
+  background: var(--callout);
+}
+.pane-editor .cm-live .cm-line.cm-live-callout-tip {
+  --callout: var(--callout-tip);
+}
+.pane-editor .cm-live .cm-line.cm-live-callout-important {
+  --callout: var(--callout-important);
+}
+.pane-editor .cm-live .cm-line.cm-live-callout-warning {
+  --callout: var(--callout-warning);
+}
+.pane-editor .cm-live .cm-line.cm-live-callout-caution {
+  --callout: var(--callout-caution);
+}
+.pane-editor .cm-live .cm-live-callout-label {
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--callout);
+}
+
+/* Highlight, sub/superscript, footnotes, inline HTML */
+.pane-editor .cm-live .cm-live-highlight,
+.pane-editor .cm-live .cm-live-html-mark {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 2px;
+}
+.pane-editor .cm-live .cm-live-sub,
+.pane-editor .cm-live .cm-live-html-sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+.pane-editor .cm-live .cm-live-sup,
+.pane-editor .cm-live .cm-live-html-sup,
+.pane-editor .cm-live .cm-live-footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+}
+.pane-editor .cm-live .cm-live-footnote-ref,
+.pane-editor .cm-live .cm-live-footnote-def {
+  color: var(--link);
+  font-variant-numeric: tabular-nums;
+}
+.pane-editor .cm-live .cm-live-html-kbd {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--hairline-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+.pane-editor .cm-live .cm-live-html-u,
+.pane-editor .cm-live .cm-live-html-ins {
+  text-decoration: underline;
+}
+.pane-editor .cm-live .cm-live-html-b,
+.pane-editor .cm-live .cm-live-html-strong {
+  font-weight: 650;
+}
+.pane-editor .cm-live .cm-live-html-i,
+.pane-editor .cm-live .cm-live-html-em {
+  font-style: italic;
+}
+.pane-editor .cm-live .cm-live-html-s,
+.pane-editor .cm-live .cm-live-html-del,
+.pane-editor .cm-live .cm-live-html-strike {
+  text-decoration: line-through;
+}
+.pane-editor .cm-live .cm-live-html-small {
+  font-size: 0.85em;
+}
+.pane-editor .cm-live .cm-live-html-code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--code-fg);
+}
+
+/* HTML blocks rendered in place (<details>, <div align>, …) */
+.pane-editor .cm-live .cm-live-htmlblock.md-body {
+  max-width: none;
+  margin: 0;
+  padding: 4px var(--pad);
+  font-size: inherit;
+  white-space: normal;
+  cursor: text;
+}
+.pane-editor .cm-live .cm-live-htmlblock.md-body > :last-child,
+.pane-editor .cm-live .cm-live-htmlblock.md-body .html-block > :last-child {
+  margin-bottom: 0;
+}
+.pane-editor .cm-live .cm-live-htmlblock summary {
+  cursor: pointer;
+}
+
+/* Front matter: a quiet, dashed metadata box. */
+.pane-editor .cm-live .cm-line.cm-live-frontmatter {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  padding-left: calc(var(--pad) + 14px);
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter * {
+  color: var(--fg-muted);
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--pad);
+  border-left: 1px dashed var(--hairline-strong);
+  border-right: 1px dashed var(--hairline-strong);
+  pointer-events: none;
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter-first::before {
+  top: 4px;
+  border-top: 1px dashed var(--hairline-strong);
+  border-radius: 6px 6px 0 0;
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter-last::before {
+  bottom: 4px;
+  border-bottom: 1px dashed var(--hairline-strong);
+  border-radius: 0 0 6px 6px;
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter-first.cm-live-frontmatter-last::before {
+  border-radius: 6px;
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter-first {
+  padding-top: 4px;
+}
+.pane-editor .cm-live .cm-line.cm-live-frontmatter-last {
+  padding-bottom: 4px;
+}
+
+/* Lists and tasks */
+.pane-editor .cm-live .cm-live-bullet {
+  color: var(--fg-faint);
+  display: inline-block;
+  transform: scale(1.25);
+}
+.pane-editor .cm-live .cm-live-ol-mark {
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pane-editor .cm-live .cm-live-task {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  vertical-align: -0.14em;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.pane-editor .cm-live .cm-line.cm-live-task-done {
+  color: var(--fg-muted);
+}
+
+/* Rules */
+.pane-editor .cm-live .cm-live-hr {
+  display: inline-block;
+  width: 100%;
+  height: 1px;
+  vertical-align: middle;
+  background: var(--hairline-strong);
+}
+
+/* Images */
+.pane-editor .cm-live .cm-live-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+.pane-editor .cm-live .cm-live-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 4px;
+  margin: 0.3em 0;
+}
+.pane-editor .cm-live .cm-live-image-companion {
+  display: block;
+  opacity: 0.85;
+}
+.pane-editor .cm-live .cm-live-image.broken {
+  padding: 0.1em 0.5em;
+  border-radius: 4px;
+  border: 1px dashed var(--hairline-strong);
+  color: var(--fg-faint);
+  font-size: 0.85em;
+}
+
+/* Math */
+.pane-editor .cm-live .cm-live-math-src,
+.pane-editor .cm-live .cm-line.cm-live-math-src {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--code-fg);
+}
+.pane-editor .cm-live .cm-live-math {
+  cursor: text;
+}
+.pane-editor .cm-live .cm-live-math-block {
+  padding: 6px var(--pad);
+  text-align: center;
+  overflow-x: auto;
+  cursor: text;
+}
+.pane-editor .cm-live .cm-live-math-block.empty,
+.pane-editor .cm-live .cm-live-diagram.empty,
+.pane-editor .cm-live .cm-live-diagram.pending {
+  color: var(--fg-faint);
+  font: 12px var(--font-ui);
+}
+
+/* Diagrams */
+.pane-editor .cm-live .cm-live-diagram {
+  padding: 8px var(--pad);
+  text-align: center;
+  cursor: text;
+}
+.pane-editor .cm-live .cm-live-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.pane-editor .cm-live .cm-live-diagram.companion {
+  opacity: 0.9;
+}
+.pane-editor .cm-live .cm-live-diagram.error {
+  color: var(--danger);
+  font: 12px var(--font-ui);
+  text-align: left;
+}
+
+/* Video embeds */
+.pane-editor .cm-live .cm-live-embed {
+  display: block;
+  max-width: 100%;
+  margin: 0.3em 0;
+  white-space: normal;
+}
+.pane-editor .cm-live .cm-live-embed video,
+.pane-editor .cm-live .cm-live-embed .embed-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 8px;
+  background: #000;
+}
+
+/* Tables: block widgets rendered with the preview styles */
+.pane-editor .cm-live .cm-live-table.md-body {
+  max-width: none;
+  margin: 0;
+  padding: 6px var(--pad);
+  font-size: inherit;
+  cursor: text;
+  /* CodeMirror's pre-wrap would render the newlines between table rows as blank lines. */
+  white-space: normal;
+}
+.pane-editor .cm-live .cm-live-table.md-body table {
+  margin: 0;
+}
+.pane-editor .cm-live .cm-line.cm-live-table-src {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+
+/* Text colour armed at the cursor (editor/typingColor.ts): the cursor shows it. */
+.cm-editor.cm-typing-color .cm-cursor {
+  border-left: 2px solid var(--typing-color);
+}
+
+/* A missing image: its name and a "Locate…" button. */
+.pane-editor .cm-live .cm-live-image.broken {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pane-editor .cm-live .cm-live-image-locate {
+  padding: 0 8px;
+  height: 22px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--fg);
+  font: 12px var(--font-ui);
+  cursor: pointer;
+}
+.pane-editor .cm-live .cm-live-image-locate:hover {
+  border-color: var(--accent);
+}

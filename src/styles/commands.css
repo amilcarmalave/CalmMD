@@ -1,0 +1,275 @@
+/* ---------- Command palette ---------- */
+.palette-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(10, 12, 18, 0.12);
+  animation: fade-in 90ms var(--ease);
+}
+.palette {
+  width: min(620px, calc(100vw - 32px));
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: rise-in 120ms var(--ease);
+}
+.palette-input {
+  height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--fg-strong);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+.palette-input::placeholder {
+  color: var(--fg-faint);
+}
+.palette-list {
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: var(--fg);
+  cursor: default;
+}
+.palette-item.active {
+  background: var(--hairline-strong);
+  color: var(--fg-strong);
+}
+.palette-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-label mark {
+  background: none;
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+.palette-detail {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-hint,
+.palette-foot kbd {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--fg-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.palette-hint {
+  margin-left: auto;
+}
+.palette-empty {
+  padding: 18px 12px;
+  color: var(--fg-faint);
+  text-align: center;
+}
+.palette-foot {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11.5px;
+  color: var(--fg-faint);
+}
+.palette-foot kbd {
+  margin-right: 4px;
+  padding: 0 5px;
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.toolbar-btn {
+  width: 30px;
+  height: 26px;
+  color: var(--fg-muted);
+}
+.toolbar-btn:hover {
+  color: var(--fg-strong);
+}
+.toolbar-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* ---------- Selection bubble ---------- */
+.bubble {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+  animation: rise-in 110ms var(--ease);
+}
+.bubble .icon-btn {
+  width: 30px;
+  height: 28px;
+  color: var(--fg-muted);
+}
+.bubble .icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.bubble-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--hairline-strong);
+}
+
+/* ---------- Customize toolbar ---------- */
+.modal-wide {
+  width: min(460px, calc(100vw - 32px));
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--fg);
+}
+.check-row input {
+  accent-color: var(--accent);
+}
+.tb-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 8px 0 16px;
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+.tb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  border-radius: 6px;
+}
+.tb-row.on {
+  background: var(--hairline);
+}
+.tb-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--fg-muted);
+}
+.tb-move {
+  display: flex;
+  gap: 2px;
+}
+
+/* ---------- Export dialog ---------- */
+.form-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 14px;
+  align-items: center;
+  margin: 6px 0 14px;
+}
+.form-grid label {
+  color: var(--fg-muted);
+}
+.form-grid select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.export-note {
+  font-size: 12px;
+  color: var(--fg-faint);
+  line-height: 1.5;
+}
+
+/* ---------- Slash menu (CodeMirror autocomplete) ---------- */
+.cm-tooltip.cm-tooltip-autocomplete.cm-slash-menu {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  padding: 4px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  overflow: hidden;
+}
+.cm-tooltip.cm-slash-menu > ul {
+  max-height: 300px;
+  min-width: 220px;
+}
+.cm-tooltip.cm-slash-menu > ul > li {
+  padding: 5px 10px !important;
+  border-radius: 6px;
+  color: var(--fg);
+  line-height: 1.4;
+}
+.cm-tooltip.cm-slash-menu > ul > li[aria-selected] {
+  background: var(--hairline-strong) !important;
+  color: var(--fg-strong) !important;
+}
+.cm-tooltip.cm-slash-menu .cm-completionMatchedText {
+  text-decoration: none;
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+.cm-tooltip.cm-slash-menu .cm-completionDetail {
+  color: var(--fg-faint);
+  font-style: normal;
+  margin-left: 10px;
+}

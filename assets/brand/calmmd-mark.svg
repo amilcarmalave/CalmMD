@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- CalmMD mark: a calm, open "C" with Markdown's down arrow (↓) resting in its opening. -->
+  <rect width="1024" height="1024" rx="232" fill="#1F2A44"/>
+  <g transform="translate(34 0)">
+    <path d="M679 326 A250 250 0 1 0 679 698"
+          fill="none" stroke="#FAF8F4" stroke-width="84" stroke-linecap="round"/>
+    <path d="M608 410 V604 M546 542 L608 604 L670 542"
+          fill="none" stroke="#E8A23B" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

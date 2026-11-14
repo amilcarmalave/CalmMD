@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalmMD · Markdown, calmly.</title>
+<meta name="description" content="A free, beautiful Markdown editor for Windows, macOS and Linux. Live preview, PDF export, Spaces. Your files stay yours.">
+<link rel="icon" href="img/mark.svg">
+<meta property="og:title" content="CalmMD · Markdown, calmly.">
+<meta property="og:description" content="A free, beautiful Markdown editor for Windows, macOS and Linux.">
+<meta property="og:image" content="img/split-light.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="wrap top">
+  <img src="img/mark.svg" alt="">
+  <strong>CalmMD</strong>
+  <nav><a href="#features">Features</a><a href="#support">Support</a><a href="#faq">Help</a><a id="repo-link" href="#">Source</a></nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Markdown, calmly.</h1>
+    <p>A beautiful Markdown editor for Windows, macOS and Linux. Write in a quiet window, see it rendered as you type, and export PDFs worth sending. Free, and your files stay yours.</p>
+    <a class="btn primary" id="download" href="#">Download</a>
+    <a class="btn" href="#features">See what it does</a>
+    <div class="others" id="others">Also for <a href="#">Windows</a> · <a href="#">macOS</a> · <a href="#">Linux</a></div>
+    <div class="shot"><img src="img/split-light.png" alt="CalmMD with the Markdown source beside the rendered page" width="2880" height="1800"></div>
+  </div>
+
+  <section id="features"><div class="wrap">
+    <h2>Everything you need, nothing in the way</h2>
+    <p class="lead">A calm interface with every tool one click, keystroke or right-click away.</p>
+    <div class="grid">
+      <div class="card"><h3>Live, Split or Preview</h3><p>Markdown renders as you type, or side by side with scroll sync that actually lines up.</p></div>
+      <div class="card"><h3>PDFs worth sending</h3><p>Page numbers, headers, a table of contents with real page numbers. No LaTeX needed.</p></div>
+      <div class="card"><h3>Files and Spaces</h3><p>A folder sidebar, favourites, search across files, and Spaces that remember a whole setup.</p></div>
+      <div class="card"><h3>Links between notes</h3><p>Type <code>[[</code> to link another note. Plain relative links that work anywhere.</p></div>
+      <div class="card"><h3>Images that travel</h3><p>Paste a screenshot and it's saved next to your document, so shared folders keep working.</p></div>
+      <div class="card"><h3>Math, diagrams, callouts</h3><p>KaTeX, Mermaid, tables, footnotes, highlights and GitHub-style callouts.</p></div>
+      <div class="card"><h3>Ten themes, five styles</h3><p>From pure white Snow to GitHub Dark, with Book, Studio, Clear, GitHub and Typewriter type.</p></div>
+      <div class="card"><h3>Private by design</h3><p>No account, no telemetry. Plain files on your disk, synced by your own Dropbox, iCloud or OneDrive.</p></div>
+    </div>
+    <div class="pair">
+      <figure><img src="img/split-dark.png" alt="GitHub Dark theme with the GitHub document style" loading="lazy"><figcaption>GitHub Dark with the GitHub style</figcaption></figure>
+      <figure><img src="img/appearance.png" alt="Colour themes and document styles" loading="lazy"><figcaption>Pick a light and a dark theme</figcaption></figure>
+      <figure><img src="img/search.png" alt="Search across every note in a folder" loading="lazy"><figcaption>Search every note in a folder</figcaption></figure>
+      <figure><img src="img/pdf-export.png" alt="PDF export with templates and a cover page" loading="lazy"><figcaption>PDF export with templates and a cover page</figcaption></figure>
+    </div>
+  </div></section>
+
+  <section id="examples"><div class="wrap">
+    <h2>See the PDFs</h2>
+    <p class="lead">Real exports, straight from CalmMD. No LaTeX, no setup.</p>
+    <div class="grid">
+      <a class="card" href="samples/calmmd-standard.pdf"><h3>Standard</h3><p>The free template: your document style, a title header and page numbers.</p></a>
+      <a class="card" href="samples/calmmd-report-template.pdf"><h3>Report (Supporter)</h3><p>A cover page, accent headings, and title and page in the header.</p></a>
+      <a class="card" href="samples/calmmd-academic-template.pdf"><h3>Academic (Supporter)</h3><p>Justified serif text and numbered sections.</p></a>
+    </div>
+  </div></section>
+
+  <section id="support"><div class="wrap pro">
+    <div>
+      <h2>Support CalmMD</h2>
+      <p class="lead">Everything above is free, forever. If CalmMD is useful to you, supporting it keeps it going, and Supporters get a few extras as a thank-you.</p>
+      <div class="price">$6 <small>once · extras for life · up to 3 devices</small></div>
+      <p><a class="btn primary" id="buy" href="#">Become a Supporter</a></p>
+    </div>
+    <ul class="ticks">
+      <li><strong>Any colour</strong> for highlights and text</li>
+      <li><strong>PDF cover page</strong> with title, author and date</li>
+      <li><strong>PDF templates:</strong> Report, Academic and Minimal</li>
+      <li><strong>Five more themes:</strong> Rosé, Parchment, Fjord, Nightshade, Forest</li>
+      <li><strong>Share bundles:</strong> a document and its images as one file or a .zip</li>
+    </ul>
+  </div></section>
+
+  <section id="faq"><div class="wrap">
+    <h2>Help</h2>
+    <details open class="launch-only">
+      <summary>Windows says “Windows protected your PC”</summary>
+      <p>CalmMD isn't signed with a paid certificate yet. Click <strong>More info → Run anyway</strong>. Installing from the Microsoft Store or with winget avoids the message.</p>
+    </details>
+    <details class="launch-only">
+      <summary>macOS says the app “can't be opened”</summary>
+      <p>Right-click CalmMD in Applications and choose <strong>Open</strong>, then <strong>Open</strong> again. On recent macOS, use System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>. Installing with Homebrew avoids it: <code>brew install --cask OWNER/calmmd/calmmd</code></p>
+    </details>
+    <details class="launch-only">
+      <summary>Install from the terminal</summary>
+      <p>Windows (PowerShell):</p>
+      <pre><code>irm https://calmmd.app/install.ps1 | iex</code></pre>
+      <p>macOS and Linux:</p>
+      <pre><code>curl -fsSL https://calmmd.app/install.sh | sh</code></pre>
+      <p>Both check the download against the release's published checksums before installing.</p>
+    </details>
+    <details>
+      <summary>How do I sync my notes?</summary>
+      <p>Keep your notes folder in Dropbox, iCloud Drive, OneDrive or Google Drive. CalmMD works with plain files and notices when they change on disk.</p>
+    </details>
+    <details>
+      <summary>Does CalmMD collect anything?</summary>
+      <p>No. There's no telemetry and no account. The only network request is activating a Supporter key, if you have one.</p>
+    </details>
+  </div></section>
+</main>
+
+<footer>CalmMD · MIT License · Made with care. <span id="year"></span>
+  <nav><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="refunds.html">Refunds</a><a href="https://github.com/OWNER/calmmd/issues">Contact</a></nav>
+</footer>
+
+<script>
+  // Fill in before launch (also in packaging/README.md).
+  const REPO = 'OWNER/calmmd';
+  const BUY_URL = null; // the Lemon Squeezy checkout link
+
+  const releases = `https://github.com/${REPO}/releases/latest`;
+  // Before launch (no public repository yet), downloads aren't open: say so instead of a broken link.
+  const prelaunch = REPO.startsWith('OWNER/');
+  const ua = navigator.userAgent;
+  const os = /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : /Linux|X11/i.test(ua) ? 'Linux' : null;
+  const dl = document.getElementById('download');
+  if (prelaunch) {
+    dl.textContent = 'Downloads open soon';
+    dl.removeAttribute('href');
+    document.getElementById('others').textContent = 'For Windows, macOS and Linux';
+    document.getElementById('repo-link').remove();
+    for (const d of document.querySelectorAll('.launch-only')) d.remove();
+  } else {
+    dl.href = releases;
+    dl.textContent = os ? `Download for ${os}` : 'Download';
+    for (const a of document.querySelectorAll('#others a')) a.href = releases;
+    document.getElementById('repo-link').href = `https://github.com/${REPO}`;
+  }
+  const buy = document.getElementById('buy');
+  if (BUY_URL) buy.href = BUY_URL;
+  else { buy.textContent = 'Coming soon'; buy.removeAttribute('href'); buy.style.opacity = '0.6'; }
+  document.getElementById('year').textContent = '© ' + new Date().getFullYear();
+</script>
+</body>
+</html>
