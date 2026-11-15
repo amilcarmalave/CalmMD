@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag like v0.1.0 (matching the version in package.json, Cargo.toml and tauri.conf.json)
+# Push a tag like v1.0.0 (matching the version in package.json, Cargo.toml and tauri.conf.json)
 # to build installers for every platform and attach them to a draft GitHub release.
 on:
   push:
