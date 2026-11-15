@@ -31,6 +31,7 @@ export function appMenus(c: MenuContext): TopMenu[] {
     label: 'File',
     items: () => [
       cmd('file.new'),
+      cmd('file.newDrawing'),
       cmd('window.new'),
       sep,
       cmd('file.open'),
@@ -151,6 +152,7 @@ export function appMenus(c: MenuContext): TopMenu[] {
       cmd('insert.codeBlock'),
       cmd('insert.math'),
       cmd('insert.mermaid'),
+      cmd('insert.drawing'),
       sep,
       cmd('insert.footnote'),
       cmd('insert.hr'),

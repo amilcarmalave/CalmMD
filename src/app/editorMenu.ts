@@ -6,6 +6,7 @@ import type { Platform } from '../platform/types';
 import type { MenuItem } from '../ui/ContextMenu';
 import type { CommandRegistry } from './commands';
 import { resolveLocalPath } from './links';
+import { isDrawingPath } from '../core/drawings';
 import { IMAGE_SIZE_PRESETS, parseAltSize, withAltOptions, type ImageAlign } from '../core/imageSize';
 
 export interface EditorMenuDeps {
@@ -23,6 +24,8 @@ export interface EditorMenuDeps {
    * system has no checker we can ask, so the menu points to the native one (Shift+right-click).
    */
   spelling?: MenuItem[];
+  /** Opens a drawing file in the drawing editor. */
+  editDrawing?: (path: string) => void;
   /** Picks an image file and puts its link in place of the destination at [from, to). */
   replaceImage?: (from: number, to: number) => void;
 }
@@ -128,6 +131,7 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
     };
     const setSize = (width: number | null) => setAlt({ width });
     const align = () => parseAltSize(altText()).align ?? 'left';
+    if (local && isDrawingPath(local) && deps.editDrawing) specific.push({ label: 'Edit Drawing', hint: 'Double-click', action: () => deps.editDrawing!(local) }, 'separator');
     specific.push(
       { label: 'Edit Alt Text', disabled: marks.length < 2, action: () => select(marks[0].to, marks[1].from) },
       { label: 'Replace Image…', disabled: !url || !deps.replaceImage, action: () => url && deps.replaceImage?.(url.from, url.to) },

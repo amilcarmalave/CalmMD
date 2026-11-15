@@ -338,7 +338,7 @@ function Row(props: RowProps & { name: string; path: string; isDir: boolean; dep
   return (
     <div
       class="tree-row"
-      classList={{ active: active(), dir: props.isDir, 'is-markdown': !props.isDir && /\.(md|markdown|mdx|txt)$/i.test(props.name) }}
+      classList={{ active: active(), dir: props.isDir, 'is-markdown': !props.isDir && /\.(md|markdown|mdx|txt|excalidraw|excalidraw\.svg)$/i.test(props.name) }}
       style={{ '--depth': props.depth }}
       role="treeitem"
       aria-expanded={props.isDir ? props.open : undefined}

@@ -62,6 +62,7 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 | **Four views** | Source · Live · Split · Preview (`Ctrl/⌘+E` to cycle). Enter starts a new paragraph, so files read the same on GitHub |
 | **Writing** | GFM tables, task lists, footnotes, `==highlight==`, any text or highlight colour, sub/superscript, GitHub-style callouts, front matter, HTML, KaTeX math, Mermaid diagrams, syntax-highlighted code, video embeds |
 | **Images** | Paste or drop images: they're saved in an `assets` folder next to the note and linked relatively. Drag to resize, align left, center or right, all in standard Markdown (`![Photo\|300\|center](photo.png)`) |
+| **Drawings** | Sketch with [Excalidraw](https://excalidraw.com) right in the app (Insert → Drawing, or `/drawing`). Each drawing is its own `.excalidraw.svg` file next to your notes: a picture that shows on GitHub and anywhere else, with the editable drawing inside. Double-click it to edit |
 | **Files** | A folder sidebar with favourites, outline and tabs that come back after a restart. Other files open in a Quick view: images, PDFs, CSV and code. `.txt` files open as plain text |
 | **File history** | Earlier versions of each file, saved when you close it or when you ask. Compare side by side and restore in one click. Versions stay in the app's data, never in your folders |
 | **Links and search** | Search every note in a folder (`Ctrl/⌘+Shift+F`), link notes with a `[[` picker, `[[Wiki links]]`, and "Linked from" for the open note |

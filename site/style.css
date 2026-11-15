@@ -272,3 +272,4 @@ footer a:hover { color: var(--strong); }
 .mini-menu span.on { background: rgba(232, 162, 59, 0.16); }
 .mini-menu span.on::before { content: '✓'; position: absolute; left: 9px; color: #c07f17; font-weight: 700; }
 @media (max-width: 640px) { .mini-menu { transform: scale(0.8); transform-origin: top right; } }
+.tile .copy p + p { margin-top: 10px; }

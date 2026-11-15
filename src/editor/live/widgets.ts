@@ -185,7 +185,14 @@ export class HrWidget extends WidgetType {
   }
 }
 
+/** Bumped when an image file changes on disk (a drawing was saved), so image widgets redraw. */
+let imageEpoch = 0;
+export function imagesChanged() {
+  imageEpoch++;
+}
+
 export class ImageWidget extends WidgetType {
+  readonly epoch = imageEpoch;
   constructor(
     readonly src: string,
     readonly alt: string,
@@ -195,7 +202,7 @@ export class ImageWidget extends WidgetType {
     super();
   }
   eq(other: ImageWidget) {
-    return other.src === this.src && other.alt === this.alt && other.companion === this.companion;
+    return other.src === this.src && other.alt === this.alt && other.companion === this.companion && other.epoch === this.epoch;
   }
   toDOM(view: EditorView) {
     const wrap = document.createElement('span');

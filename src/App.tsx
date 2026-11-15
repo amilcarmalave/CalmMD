@@ -35,6 +35,13 @@ import { linksTo, parseWiki, resolveWiki, type Backlink } from './core/noteLinks
 import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
+import { DrawingEditor } from './ui/DrawingEditor';
+import { drawingFileName, drawingMarkdown } from './core/drawings';
+import { withAssetVersions } from './platform/assetVersions';
+import { imagesChanged } from './editor/live/widgets';
+import { insertBlock } from './editor/format';
+import { findImageLinks as findDrawingLinks } from './core/assets';
+import { resolveLocalPath } from './app/links';
 import { HistoryPanel, versionTime } from './ui/HistoryPanel';
 import { VersionView } from './ui/VersionView';
 import { createHistory, type Version } from './app/history';
@@ -73,7 +80,10 @@ const showsPreview = (m: ViewMode) => m === 'split' || m === 'preview';
 
 export default function App(props: { platform: Platform }) {
   // Files saved through a save dialog (Save As, exports) show in the Files sidebar right away.
-  const platform = notifySavedFiles(props.platform, (path) => void explorer.refreshDir(dirname(path)));
+  // Files saved through a save dialog (Save As, exports) show in the Files sidebar right away, and
+  // file URLs change when a drawing is saved so pictures of it reload.
+  const assetVersions = withAssetVersions(notifySavedFiles(props.platform, (path) => void explorer.refreshDir(dirname(path))));
+  const platform = assetVersions.platform;
   const isMac = platform.isMac;
   const { settings, update, load: loadSettings, flush: flushSettings } = createSettings(platform);
   const [message, setMessage] = createSignal<{ text: string; action?: { label: string; run: () => void } } | null>(null);
@@ -157,6 +167,7 @@ export default function App(props: { platform: Platform }) {
       item('Image', 'insert.image', 'picture'),
       item('Math block', 'insert.math', 'latex katex equation'),
       item('Mermaid diagram', 'insert.mermaid', 'chart flowchart graph'),
+      item('Drawing', 'insert.drawing', 'excalidraw sketch whiteboard draw picture'),
       item('Footnote', 'insert.footnote', 'note reference'),
     ];
   };
@@ -173,6 +184,18 @@ export default function App(props: { platform: Platform }) {
         notePicker({ files: () => noteFiles(), docPath: () => activeDoc()?.path ?? null, root: () => explorer.state.root }),
       ]),
       // Pasted and dropped images are saved as files and linked (app/assets.ts).
+      // Double-click a drawing's picture to edit it.
+      EditorView.domEventHandlers({
+        dblclick: (e, v) => {
+          const img = (e.target as HTMLElement).closest('.cm-live-image');
+          if (!img) return false;
+          const path = drawingAt(v.posAtDOM(img));
+          if (!path) return false;
+          e.preventDefault();
+          openDrawing(path);
+          return true;
+        },
+      }),
       EditorView.domEventHandlers({
         paste: (e) => {
           const data = e.clipboardData;
@@ -258,10 +281,67 @@ export default function App(props: { platform: Platform }) {
 
   // ---------- Quick view ----------
   const [quickView, setQuickView] = createSignal<string | null>(null);
-  /** Notes open in the editor; anything else opens in Quick view. */
+  /** Notes open in the editor, drawings in the drawing editor; anything else opens in Quick view. */
   function openFileOrView(path: string) {
-    if (fileKind(path) === 'note') void docs.openPaths([path]);
+    const kind = fileKind(path);
+    if (kind === 'note') void docs.openPaths([path]);
+    else if (kind === 'drawing') openDrawing(path);
     else setQuickView(path);
+  }
+
+  // ---------- Drawings (Excalidraw) ----------
+  // A drawing is its own file next to the notes (Name.excalidraw.svg). Notes show it as a picture.
+  const [drawing, setDrawing] = createSignal<{ path: string; exists: boolean; insertInto?: string } | null>(null);
+  const openDrawing = (path: string) => setDrawing({ path, exists: true });
+
+  /** Insert → Drawing (insert: true) or File → New Drawing: asks for a name, then opens the editor. */
+  async function newDrawing(insert: boolean) {
+    const d = activeDoc();
+    const dir = d?.path ? dirname(d.path) : explorer.state.root;
+    if (!dir) {
+      notify(insert ? 'Save this note first, so the drawing has a folder to go in' : 'Open a folder or save a note first, so the drawing has a place to go');
+      return;
+    }
+    const name = await prompt({
+      title: 'New Drawing',
+      message: `It’s saved as its own file in “${basename(dir) || dir}”${insert ? ', and shown in this note as a picture' : ''}.`,
+      placeholder: 'For example: Kitchen layout',
+      primary: 'Create',
+    });
+    const file = name ? drawingFileName(name) : null;
+    if (!file) return;
+    const path = joinPath(dir, file);
+    const exists = !!(await platform.stat(path).catch(() => null));
+    setDrawing({ path, exists, insertInto: insert ? d?.id : undefined });
+    if (insert && exists) insertDrawingLink(path);
+  }
+  function insertDrawingLink(path: string) {
+    if (!view) return;
+    const md = drawingMarkdown(activeDoc()?.path ?? null, path);
+    view.dispatch({ ...insertBlock(view.state, md, md.length), userEvent: 'input' });
+  }
+  function drawingSaved(path: string, first: boolean) {
+    assetVersions.changed(path);
+    imagesChanged();
+    void explorer.refreshDir(dirname(path));
+    const d = drawing();
+    if (first && d?.insertInto && d.insertInto === store.activeId) insertDrawingLink(path);
+    view?.dispatch({ effects: refreshLive.of(null) });
+    if (preview && showsPreview(mode())) {
+      preview.invalidate();
+      preview.renderNow();
+    }
+  }
+  /** The drawing file an image link at pos points to, if it's a drawing. */
+  function drawingAt(pos: number): string | null {
+    if (!view) return null;
+    // Link offsets cover only the destination, so take the image link on the same line closest to pos.
+    const line = view.state.doc.lineAt(pos);
+    const link = findDrawingLinks(view.state.doc.toString())
+      .filter((l) => l.from >= line.from && l.to <= line.to)
+      .sort((x, y) => Math.abs(x.from - pos) - Math.abs(y.from - pos))[0];
+    const local = link ? resolveLocalPath(link.url, activeDoc()?.path ?? null) : null;
+    return local && fileKind(local) === 'drawing' ? local : null;
   }
   createEffect(() => explorer.setShowAllFiles(settings.showAllFiles));
 
@@ -771,6 +851,8 @@ export default function App(props: { platform: Platform }) {
   registry.register([
     { id: 'history.save', title: 'Save Version…', category: 'File', run: () => void saveVersion() },
     { id: 'history.show', title: 'Show File History', category: 'File', run: () => setSidebar({ open: true, view: 'history' }) },
+    { id: 'insert.drawing', title: 'Drawing…', category: 'Insert', run: () => void newDrawing(true) },
+    { id: 'file.newDrawing', title: 'New Drawing…', category: 'File', run: () => void newDrawing(false) },
   ]);
 
   // ---------- Share bundles ----------
@@ -1344,6 +1426,7 @@ export default function App(props: { platform: Platform }) {
         spellcheck: settings.spellcheck,
         spelling,
         replaceImage: (from, to) => void replaceImageAt(from, to),
+        editDrawing: openDrawing,
       }),
     );
   }
@@ -1851,6 +1934,23 @@ export default function App(props: { platform: Platform }) {
             onRestore={() => void restoreVersion()}
             onDelete={() => void deleteVersion()}
             onClose={() => setVersionView(null)}
+          />
+        )}
+      </Show>
+      <Show when={drawing()}>
+        {(d) => (
+          <DrawingEditor
+            path={d().path}
+            exists={d().exists}
+            theme={effectiveScheme()}
+            readText={(p) => platform.readTextFile(p).then((r) => r.text)}
+            writeText={(p, text) => platform.writeTextFile(p, text).then(() => undefined)}
+            onSaved={drawingSaved}
+            onClose={() => {
+              setDrawing(null);
+              view?.focus();
+            }}
+            notify={notify}
           />
         )}
       </Show>

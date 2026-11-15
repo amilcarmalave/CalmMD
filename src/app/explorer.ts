@@ -1,5 +1,6 @@
 import { batch } from 'solid-js';
 import { createStore, produce, reconcile, unwrap } from 'solid-js/store';
+import { isDrawingPath } from '../core/drawings';
 import { basename, dirname, isMarkdownPath, isWithin, joinPath, rebase, samePath } from '../core/paths';
 import type { DirEntry, Platform } from '../platform/types';
 import type { ConfirmFn } from './documents';
@@ -74,7 +75,7 @@ export function createExplorer(deps: ExplorerDeps) {
 
   /** Markdown files and folders by default. Other files only when asked. */
   const visible = (entries: DirEntry[]) =>
-    state.showAllFiles ? entries : entries.filter((e) => e.isDir || isMarkdownPath(e.name));
+    state.showAllFiles ? entries : entries.filter((e) => e.isDir || isMarkdownPath(e.name) || isDrawingPath(e.name));
 
   async function load(dir: string) {
     try {

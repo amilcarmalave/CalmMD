@@ -24,7 +24,7 @@
     ],
     "security": {
       "assetProtocol": { "enable": true, "scope": ["**"] },
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https: data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost https: blob:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com asset: http://asset.localhost"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https: data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost https: blob:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com asset: http://asset.localhost"
     }
   },
   "bundle": {

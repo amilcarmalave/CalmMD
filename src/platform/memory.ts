@@ -251,7 +251,10 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     assetUrl: (absPath) => {
       const v = store.getItem('fs:' + absPath);
-      return v && v.startsWith('data:') ? v : absPath;
+      if (v && v.startsWith('data:')) return v;
+      // SVG written as text (drawings): show it as a picture too.
+      if (v && /\.svg$/i.test(absPath) && /^\s*</.test(v)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(v);
+      return absPath;
     },
     async openExternal(url) {
       if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener');

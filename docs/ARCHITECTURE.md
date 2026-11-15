@@ -206,6 +206,28 @@ src-tauri/
   (`buildBody`/`buildDocument` via dynamic import), `POST /__calmmd/save?name=x.html`, then print it with
   `prints_file_from_env`.
 
+### Drawings (Excalidraw)
+
+- A drawing is its own file next to the notes, `Name.excalidraw.svg`: an SVG picture with the editable scene
+  embedded (`exportEmbedScene`), so GitHub and other viewers show it and CalmMD can open it again. Plain
+  `.excalidraw` JSON files open too and save as JSON. Helpers: `core/drawings.ts`; `fileKind` returns `'drawing'`.
+- Insert → Drawing (also `/drawing`) and File → New Drawing ask for a name, then open `ui/DrawingEditor.tsx`
+  full window. It autosaves like a note; a new drawing's file is only written once something is drawn, and
+  Insert puts the image link in the note on that first save. Double-click a drawing's picture in Live mode,
+  "Edit Drawing" in its right-click menu, or click it in the sidebar to edit it.
+- The editor is React (`drawing/excalidraw.ts`, no JSX because the app's JSX is Solid), lazy-loaded, so neither
+  React nor Excalidraw is in the startup bundle.
+- **Offline fonts:** `window.EXCALIDRAW_ASSET_PATH = '/excalidraw/'`, and the `excalidrawFonts` Vite plugin serves
+  and bundles `dist/prod/fonts` there, except Xiaolai (CJK, 13 MB). Excalidraw always appends an esm.sh CDN
+  fallback; the plugin rewrites it to the app's own origin in builds, so nothing is fetched online.
+- CSP: `'wasm-unsafe-eval'` (font tools) and `worker-src 'self' blob:`. Excalidraw's glyph subsetting needs
+  `unsafe-eval`, which we don't allow, so it falls back to embedding whole fonts (about 30 KB each).
+- After a save, `withAssetVersions` (`platform/assetVersions.ts`) adds `?v=n` to that file's URL and
+  `imagesChanged()` makes Live image widgets redraw, so notes show the new picture.
+- Browser checks: on `?demo` pages the Excalidraw API is on `window.__excalidraw` (and
+  `__excalidrawConvert`), because synthetic clicks don't reach Excalidraw's canvas. `?doc=lisbon` opens a
+  note with a picture.
+
 ### Files and sessions
 - Favorites are global (all windows). The root, expanded folders, tabs and sidebar are per-window session state,
   and Spaces bundle them.

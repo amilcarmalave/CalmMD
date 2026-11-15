@@ -1,11 +1,13 @@
+import { isDrawingPath } from './drawings';
 import { isMarkdownPath } from './paths';
 
 /**
- * What CalmMD does with a file in the sidebar. Notes open in the editor; everything else opens in
+ * What CalmMD does with a file in the sidebar. Notes open in the editor, drawings in the drawing
+ * editor; everything else opens in
  * the read-only Quick view, which shows images, PDFs, text and tables, or a card with the file's
  * details and "Open with default app".
  */
-export type FileKind = 'note' | 'image' | 'pdf' | 'table' | 'text' | 'other';
+export type FileKind = 'note' | 'drawing' | 'image' | 'pdf' | 'table' | 'text' | 'other';
 
 const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg|bmp|ico)$/i;
 const TABLE = /\.(csv|tsv)$/i;
@@ -15,6 +17,7 @@ const TEXT_NAMES = /^(readme|license|licence|changelog|makefile|dockerfile|\.git
 
 export function fileKind(name: string): FileKind {
   if (isMarkdownPath(name)) return 'note';
+  if (isDrawingPath(name)) return 'drawing';
   if (IMAGE.test(name)) return 'image';
   if (/\.pdf$/i.test(name)) return 'pdf';
   if (TABLE.test(name)) return 'table';

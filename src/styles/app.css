@@ -1736,3 +1736,30 @@ button {
 .version-fold:hover {
   color: var(--fg);
 }
+
+/* ---------- Drawing editor (Excalidraw), full window ---------- */
+.drawing-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.drawing-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-raised);
+}
+.drawing-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.drawing-error {
+  padding: 24px;
+  color: var(--fg-muted);
+}
