@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code signing policy · CalmMD</title>
+<link rel="icon" href="img/mark.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="hero-bg page-head">
+  <header class="wrap top">
+    <a class="brand" href="index.html"><img src="img/mark.svg" alt=""><span>CalmMD</span></a>
+    <nav><a href="index.html">Home</a><a href="index.html#download">Download</a></nav>
+  </header>
+</div>
+<main class="page">
+  <h1>Code signing policy</h1>
+  <p class="updated">Last updated: November 2026</p>
+
+  <h2>How releases are built</h2>
+  <p>Every CalmMD installer is built by <a href="https://github.com/amilcarmalave/CalmMD/actions/workflows/release.yml">GitHub Actions</a> from the public source code in <a href="https://github.com/amilcarmalave/CalmMD">github.com/amilcarmalave/CalmMD</a>, when a version tag is pushed. Nothing is built or signed on a personal computer. Each release lists SHA-256 checksums of its files (<code>SHA256SUMS</code>), and the install scripts check downloads against them.</p>
+
+  <h2>What gets signed</h2>
+  <p>Only CalmMD's own installers and program files, built from this repository. Third-party components are included unmodified from their upstream releases and listed in <a href="https://github.com/amilcarmalave/CalmMD/blob/main/THIRD_PARTY_LICENSES.md">THIRD_PARTY_LICENSES.md</a>.</p>
+
+  <h2>Team and roles</h2>
+  <ul>
+    <li><strong>Committers and reviewers:</strong> <a href="https://github.com/amilcarmalave">amilcarmalave</a> (maintainer). Contributions from others are reviewed by the maintainer before they are merged.</li>
+    <li><strong>Approvers:</strong> <a href="https://github.com/amilcarmalave">amilcarmalave</a>. Every signing request is approved by hand, for each release.</li>
+  </ul>
+  <p>All team members use multi-factor authentication on GitHub.</p>
+
+  <h2>Privacy</h2>
+  <p>CalmMD doesn't transfer any information to other networked systems unless the user asks for it, for example by opening a link or loading an image from the web. See the <a href="privacy.html">privacy policy</a>.</p>
+
+  <h2>Reporting a problem</h2>
+  <p>If you think a signed CalmMD file was not built from this repository, or you've found a security problem, please <a href="https://github.com/amilcarmalave/CalmMD/security/advisories/new">report it privately on GitHub</a>.</p>
+</main>
+<footer class="wrap">
+  <span><img src="img/mark.svg" alt="" width="20" height="20"> CalmMD · MIT License</span>
+  <nav><a href="index.html">Home</a><a href="privacy.html">Privacy</a><a href="https://github.com/amilcarmalave/CalmMD">GitHub</a></nav>
+</footer>
+</body>
+</html>

@@ -18,7 +18,7 @@ mkdirSync(resolve(out, 'samples'), { recursive: true });
 
 cpSync(at('site'), out, { recursive: true });
 cpSync(at('assets/brand/calmmd-mark.svg'), resolve(out, 'img/mark.svg'));
-for (const name of ['split-light', 'split-dark', 'appearance', 'search', 'pdf-export', 'live-light', 'palette'])
+for (const name of ['split-light', 'split-dark', 'appearance', 'search', 'pdf-export', 'live-light', 'palette', 'images'])
   cpSync(at(`docs/screenshots/${name}.png`), resolve(out, `img/${name}.png`));
 const samples = {
   'guide-paper.pdf': 'calmmd-standard.pdf',

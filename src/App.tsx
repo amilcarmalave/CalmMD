@@ -5,7 +5,7 @@ import { createStore } from 'solid-js/store';
 import { buildCommands } from './app/appCommands';
 import { CommandRegistry } from './app/commands';
 import { createDocuments, docName } from './app/documents';
-import { editorMenuItems } from './app/editorMenu';
+import { editorMenuItems, spellingItems, wordAt } from './app/editorMenu';
 import { createExplorer } from './app/explorer';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
@@ -1309,15 +1309,20 @@ export default function App(props: { platform: Platform }) {
   }
 
   // ---------- Context menus ----------
-  function onEditorContextMenu(e: MouseEvent) {
-    if (!view || e.shiftKey) return; // Shift+right-click: the native menu (spelling suggestions)
+  async function onEditorContextMenu(e: MouseEvent) {
+    if (!view || e.shiftKey) return; // Shift+right-click: the native menu
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
     if (pos === null) return;
+    e.preventDefault();
+    e.stopPropagation();
     const sel = view.state.selection.main;
     if (pos < sel.from || pos > sel.to) view.dispatch({ selection: { anchor: pos } });
     setBubble(null);
-    menu.open(
-      e,
+    const spelling = await spellingAt(pos);
+    if (!view) return;
+    menu.openAt(
+      e.clientX,
+      e.clientY,
       editorMenuItems(view, pos, {
         registry,
         platform,
@@ -1327,8 +1332,36 @@ export default function App(props: { platform: Platform }) {
         notify,
         hint,
         spellcheck: settings.spellcheck,
+        spelling,
         replaceImage: (from, to) => void replaceImageAt(from, to),
       }),
+    );
+  }
+
+  /**
+   * Suggestions for the word at pos, from the OS spellchecker: [] when it's spelled right or there's
+   * no word, undefined when there's no checker to ask (the menu then points to the native one).
+   */
+  async function spellingAt(pos: number): Promise<MenuItem[] | undefined> {
+    if (!view || !settings.spellcheck) return [];
+    const line = view.state.doc.lineAt(pos);
+    const w = wordAt(line.text, pos - line.from);
+    if (!w) return [];
+    const from = line.from + w.from;
+    const to = line.from + w.to;
+    const lang = settings.spellLang === 'auto' ? undefined : settings.spellLang;
+    const timeout = new Promise<null>((r) => setTimeout(() => r(null), 400));
+    const result = await Promise.race([platform.spellCheck(w.word, lang).catch(() => null), timeout]);
+    if (!result) return undefined;
+    if (!result.misspelled) return [];
+    return spellingItems(
+      result.suggestions,
+      (s) => {
+        if (view?.state.sliceDoc(from, to) !== w.word) return;
+        view.dispatch({ changes: { from, to, insert: s }, selection: { anchor: from + s.length }, userEvent: 'input.spell' });
+        view.focus();
+      },
+      () => void platform.spellLearn(w.word, lang).then(() => notify(`Added “${w.word}” to the dictionary`)),
     );
   }
 
@@ -1546,6 +1579,14 @@ export default function App(props: { platform: Platform }) {
               }, 50);
           }
           if (ui === 'spaces') document.querySelector<HTMLButtonElement>('.space-switcher')?.click();
+          if (ui === 'image')
+            // Right-click the first picture once it has loaded: its Size and Align menu.
+            setTimeout(() => {
+              const img = document.querySelector<HTMLElement>('.pane-editor .cm-live-image img');
+              const r = img?.getBoundingClientRect();
+              if (img && r)
+                img.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + r.width * 0.55, clientY: r.top + r.height * 0.3 }));
+            }, 700);
           if (ui.startsWith('qv:')) setQuickView(ui.slice(3));
           if (ui === 'search') {
             registry.run('view.search');

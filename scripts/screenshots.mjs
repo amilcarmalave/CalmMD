@@ -37,6 +37,7 @@ const shots = [
   { name: 'split-dark', q: 'demo&mode=split&scheme=dark&dark=github-dark&theme=github&sidebar=none' },
   { name: 'preview-outline', q: 'demo&mode=preview&scheme=light&theme=clear&sidebar=outline&toolbar=0' },
   { name: 'appearance', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=appearance' },
+  { name: 'images', q: 'demo&mode=live&scheme=light&light=paper&theme=paper&sidebar=files&doc=lisbon&ui=image' },
   { name: 'search', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=search' },
   { name: 'pdf-export', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=export' },
   { name: 'palette', q: 'demo&mode=live&scheme=dark&dark=midnight&theme=paper&sidebar=files&palette=' + encodeURIComponent('>them') },

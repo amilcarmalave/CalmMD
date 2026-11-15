@@ -54,6 +54,8 @@ Press \`Ctrl/Cmd+Shift+P\` for every command, or type \`/\` on an empty line to 
 
 const FILES: Record<string, string> = {
   '/Notes/Welcome to CalmMD.md': WELCOME,
+  '/Notes/Trip to Lisbon.md':
+    '# Trip to Lisbon\n\nThree days of tiled streets, custard tarts and river light.\n\n![Sunrise over the Tagus|520|center](assets/sunrise.svg)\n\n## Day one\n\n- [x] Book the flat in Alfama\n- [ ] Pastéis de nata at Manteigaria\n- [ ] Sunset at Miradouro da Graça\n',
   '/Notes/Ideas.md': '# Ideas\n\n## Small\n\n- Calm defaults\n- Fewer buttons\n\n## Large\n\n- Spaces for every project\n',
   '/Notes/Reading list.md': '# Reading list\n\n- [ ] *The Elements of Typographic Style*\n- [x] *Thinking with Type*\n',
   '/Notes/Journal/2026-11-12.md': '# Thursday\n\nShipped the export pipeline.\n',
@@ -85,6 +87,8 @@ export function createDemoPlatform(params: URLSearchParams) {
   const light = params.get('light') ?? 'snow';
   const dark = params.get('dark') ?? 'ink';
   const toolbar = params.get('toolbar') !== '0';
+  // ?doc=lisbon: a note with a picture is the active tab (screenshots of images).
+  const lisbon = params.get('doc') === 'lisbon' ? '/Notes/Trip to Lisbon.md' : null;
   void platform.kvSet(
     'settings',
     JSON.stringify({ v: 2, viewMode: mode, colorScheme: scheme, previewTheme: theme, splitRatio: 0.5, lightTheme: light, darkTheme: dark, toolbarVisible: toolbar }),
@@ -99,8 +103,9 @@ export function createDemoPlatform(params: URLSearchParams) {
         { path: '/Notes/Welcome to CalmMD.md', cursor: WELCOME.length, topLine: 0 },
         { path: '/Notes/Ideas.md', cursor: 0, topLine: 0 },
         ...(extra ? [{ path: extra, cursor: files[extra].length, topLine: 0 }] : []),
+        ...(lisbon ? [{ path: lisbon, cursor: files[lisbon].length, topLine: 0 }] : []),
       ],
-      active: extra ? 2 : 0,
+      active: extra || lisbon ? 2 : 0,
       root: '/Notes',
       expanded: ['/Notes/Journal'],
       sidebar: { open: sidebar !== 'none', view: sidebar === 'outline' ? 'outline' : 'files', width: 240 },
