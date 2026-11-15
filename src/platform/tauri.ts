@@ -119,6 +119,7 @@ export function createTauriPlatform(): Platform {
     pendingAssetsDir: () => invoke<string>('pending_assets_dir'),
     findPandoc: () => invoke<string | null>('find_pandoc'),
     spellCheck: (word, lang) => invoke('spell_check', { word, lang: lang ?? null }),
+    spellCheckText: (text, lang) => invoke('spell_check_text', { text, lang: lang ?? null }),
     spellLearn: (word, lang) => invoke<void>('spell_learn', { word, lang: lang ?? null }),
     pandocConvert: (markdown, out, resourceDir) => invoke<void>('pandoc_convert', { markdown, out, resourceDir }),
     themesDir: () => invoke<string>('themes_dir'),

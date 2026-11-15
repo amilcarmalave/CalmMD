@@ -197,6 +197,14 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       const s = learned.has(word.toLowerCase()) ? undefined : fixes[word.toLowerCase()];
       return { misspelled: !!s, suggestions: s ?? [] };
     },
+    async spellCheckText(text) {
+      const out: [number, number][] = [];
+      for (const m of text.matchAll(/\p{L}+/gu)) {
+        const w = m[0].toLowerCase();
+        if (!learned.has(w) && ['recieve', 'teh', 'wierd'].includes(w)) out.push([m.index!, m.index! + m[0].length]);
+      }
+      return out;
+    },
     async spellLearn(word) {
       learned.add(word.toLowerCase());
     },

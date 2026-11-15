@@ -87,6 +87,8 @@ export interface Platform {
    * Null when this system has no checker the app can ask (the webview may still underline).
    */
   spellCheck(word: string, lang?: string): Promise<{ misspelled: boolean; suggestions: string[] } | null>;
+  /** Misspelled ranges in text ([from, to) string offsets), or null when there's no OS checker to ask. */
+  spellCheckText(text: string, lang?: string): Promise<[number, number][] | null>;
   /** Adds a word to the OS user dictionary. */
   spellLearn(word: string, lang?: string): Promise<void>;
   pandocConvert(markdown: string, outPath: string, resourceDir: string | null): Promise<void>;

@@ -84,6 +84,7 @@ pub fn run() {
             export::pandoc_convert,
             export::themes_dir,
             spell::spell_check,
+            spell::spell_check_text,
             spell::spell_learn,
             launch_paths,
         ])

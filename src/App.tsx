@@ -6,6 +6,7 @@ import { buildCommands } from './app/appCommands';
 import { CommandRegistry } from './app/commands';
 import { createDocuments, docName } from './app/documents';
 import { editorMenuItems, spellingItems, wordAt } from './app/editorMenu';
+import { recheckSpelling, spelling } from './editor/spelling';
 import { createExplorer } from './app/explorer';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
@@ -320,22 +321,31 @@ export default function App(props: { platform: Platform }) {
     colorScheme: () => effectiveScheme(),
   });
   const liveFor = (m: ViewMode) => (m === 'live' ? liveExtension : []);
-  // Spellcheck: the webview's native checker, configured via contentDOM attributes. The `lang`
-  // attribute picks the dictionary (it must be installed in the OS).
+  // Spellcheck. Where the OS spellchecker answers us (Windows, macOS), CalmMD draws the underlines
+  // itself (editor/spelling.ts) and the webview's own checker is off. Elsewhere the webview's checker
+  // is used, configured with contentDOM attributes; `lang` picks the dictionary.
   const spellCompartment = new Compartment();
   const spellCache = new Map<string, Extension>();
+  const [osSpelling, setOsSpelling] = createSignal(false);
+  const spellLangArg = () => (settings.spellLang === 'auto' ? undefined : settings.spellLang);
   const spellFor = () => {
-    const key = `${settings.spellcheck}|${settings.spellLang}`;
+    const ours = settings.spellcheck && osSpelling();
+    const key = `${settings.spellcheck}|${settings.spellLang}|${ours}`;
     let ext = spellCache.get(key);
     if (!ext) {
-      ext = EditorView.contentAttributes.of({
-        spellcheck: settings.spellcheck ? 'true' : 'false',
-        ...(settings.spellLang !== 'auto' ? { lang: settings.spellLang } : {}),
-      });
+      const lang = spellLangArg();
+      ext = [
+        EditorView.contentAttributes.of({
+          spellcheck: settings.spellcheck && !ours ? 'true' : 'false',
+          ...(lang ? { lang } : {}),
+        }),
+        ours ? spelling({ check: (text) => platform.spellCheckText(text, lang) }) : [],
+      ];
       spellCache.set(key, ext);
     }
     return ext;
   };
+  void platform.spellCheckText('', undefined).then((r) => setOsSpelling(r !== null), () => setOsSpelling(false));
 
   /** Brings the active editor state's per-window configuration up to date. */
   function applyLiveMode() {
@@ -349,7 +359,7 @@ export default function App(props: { platform: Platform }) {
     if (spellCompartment.get(view.state) !== spell) effects.push(spellCompartment.reconfigure(spell));
     if (effects.length) view.dispatch({ effects });
   }
-  createEffect(on(() => [settings.spellcheck, settings.spellLang], () => applyLiveMode(), { defer: true }));
+  createEffect(on(() => [settings.spellcheck, settings.spellLang, osSpelling()], () => applyLiveMode(), { defer: true }));
 
   const docs = createDocuments({
     platform,
@@ -1361,7 +1371,11 @@ export default function App(props: { platform: Platform }) {
         view.dispatch({ changes: { from, to, insert: s }, selection: { anchor: from + s.length }, userEvent: 'input.spell' });
         view.focus();
       },
-      () => void platform.spellLearn(w.word, lang).then(() => notify(`Added “${w.word}” to the dictionary`)),
+      () =>
+        void platform.spellLearn(w.word, lang).then(() => {
+          view?.dispatch({ effects: recheckSpelling.of(null) });
+          notify(`Added “${w.word}” to the dictionary`);
+        }),
     );
   }
 

@@ -1,7 +1,7 @@
-//! The operating system's spellchecker, for suggestions in CalmMD's own right-click menu. The
-//! webview draws the red underlines, but its native menu (which lists suggestions) is replaced by
-//! ours, so we ask the same OS spellchecker directly. Windows: ISpellChecker. macOS: NSSpellChecker.
-//! Elsewhere there's no checker and the menu shows no suggestions.
+//! The operating system's spellchecker, for the editor's underlines and the suggestions in CalmMD's
+//! own right-click menu. (The webview's checker loses its underlines whenever Live mode redraws a
+//! line, and its menu is replaced by ours.) Windows: ISpellChecker. macOS: NSSpellChecker.
+//! Elsewhere there's no checker: the webview's own underlines are used instead.
 
 use serde::Serialize;
 
@@ -23,6 +23,13 @@ pub fn spell_check(word: String, lang: Option<String>) -> Result<Option<SpellChe
         return Ok(None);
     }
     imp::check(word, lang.as_deref()).map_err(|e| e.to_string())
+}
+
+/// The misspelled words in some text, as [start, end) offsets in UTF-16 code units (JavaScript string
+/// indices). `Ok(None)`: no spellchecker for that language on this system.
+#[tauri::command]
+pub fn spell_check_text(text: String, lang: Option<String>) -> Result<Option<Vec<(u32, u32)>>, String> {
+    imp::misspellings(&text, lang.as_deref()).map_err(|e| e.to_string())
 }
 
 /// Adds a word to the user's dictionary (shared with other apps on this system).
@@ -49,7 +56,21 @@ mod imp {
         }
     }
 
+    thread_local! {
+        static CHECKERS: std::cell::RefCell<std::collections::HashMap<String, Option<ISpellChecker>>> = Default::default();
+    }
+
     fn checker(lang: Option<&str>) -> ::windows::core::Result<Option<ISpellChecker>> {
+        let key = lang.unwrap_or("").to_string();
+        if let Some(found) = CHECKERS.with(|c| c.borrow().get(&key).cloned()) {
+            return Ok(found);
+        }
+        let made = create(lang)?;
+        CHECKERS.with(|c| c.borrow_mut().insert(key, made.clone()));
+        Ok(made)
+    }
+
+    fn create(lang: Option<&str>) -> ::windows::core::Result<Option<ISpellChecker>> {
         unsafe {
             // Already initialised on this thread (by the webview) is fine.
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
@@ -95,6 +116,27 @@ mod imp {
         }
     }
 
+    pub fn misspellings(text: &str, lang: Option<&str>) -> ::windows::core::Result<Option<Vec<(u32, u32)>>> {
+        let Some(checker) = checker(lang)? else { return Ok(None) };
+        let mut out = Vec::new();
+        if text.is_empty() {
+            return Ok(Some(out));
+        }
+        unsafe {
+            let errors = checker.Check(&HSTRING::from(text))?;
+            loop {
+                let mut e = None;
+                if errors.Next(&mut e) != S_OK {
+                    break;
+                }
+                let Some(e) = e else { break };
+                let start = e.StartIndex()?;
+                out.push((start, start + e.Length()?));
+            }
+        }
+        Ok(Some(out))
+    }
+
     pub fn learn(word: &str, lang: Option<&str>) -> ::windows::core::Result<()> {
         if let Some(checker) = checker(lang)? {
             unsafe { checker.Add(&HSTRING::from(word))? };
@@ -137,6 +179,33 @@ mod imp {
         Ok(Some(SpellCheck { misspelled, suggestions }))
     }
 
+    pub fn misspellings(text: &str, lang: Option<&str>) -> Result<Option<Vec<(u32, u32)>>, String> {
+        let checker = NSSpellChecker::sharedSpellChecker();
+        let text = NSString::from_str(text);
+        let language = lang.map(NSString::from_str);
+        let len = text.length();
+        let mut out = Vec::new();
+        let mut at = 0usize;
+        while at < len {
+            let found = unsafe {
+                checker.checkSpellingOfString_startingAt_language_wrap_inSpellDocumentWithTag_wordCount(
+                    &text,
+                    at as isize,
+                    language.as_deref(),
+                    false,
+                    0,
+                    std::ptr::null_mut(),
+                )
+            };
+            if found.length == 0 || found.location == usize::MAX || found.location < at {
+                break;
+            }
+            out.push((found.location as u32, (found.location + found.length) as u32));
+            at = found.location + found.length;
+        }
+        Ok(Some(out))
+    }
+
     pub fn learn(word: &str, _lang: Option<&str>) -> Result<(), String> {
         NSSpellChecker::sharedSpellChecker().learnWord(&NSString::from_str(word));
         Ok(())
@@ -148,6 +217,10 @@ mod imp {
     use super::SpellCheck;
 
     pub fn check(_word: &str, _lang: Option<&str>) -> Result<Option<SpellCheck>, String> {
+        Ok(None)
+    }
+
+    pub fn misspellings(_text: &str, _lang: Option<&str>) -> Result<Option<Vec<(u32, u32)>>, String> {
         Ok(None)
     }
 
@@ -167,5 +240,15 @@ mod tests {
         assert!(bad.suggestions.iter().any(|s| s == "receive"), "{:?}", bad.suggestions);
         let good = spell_check("receive".into(), Some("en-US".into())).unwrap().unwrap();
         assert_eq!(good, SpellCheck { misspelled: false, suggestions: vec![] });
+    }
+
+    #[test]
+    fn finds_misspelled_words_in_text_as_utf16_ranges() {
+        // "Café" has a 2-byte é (1 UTF-16 unit), so byte and UTF-16 offsets differ after it.
+        let text = "Café, I recieve teh mail.";
+        let found = spell_check_text(text.into(), Some("en-US".into())).unwrap().unwrap();
+        let utf16: Vec<u16> = text.encode_utf16().collect();
+        let words: Vec<String> = found.iter().map(|&(a, b)| String::from_utf16_lossy(&utf16[a as usize..b as usize])).collect();
+        assert_eq!(words, vec!["recieve", "teh"]);
     }
 }
