@@ -32,6 +32,12 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 
 <table>
 <tr>
+<td colspan="2"><img src="docs/screenshots/live-light.png" alt="Live mode: the page renders as you type, and the Markdown shows only where the cursor is"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><sub><b>Live mode:</b> a finished page as you type. The Markdown (here <code>**bold**</code>) appears only where your cursor is</sub></td>
+</tr>
+<tr>
 <td width="50%"><img src="docs/screenshots/split-light.png" alt="Split view: the Markdown source beside the rendered page"></td>
 <td width="50%"><img src="docs/screenshots/split-dark.png" alt="Split view in GitHub Dark with the GitHub document style"></td>
 </tr>

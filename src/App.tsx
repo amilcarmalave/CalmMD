@@ -1526,6 +1526,10 @@ export default function App(props: { platform: Platform }) {
       const params = new URLSearchParams(location.search);
       const q = params.get('palette');
       if (q !== null) setPalette(q);
+      // ?at=<text>: the cursor goes right after that text, so Live mode shows the syntax there.
+      const at = params.get('at');
+      const found = at ? view.state.doc.toString().indexOf(at) : -1;
+      if (found >= 0) view.dispatch({ selection: { anchor: found + at!.length }, scrollIntoView: true });
       const ui = params.get('ui');
       if (ui)
         setTimeout(() => {

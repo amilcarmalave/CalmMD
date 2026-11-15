@@ -33,7 +33,7 @@ mkdirSync(out, { recursive: true });
 
 const shots = [
   { name: 'split-light', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files' },
-  { name: 'live-light', q: 'demo&mode=live&scheme=light&light=paper&theme=paper&sidebar=files&toolbar=0' },
+  { name: 'live-light', q: 'demo&mode=live&scheme=light&light=paper&theme=paper&sidebar=files&toolbar=0&at=saved%20auto' },
   { name: 'split-dark', q: 'demo&mode=split&scheme=dark&dark=github-dark&theme=github&sidebar=none' },
   { name: 'preview-outline', q: 'demo&mode=preview&scheme=light&theme=clear&sidebar=outline&toolbar=0' },
   { name: 'appearance', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=appearance' },

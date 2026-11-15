@@ -71,12 +71,43 @@ function render(src) {
 
 const srcEl = document.getElementById('demo-src');
 const outEl = document.getElementById('demo-out');
-function show(text) {
-  srcEl.innerHTML = highlight(text);
-  outEl.innerHTML = render(text);
+const demoEl = document.getElementById('demo');
+let mode = 'live';
+let userPicked = false;
+
+/** The line being typed, in Live mode: styled like its block, with its Markdown still showing. */
+function liveLine(line) {
+  const kind = /^#{1,6} /.test(line) ? 'h1' : /^- /.test(line) ? 'li' : /^>/.test(line) ? 'quote' : 'p';
+  return `<div class="live-cur ${kind}">${highlight(line)}<span class="caret"></span></div>`;
 }
 
+function show(text) {
+  if (mode === 'split') {
+    srcEl.innerHTML = highlight(text);
+    outEl.innerHTML = render(text);
+    return;
+  }
+  // Live: finished lines render; the line under the cursor shows its syntax, as in CalmMD.
+  const cut = text.lastIndexOf('\n');
+  outEl.innerHTML = render(cut < 0 ? '' : text.slice(0, cut)) + liveLine(cut < 0 ? text : text.slice(cut + 1));
+}
+
+function setMode(m) {
+  mode = m;
+  demoEl.classList.toggle('live', m === 'live');
+  for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-selected', String(b.dataset.mode === m));
+}
+let current = '';
+for (const b of document.querySelectorAll('[data-mode]'))
+  b.addEventListener('click', () => {
+    userPicked = true;
+    setMode(b.dataset.mode);
+    show(current);
+  });
+
 if (srcEl && outEl) {
+  const realShow = show;
+  show = (text) => realShow((current = text));
   if (reduceMotion) show(DOC);
   else {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -96,6 +127,8 @@ if (srcEl && outEl) {
           await sleep(12);
         }
         await sleep(700);
+        // Alternate Live and Split each time round, unless the visitor picked one.
+        if (!userPicked) setMode(mode === 'live' ? 'split' : 'live');
       }
     })();
   }

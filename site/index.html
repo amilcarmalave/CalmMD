@@ -44,10 +44,16 @@
     <p class="fine" data-download-fine>Installers for Windows, macOS and Linux.</p>
   </section>
 
-  <!-- The demo: Markdown typed on the left, rendered on the right, the way CalmMD's Split mode works. -->
+  <!-- The demo: Live mode (renders in place, the syntax shows only on the line being typed) or Split. -->
   <div class="wrap">
-    <div class="window demo" aria-label="A demo: Markdown typed on the left renders on the right">
-      <div class="titlebar"><i></i><i></i><i></i><span>Trip to Lisbon.md</span></div>
+    <div class="window demo live" id="demo" aria-label="A demo of CalmMD rendering Markdown as it's typed">
+      <div class="titlebar">
+        <i></i><i></i><i></i><span>Trip to Lisbon.md</span>
+        <div class="modes" role="tablist" aria-label="View mode">
+          <button role="tab" aria-selected="true" data-mode="live">Live</button>
+          <button role="tab" aria-selected="false" data-mode="split">Split</button>
+        </div>
+      </div>
       <div class="panes">
         <pre class="src" aria-hidden="true"><code id="demo-src"></code><span class="caret"></span></pre>
         <article class="out" id="demo-out"></article>

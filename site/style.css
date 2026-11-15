@@ -234,3 +234,24 @@ footer a:hover { color: var(--strong); }
   .caret, .out .rendered { animation: none; }
   .btn, .tile, .platform { transition: none; }
 }
+
+/* ---------- Demo: Live / Split switch ---------- */
+.titlebar { position: relative; }
+.modes { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; padding: 3px; gap: 2px; border-radius: 8px; background: rgba(0,0,0,0.06); }
+.modes button { font: 600 12.5px var(--sans); color: #6b6f78; background: none; border: 0; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+.modes button[aria-selected='true'] { background: #fff; color: #1f2a44; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.demo.live .src { display: none; }
+.demo.live .panes { grid-template-columns: 1fr; }
+.demo.live .out { width: 100%; max-width: 720px; margin: 0 auto; padding: 40px 44px; }
+/* The line being typed: its block's look, with the Markdown still visible (dimmed amber). */
+.live-cur { margin: 0 0 14px; white-space: pre-wrap; }
+.live-cur .m { color: #c08a2e; opacity: 0.85; font-weight: 400; }
+.live-cur b { font-weight: inherit; }
+.live-cur.h1 { font: 600 30px/1.2 var(--serif); color: #151922; letter-spacing: -0.01em; }
+.live-cur.quote { padding-left: 16px; border-left: 3px solid #2f9e66; font-size: 15.5px; }
+.live-cur .caret { height: 1.05em; }
+@media (max-width: 640px) {
+  .demo.live .out { padding: 22px; }
+  .titlebar span { display: none; }
+}
+.out ul + .live-cur.li { margin-top: -12px; }
