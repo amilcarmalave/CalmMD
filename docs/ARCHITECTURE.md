@@ -227,6 +227,27 @@ src-tauri/
 - Browser checks: on `?demo` pages the Excalidraw API is on `window.__excalidraw` (and
   `__excalidrawConvert`), because synthetic clicks don't reach Excalidraw's canvas. `?doc=lisbon` opens a
   note with a picture.
+- **Own window on the desktop:** `open_drawing_window` (Rust, `windows.rs`) opens `drawing-<hash of path>`, so a
+  file always gets the same window (focused if open), with `window.__CALMMD_DRAWING__` set; `main.tsx` then
+  renders `ui/DrawingWindow.tsx` instead of the editor. Saves are broadcast (`drawing-saved`); the editor
+  window refreshes pictures and, on the first save, links a new drawing into the note that asked for it
+  (`waitingForDrawing`). Closing the window flushes pending changes. The browser build has no windows and
+  shows the drawing in the page.
+
+### New-version notices
+
+- Asked once (`settings.updateCheck`: `'ask'` → `'on'`/`'off'`, a confirm 4 s after the first window opens;
+  Esc asks again next launch). When on, the main window fetches GitHub's `releases/latest` about once a day
+  (`app/updates.ts`; CSP allows `connect-src https://api.github.com`) and shows a sticky status bar notice with
+  "What's New" (the release page) once per version. Help → Check for Updates… checks on demand; Help → Tell
+  Me About New Versions toggles it. Nothing else is sent. The release notes on GitHub are where new features
+  are announced.
+
+### File history size
+
+- Unnamed versions are capped per file (`HISTORY_KEEP_UNNAMED`); saving on close is off by default. The History
+  tab shows total usage (`history.usage()`) and can delete one file's versions or all of them (also File →
+  Clear All File History… in the command palette).
 
 ### Files and sessions
 - Favorites are global (all windows). The root, expanded folders, tabs and sidebar are per-window session state,

@@ -68,4 +68,18 @@ describe('file history', () => {
     expect((await history.list('/n/a.md')).map((x) => x.size)).toEqual([3]);
     expect(await history.read('/n/a.md', v!.id)).toBeNull();
   });
+
+  it('reports how much is stored, and clears one file or everything', async () => {
+    const { history, platform } = setup();
+    await history.save('/n/a.md', 'one');
+    await history.save('/n/a.md', 'one two');
+    await history.save('/n/b.md', 'three');
+    expect(await history.usage()).toEqual({ files: 2, versions: 3, chars: 15 });
+    await history.clearFile('/n/a.md');
+    expect(await history.list('/n/a.md')).toEqual([]);
+    expect(await history.usage()).toEqual({ files: 1, versions: 1, chars: 5 });
+    await history.clearAll();
+    expect(await history.usage()).toEqual({ files: 0, versions: 0, chars: 0 });
+    expect(await platform.kvList('history/')).toEqual([]);
+  });
 });

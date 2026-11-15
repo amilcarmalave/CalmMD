@@ -116,6 +116,10 @@ export interface Platform {
   /** The Space this window was opened for, if any. */
   initialSpaceId(): string | null;
   openWindow(spaceId: string | null): Promise<void>;
+  /** Desktop only: opens a drawing in its own window (or focuses it). Without it, drawings open in the page. */
+  openDrawingWindow?(path: string, title: string): Promise<void>;
+  /** The drawing this window was opened for, if it's a drawing window. */
+  initialDrawing?(): string | null;
   /** Binds a Space to this window (null releases it). Returns another window's label if it already holds the Space. */
   claimSpace(spaceId: string | null): Promise<string | null>;
   /** The window that currently holds a Space, if any. */

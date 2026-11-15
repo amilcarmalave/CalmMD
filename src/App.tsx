@@ -36,7 +36,8 @@ import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
 import { DrawingEditor } from './ui/DrawingEditor';
-import { drawingFileName, drawingMarkdown } from './core/drawings';
+import { compareVersions, isCheckDue, parseRelease, RELEASES_API, shouldAnnounce, type Release } from './app/updates';
+import { drawingFileName, drawingMarkdown, drawingTitle } from './core/drawings';
 import { withAssetVersions } from './platform/assetVersions';
 import { imagesChanged } from './editor/live/widgets';
 import { insertBlock } from './editor/format';
@@ -53,7 +54,7 @@ import { isEmbeddableUrl } from './render/embeds';
 import { BRAND } from './brand';
 import { formatBinding } from './core/keys';
 import { extractHeadings, headingIndexAt, type Heading } from './core/outline';
-import { basename, dirname, isPlainTextPath, isWithin, joinPath, samePath, stem } from './core/paths';
+import { basename, dirname, isPlainTextPath, isWithin, joinPath, pathKey, samePath, stem } from './core/paths';
 import { notifySavedFiles } from './platform/savedFiles';
 import { countStats, type TextStats } from './core/stats';
 import { editorExtensions, isUserEdit, markdownSupport } from './editor/extensions';
@@ -125,11 +126,12 @@ export default function App(props: { platform: Platform }) {
   const mode = (): ViewMode => (plainText() ? 'source' : chosenMode());
 
   let messageTimer: ReturnType<typeof setTimeout> | undefined;
-  const notify = (text: string, action?: { label: string; run: () => void }) => {
+  /** A status bar message. `sticky` ones stay until the next message (a new-version notice). */
+  const notify = (text: string, action?: { label: string; run: () => void }, sticky = false) => {
     setMessage({ text, action });
     clearTimeout(messageTimer);
     // Messages with an action stay a little longer.
-    messageTimer = setTimeout(() => setMessage(null), action ? 9000 : 5000);
+    if (!sticky) messageTimer = setTimeout(() => setMessage(null), action ? 9000 : 5000);
   };
 
   let view: EditorView | undefined;
@@ -291,8 +293,19 @@ export default function App(props: { platform: Platform }) {
 
   // ---------- Drawings (Excalidraw) ----------
   // A drawing is its own file next to the notes (Name.excalidraw.svg). Notes show it as a picture.
-  const [drawing, setDrawing] = createSignal<{ path: string; exists: boolean; insertInto?: string } | null>(null);
-  const openDrawing = (path: string) => setDrawing({ path, exists: true });
+  // On the desktop each drawing gets its own window (platform.openDrawingWindow); the browser build
+  // shows it in the page. A note waiting for a new drawing gets its link on the drawing's first save.
+  const [drawing, setDrawing] = createSignal<{ path: string; exists: boolean } | null>(null);
+  const waitingForDrawing = new Map<string, string>(); // drawing path key -> document id
+  function showDrawing(path: string, exists: boolean) {
+    if (platform.openDrawingWindow) void platform.openDrawingWindow(path, `${drawingTitle(path)} — CalmMD`).catch((e) => notify(String(e)));
+    else setDrawing({ path, exists });
+  }
+  const openDrawing = (path: string) => showDrawing(path, true);
+  platform.onBroadcast('drawing-saved', (p) => {
+    const { path, first } = p as { path: string; first: boolean };
+    drawingSaved(path, first);
+  });
 
   /** Insert → Drawing (insert: true) or File → New Drawing: asks for a name, then opens the editor. */
   async function newDrawing(insert: boolean) {
@@ -312,8 +325,9 @@ export default function App(props: { platform: Platform }) {
     if (!file) return;
     const path = joinPath(dir, file);
     const exists = !!(await platform.stat(path).catch(() => null));
-    setDrawing({ path, exists, insertInto: insert ? d?.id : undefined });
     if (insert && exists) insertDrawingLink(path);
+    else if (insert && d) waitingForDrawing.set(pathKey(path), d.id);
+    showDrawing(path, exists);
   }
   function insertDrawingLink(path: string) {
     if (!view) return;
@@ -324,8 +338,12 @@ export default function App(props: { platform: Platform }) {
     assetVersions.changed(path);
     imagesChanged();
     void explorer.refreshDir(dirname(path));
-    const d = drawing();
-    if (first && d?.insertInto && d.insertInto === store.activeId) insertDrawingLink(path);
+    const waiting = waitingForDrawing.get(pathKey(path));
+    if (first && waiting) {
+      waitingForDrawing.delete(pathKey(path));
+      if (waiting === store.activeId) insertDrawingLink(path);
+      else notify(`Saved ${drawingTitle(path)}. Its note isn’t open here, so add the picture with Insert → Image.`);
+    }
     view?.dispatch({ effects: refreshLive.of(null) });
     if (preview && showsPreview(mode())) {
       preview.invalidate();
@@ -851,9 +869,86 @@ export default function App(props: { platform: Platform }) {
   registry.register([
     { id: 'history.save', title: 'Save Version…', category: 'File', run: () => void saveVersion() },
     { id: 'history.show', title: 'Show File History', category: 'File', run: () => setSidebar({ open: true, view: 'history' }) },
+    { id: 'history.clearAll', title: 'Clear All File History…', category: 'File', run: () => void clearAllHistory() },
+    { id: 'help.checkUpdates', title: 'Check for Updates…', category: 'Help', run: () => void checkForUpdates(true) },
+    {
+      id: 'help.updateNotices',
+      title: 'Tell Me About New Versions',
+      category: 'Help',
+      run: () => {
+        const on = settings.updateCheck !== 'on';
+        update({ updateCheck: on ? 'on' : 'off' });
+        notify(on ? 'CalmMD will tell you when a new version is out' : 'No more new-version notices');
+        if (on) void checkForUpdates();
+      },
+    },
     { id: 'insert.drawing', title: 'Drawing…', category: 'Insert', run: () => void newDrawing(true) },
     { id: 'file.newDrawing', title: 'New Drawing…', category: 'File', run: () => void newDrawing(false) },
   ]);
+
+  async function clearFileHistory(path: string) {
+    const c = await confirm({
+      title: 'Delete this file’s history?',
+      message: `Every saved version of “${basename(path)}” goes. The file itself isn’t touched. This can’t be undone.`,
+      primary: 'Delete History',
+      destructive: 'primary',
+    });
+    if (c !== 'primary') return;
+    await history.clearFile(path).catch((e) => notify(String(e)));
+    setHistoryRev((n) => n + 1);
+  }
+  async function clearAllHistory() {
+    const u = await history.usage().catch(() => null);
+    if (!u?.versions) return notify('There’s no file history to clear');
+    const c = await confirm({
+      title: 'Clear all file history?',
+      message: `${u.versions === 1 ? 'The one saved version' : `All ${u.versions.toLocaleString()} saved versions`} of ${u.files.toLocaleString()} ${u.files === 1 ? 'file' : 'files'} will be deleted. Your files themselves aren’t touched. This can’t be undone.`,
+      primary: 'Clear All',
+      destructive: 'primary',
+    });
+    if (c !== 'primary') return;
+    await history.clearAll().catch((e) => notify(String(e)));
+    setHistoryRev((n) => n + 1);
+    notify('File history cleared');
+  }
+
+  // ---------- New-version notices ----------
+  // Only with the user's OK (asked once). About once a day the app asks GitHub for the latest release.
+  async function checkForUpdates(manual = false) {
+    if (!manual && settings.updateCheck !== 'on') return;
+    if (!manual) {
+      const last = Number(await platform.kvGet('updates/lastCheck').catch(() => null)) || null;
+      if (!isCheckDue(last, Date.now())) return;
+    }
+    let latest: Release | null = null;
+    try {
+      const r = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
+      latest = r.ok ? parseRelease(await r.json()) : null;
+    } catch {
+      if (manual) notify('Couldn’t reach GitHub to check for a new version');
+      return;
+    }
+    await platform.kvSet('updates/lastCheck', String(Date.now()));
+    const shown = await platform.kvGet('updates/shown').catch(() => null);
+    const newer = !!latest && compareVersions(latest.version, __APP_VERSION__) > 0;
+    if (latest && newer && (manual || shouldAnnounce(latest, __APP_VERSION__, shown))) {
+      const release = latest;
+      await platform.kvSet('updates/shown', release.version);
+      notify(`CalmMD ${release.version} is out`, { label: 'What’s New', run: () => void platform.openExternal(release.url) }, true);
+    } else if (manual) notify(`You have the latest version (${__APP_VERSION__})`);
+  }
+  async function askAboutUpdates() {
+    if (settings.updateCheck !== 'ask') return;
+    const c = await confirm({
+      title: 'Hear about new versions?',
+      message:
+        'CalmMD can check GitHub about once a day and show a short note when a new version is out. Nothing about you or your files is sent. You can change this any time in the Help menu.',
+      primary: 'Yes, Tell Me',
+      secondary: 'No Thanks',
+    });
+    if (c === 'cancel') return; // asked again next launch
+    update({ updateCheck: c === 'primary' ? 'on' : 'off' });
+  }
 
   // ---------- Share bundles ----------
   const dataUrlBytes = (url: string) => {
@@ -1648,6 +1743,11 @@ export default function App(props: { platform: Platform }) {
     }
     sessionReady = true;
     saveSession(); // persist right away, so a crash before the first change still keeps it
+    // New-version notices (desktop, first window): the one-time question, then a check about once a day.
+    if (platform.kind === 'tauri' && isMain) {
+      setTimeout(() => void askAboutUpdates().then(() => checkForUpdates()), 4000);
+      setInterval(() => void checkForUpdates(), 6 * 60 * 60 * 1000);
+    }
     if (showsPreview(mode())) preview.renderNow();
     if (showsEditor(mode())) view.focus();
     // Browser demo mode (README screenshots): ?palette=<query> opens the palette.
@@ -1784,6 +1884,9 @@ export default function App(props: { platform: Platform }) {
                 onOpen={(v) => activeDoc()?.path && void openVersion(activeDoc()!.path!, v)}
                 saveOnClose={settings.historyOnClose}
                 setSaveOnClose={(on) => update({ historyOnClose: on })}
+                usage={() => history.usage()}
+                onClearFile={() => activeDoc()?.path && void clearFileHistory(activeDoc()!.path!)}
+                onClearAll={() => void clearAllHistory()}
               />
             }
             recentSpaces={recentSpaces()}

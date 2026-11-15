@@ -52,8 +52,10 @@ export interface Settings {
   textWidth: TextWidth;
   /** The file list shows every file (notes first-class, others dimmed), or notes only. */
   showAllFiles: boolean;
-  /** File history: save a version when a changed file closes. Off = only Save Version. */
+  /** File history: save a version when a changed file closes (off by default). Off = only Save Version. */
   historyOnClose: boolean;
+  /** New-version notices: 'ask' until the user answers the one-time question. */
+  updateCheck: 'ask' | 'on' | 'off';
   /** Where pasted and dropped images are saved (links are always relative). */
   imageFolder: ImageFolderMode;
   spellcheck: boolean;
@@ -130,7 +132,8 @@ export const DEFAULT_SETTINGS: Settings = {
   textWidth: 'standard',
   imageFolder: 'document',
   showAllFiles: true,
-  historyOnClose: true,
+  historyOnClose: false,
+  updateCheck: 'ask',
   spellcheck: true,
   spellLang: 'auto',
 };
@@ -185,6 +188,7 @@ export function parseSettings(raw: string | null): Settings {
     if (s.imageFolder === 'document' || s.imageFolder === 'root') out.imageFolder = s.imageFolder;
     if (typeof s.showAllFiles === 'boolean') out.showAllFiles = s.showAllFiles;
     if (typeof s.historyOnClose === 'boolean') out.historyOnClose = s.historyOnClose;
+    if (s.updateCheck === 'ask' || s.updateCheck === 'on' || s.updateCheck === 'off') out.updateCheck = s.updateCheck;
     if ((FONT_CHOICES as readonly string[]).includes(s.fontFamily as string)) out.fontFamily = s.fontFamily!;
     if ((TEXT_WIDTHS as readonly string[]).includes(s.textWidth as string)) out.textWidth = s.textWidth!;
     if (typeof s.spellcheck === 'boolean') out.spellcheck = s.spellcheck;

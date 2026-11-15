@@ -18,6 +18,8 @@ export function DrawingEditor(props: {
   onSaved: (path: string, first: boolean) => void;
   onClose: () => void;
   notify: (msg: string) => void;
+  /** Receives a function that saves any pending change (for closing the window). */
+  onFlush?: (flush: () => Promise<void>) => void;
 }) {
   let host!: HTMLDivElement;
   let drawing: MountedDrawing | null = null;
@@ -49,6 +51,11 @@ export function DrawingEditor(props: {
     setStatus('saving');
     timer = setTimeout(() => void save(), 900);
   };
+  const flush = () => {
+    clearTimeout(timer);
+    return save();
+  };
+  props.onFlush?.(flush);
   const done = async () => {
     clearTimeout(timer);
     await save();

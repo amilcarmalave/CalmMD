@@ -228,7 +228,15 @@ export function appMenus(c: MenuContext): TopMenu[] {
 
   const help: TopMenu = {
     label: 'Help',
-    items: () => [cmd('help.shortcuts'), cmd('help.welcome'), cmd('help.markdown'), ...(c.isMac ? [] : [sep, cmd('help.about')])],
+    items: () => [
+      cmd('help.shortcuts'),
+      cmd('help.welcome'),
+      cmd('help.markdown'),
+      sep,
+      cmd('help.checkUpdates'),
+      cmd('help.updateNotices', { checked: () => c.settings.updateCheck === 'on' }),
+      ...(c.isMac ? [] : [sep, cmd('help.about')]),
+    ],
   };
 
   return [file, edit, view, insert, format, tools, help];

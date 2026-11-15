@@ -24,8 +24,16 @@ export function HistoryPanel(props: {
   onSave: () => void;
   onOpen: (v: Version) => void;
   saveOnClose: boolean;
+  /** How much history is stored across all files. */
+  usage: () => Promise<{ files: number; versions: number; chars: number }>;
+  onClearFile: () => void;
+  onClearAll: () => void;
   setSaveOnClose: (on: boolean) => void;
 }) {
+  const [usage] = createResource(
+    () => props.revision + 1,
+    () => props.usage().catch(() => null),
+  );
   const [versions] = createResource(
     () => (props.path ? { path: props.path, rev: props.revision } : null),
     (k) => props.list(k.path).catch(() => []),
@@ -78,10 +86,29 @@ export function HistoryPanel(props: {
                   )}
                 </For>
               </ul>
+              <button class="history-clear" onClick={props.onClearFile}>
+                Delete this file’s history…
+              </button>
             </Show>
           )}
+        </Show>
+        <Show when={usage()?.versions}>
+          <p class="history-muted history-usage">
+            All file history: {usage()!.versions.toLocaleString()} {usage()!.versions === 1 ? 'version' : 'versions'} of {usage()!.files.toLocaleString()}{' '}
+            {usage()!.files === 1 ? 'file' : 'files'}, about {sizeText(usage()!.chars)}.{' '}
+            <button class="history-clear inline" onClick={props.onClearAll}>
+              Clear all…
+            </button>
+          </p>
         </Show>
       </Show>
     </div>
   );
+}
+
+/** Characters of text as storage, roughly (UTF-16 in the app's store). */
+function sizeText(chars: number): string {
+  const bytes = chars * 2;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

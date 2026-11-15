@@ -131,5 +131,41 @@ export function createHistory(deps: { platform: Platform; now?: () => number }) 
     });
   }
 
-  return { list, read, save, remove, rename };
+  /** Every version of one file goes. */
+  function clearFile(path: string): Promise<void> {
+    return serial(async () => {
+      const map = await readMap();
+      const entry = map[pathKey(path)];
+      if (!entry) return;
+      for (const v of await readIndex(entry.id)) await platform.kvDelete(textKey(entry.id, v.id));
+      await platform.kvDelete(indexKey(entry.id));
+      delete map[pathKey(path)];
+      await platform.kvSet(MAP, JSON.stringify(map));
+    });
+  }
+
+  /** All file history goes (versions of every file). */
+  function clearAll(): Promise<void> {
+    return serial(async () => {
+      for (const key of await platform.kvList('history/')) await platform.kvDelete(key);
+    });
+  }
+
+  /** How much file history is stored: files with versions, versions, and characters of text. */
+  async function usage(): Promise<{ files: number; versions: number; chars: number }> {
+    const map = await readMap();
+    let files = 0;
+    let versions = 0;
+    let chars = 0;
+    for (const entry of Object.values(map)) {
+      const index = await readIndex(entry.id);
+      if (!index.length) continue;
+      files++;
+      versions += index.length;
+      chars += index.reduce((n, v) => n + (v.size || 0), 0);
+    }
+    return { files, versions, chars };
+  }
+
+  return { list, read, save, remove, rename, clearFile, clearAll, usage };
 }

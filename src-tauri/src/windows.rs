@@ -77,6 +77,38 @@ pub async fn open_window(app: AppHandle, claims: State<'_, SpaceClaims>, space_i
     Ok(label)
 }
 
+/// The window label for a drawing: the same file always gets the same window.
+pub fn drawing_label(path: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    path.replace('\\', "/").to_lowercase().hash(&mut h);
+    format!("drawing-{:016x}", h.finish())
+}
+
+/// Opens a drawing in its own window, or brings its window forward if it's already open.
+#[tauri::command]
+pub async fn open_drawing_window(app: AppHandle, path: String, title: String) -> Result<String, String> {
+    let label = drawing_label(&path);
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(label);
+    }
+    // The frontend reads which drawing to open from this global before any script runs.
+    let init = format!("window.__CALMMD_DRAWING__ = {};", serde_json::to_string(&path).map_err(|e| e.to_string())?);
+    let offset = 28.0 * (app.webview_windows().len() as f64 % 8.0);
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title(title)
+        .inner_size(1200.0, 820.0)
+        .min_inner_size(560.0, 400.0)
+        .position(100.0 + offset, 80.0 + offset)
+        .initialization_script(&init)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(label)
+}
+
 #[tauri::command]
 pub fn focus_window(app: AppHandle, label: String) -> Result<(), String> {
     let w = app.get_webview_window(&label).ok_or("window not found")?;
@@ -93,6 +125,13 @@ pub fn window_labels(app: AppHandle) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_drawing_always_gets_the_same_window() {
+        assert_eq!(drawing_label("C:\\Notes\\Plan.excalidraw.svg"), drawing_label("c:/notes/plan.excalidraw.svg"));
+        assert_ne!(drawing_label("/n/a.excalidraw.svg"), drawing_label("/n/b.excalidraw.svg"));
+        assert!(drawing_label("/n/a.excalidraw.svg").starts_with("drawing-"));
+    }
 
     #[test]
     fn a_space_lives_in_one_window() {

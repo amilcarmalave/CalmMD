@@ -64,7 +64,7 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 | **Images** | Paste or drop images: they're saved in an `assets` folder next to the note and linked relatively. Drag to resize, align left, center or right, all in standard Markdown (`![Photo\|300\|center](photo.png)`) |
 | **Drawings** | Sketch with [Excalidraw](https://excalidraw.com) right in the app (Insert → Drawing, or `/drawing`). Each drawing is its own `.excalidraw.svg` file next to your notes: a picture that shows on GitHub and anywhere else, with the editable drawing inside. Double-click it to edit |
 | **Files** | A folder sidebar with favourites, outline and tabs that come back after a restart. Other files open in a Quick view: images, PDFs, CSV and code. `.txt` files open as plain text |
-| **File history** | Earlier versions of each file, saved when you close it or when you ask. Compare side by side and restore in one click. Versions stay in the app's data, never in your folders |
+| **File history** | Earlier versions of each file, saved when you ask (Save Version), or every time you close a changed file if you turn that on. Compare side by side and restore in one click. Versions stay in the app's data, never in your folders; the History tab shows how much space they use and clears them |
 | **Links and search** | Search every note in a folder (`Ctrl/⌘+Shift+F`), link notes with a `[[` picker, `[[Wiki links]]`, and "Linked from" for the open note |
 | **Spaces** | Save a window (folder, tabs, layout) as a Space and switch with `Ctrl/⌘+Alt+O`, or open Spaces in their own windows |
 | **Finding things** | Command palette (`Ctrl/⌘+Shift+P`), go to file (`Ctrl/⌘+P`), line (`:`), heading (`@`), and `/` on an empty line to insert anything |
@@ -139,8 +139,9 @@ handy for UI work. Add `?demo` to the URL for a showcase document.
 
 ## Privacy
 
-CalmMD never contacts a server of its own: no telemetry, no update pings, no account. It works fully
-offline. Remote images in your documents load like they would in a browser, and video embeds stay
+CalmMD has no telemetry and no account, and it works fully offline. The one thing it can ask the
+internet is whether there's a new version: the first time it opens, it asks whether you'd like that,
+and if you say yes it checks GitHub's latest release about once a day (Help menu to turn it off). Remote images in your documents load like they would in a browser, and video embeds stay
 inert until you click them, then use YouTube's privacy-enhanced domain.
 
 ## Contributing
