@@ -3,6 +3,7 @@ mod export;
 mod fsops;
 mod kv;
 mod search;
+mod spell;
 mod tree;
 mod windows;
 
@@ -82,6 +83,8 @@ pub fn run() {
             export::find_pandoc,
             export::pandoc_convert,
             export::themes_dir,
+            spell::spell_check,
+            spell::spell_learn,
             launch_paths,
         ])
         .run(tauri::generate_context!())

@@ -16,8 +16,13 @@ export interface EditorMenuDeps {
   openPalette: (query: string) => void;
   notify: (msg: string) => void;
   hint: (commandId: string) => string | undefined;
-  /** Shows where to find spelling suggestions (the native menu). */
+  /** Spellcheck is on. */
   spellcheck?: boolean;
+  /**
+   * Suggestions for the word under the pointer (from the OS spellchecker), shown first. Undefined: this
+   * system has no checker we can ask, so the menu points to the native one (Shift+right-click).
+   */
+  spelling?: MenuItem[];
   /** Picks an image file and puts its link in place of the destination at [from, to). */
   replaceImage?: (from: number, to: number) => void;
 }
@@ -195,9 +200,35 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
     });
   }
 
-  const spelling: MenuItem[] =
-    deps.spellcheck && kind === 'text'
+  const nativeHint: MenuItem[] =
+    deps.spellcheck && kind === 'text' && !deps.spelling
       ? ['separator', { label: 'Spelling suggestions', hint: 'Shift+Right-click', disabled: true, action: () => {} }]
       : [];
-  return [...specific, 'separator', ...clipboard, 'separator', cmd('edit.selectAll'), ...spelling];
+  const spelling = deps.spelling?.length ? [...deps.spelling, 'separator' as const] : [];
+  return [...spelling, ...specific, 'separator', ...clipboard, 'separator', cmd('edit.selectAll'), ...nativeHint];
+}
+
+/** The word around a position (letters, marks, digits and inner apostrophes), or null. */
+export function wordAt(text: string, pos: number): { from: number; to: number; word: string } | null {
+  const isWord = (ch: string | undefined) => !!ch && /[\p{L}\p{M}\p{N}'’]/u.test(ch);
+  let from = pos;
+  let to = pos;
+  while (from > 0 && isWord(text[from - 1])) from--;
+  while (to < text.length && isWord(text[to])) to++;
+  while (from < to && /['’]/.test(text[from])) from++;
+  while (to > from && /['’]/.test(text[to - 1])) to--;
+  const word = text.slice(from, to);
+  return /\p{L}/u.test(word) ? { from, to, word } : null;
+}
+
+/** Menu items for a misspelled word: up to six suggestions, then Add to Dictionary. */
+export function spellingItems(
+  suggestions: string[],
+  replace: (word: string) => void,
+  learn: () => void,
+): MenuItem[] {
+  const items: MenuItem[] = suggestions.map((s) => ({ label: s, action: () => replace(s) }));
+  if (!items.length) items.push({ label: 'No suggestions', disabled: true, action: () => {} });
+  items.push({ label: 'Add to Dictionary', action: learn });
+  return items;
 }

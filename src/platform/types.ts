@@ -82,6 +82,13 @@ export interface Platform {
   /** Where images pasted into untitled documents wait until the first save. */
   pendingAssetsDir(): Promise<string>;
   findPandoc(): Promise<string | null>;
+  /**
+   * Asks the OS spellchecker about one word (lang: BCP 47, or undefined for the system language).
+   * Null when this system has no checker the app can ask (the webview may still underline).
+   */
+  spellCheck(word: string, lang?: string): Promise<{ misspelled: boolean; suggestions: string[] } | null>;
+  /** Adds a word to the OS user dictionary. */
+  spellLearn(word: string, lang?: string): Promise<void>;
   pandocConvert(markdown: string, outPath: string, resourceDir: string | null): Promise<void>;
   /** User themes folder (created with an example on first use). */
   themesDir(): Promise<string>;

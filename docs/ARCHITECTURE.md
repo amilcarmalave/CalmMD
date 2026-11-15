@@ -195,6 +195,10 @@ src-tauri/
   `math-preview`/`diagram-preview` companions while editing (analyzeBlocks). Video images → EmbedWidget,
   which handles its own click because `ignoreEvent` hides it from CM. `refreshLive` effect re-themes diagrams.
 - Spellcheck is a compartment (`spellCompartment`) with contentDOM `spellcheck` and `lang` attributes.
+  The webview draws the underlines, but our right-click menu replaces its native one, so suggestions come
+  from the OS spellchecker directly: `spell_check` / `spell_learn` in `src-tauri/src/spell.rs` (Windows
+  ISpellChecker, macOS NSSpellChecker; none on Linux, where the menu points to Shift+right-click).
+  `wordAt` and `spellingItems` (`app/editorMenu.ts`) build the menu items.
 - Debugging real exports: run the `web-debug` launch config (sets `CALMMD_DEBUG_DIR`), build the HTML in the page
   (`buildBody`/`buildDocument` via dynamic import), `POST /__calmmd/save?name=x.html`, then print it with
   `prints_file_from_env`.

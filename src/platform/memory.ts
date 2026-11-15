@@ -23,6 +23,7 @@ export interface MemoryPlatformOptions {
  * Files live under keys `fs:<path>` and the kv store under `kv:<key>`.
  */
 export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
+  const learned = new Set<string>();
   const store = opts.storage ?? mapStorage();
   const mtimes = new Map<string, number>();
   let clock = Date.now();
@@ -189,6 +190,15 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     openImageDialog: opts.pickImages ?? (async () => []),
     async findPandoc() {
       return null;
+    },
+    // A stand-in spellchecker that knows a few common misspellings.
+    async spellCheck(word) {
+      const fixes: Record<string, string[]> = { recieve: ['receive', 'relieve'], teh: ['the', 'ten', 'tech'], wierd: ['weird', 'wired'] };
+      const s = learned.has(word.toLowerCase()) ? undefined : fixes[word.toLowerCase()];
+      return { misspelled: !!s, suggestions: s ?? [] };
+    },
+    async spellLearn(word) {
+      learned.add(word.toLowerCase());
     },
     async pandocConvert() {
       throw new Error("Pandoc isn't available here");
