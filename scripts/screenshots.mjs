@@ -38,8 +38,7 @@ const shots = [
   { name: 'preview-outline', q: 'demo&mode=preview&scheme=light&theme=clear&sidebar=outline&toolbar=0' },
   { name: 'appearance', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=appearance' },
   { name: 'search', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=search' },
-  { name: 'pdf-export', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&pro&ui=export' },
-  { name: 'pro', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=pro' },
+  { name: 'pdf-export', q: 'demo&mode=split&scheme=light&theme=paper&sidebar=files&ui=export' },
   { name: 'palette', q: 'demo&mode=live&scheme=dark&dark=midnight&theme=paper&sidebar=files&palette=' + encodeURIComponent('>them') },
 ];
 
