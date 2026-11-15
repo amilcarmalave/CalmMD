@@ -1,7 +1,7 @@
 #!/bin/sh
 # CalmMD installer for macOS and Linux (technical users):
 #
-#   curl -fsSL https://calmmd.app/install.sh | sh
+#   curl -fsSL https://amilcarmalave.github.io/CalmMD/install.sh | sh
 #
 # Downloads the latest release from GitHub, checks it against the release's SHA256SUMS, and installs
 # it for the current user: macOS → ~/Applications/CalmMD.app (or /Applications if writable);

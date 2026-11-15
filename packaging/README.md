@@ -20,7 +20,7 @@ Everything needed to ship CalmMD through each channel, from the repository
 | winget | `winget/README.md` | `wingetcreate update CalmMD.CalmMD …` after each release |
 | Scoop | `scoop/calmmd.json` | Lives in our own bucket repo (`amilcarmalave/scoop-calmmd`, `bucket/calmmd.json`). `checkver`/`autoupdate` let Scoop's tooling bump it |
 | Homebrew | `homebrew/calmmd.rb` | Lives in our own tap (`amilcarmalave/homebrew-calmmd`, `Casks/calmmd.rb`). Bump `version` and `sha256` |
-| Install scripts | `install.ps1`, `install.sh` | Host them at the website root (`calmmd.app/install.ps1`). They verify `SHA256SUMS` |
+| Install scripts | `install.ps1`, `install.sh` | Host them at the website root (`amilcarmalave.github.io/CalmMD/install.ps1`). They verify `SHA256SUMS` |
 
 ### Microsoft Store, first time
 

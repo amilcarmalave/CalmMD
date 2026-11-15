@@ -1,6 +1,6 @@
 # CalmMD installer for Windows (technical users):
 #
-#   irm https://calmmd.app/install.ps1 | iex
+#   irm https://amilcarmalave.github.io/CalmMD/install.ps1 | iex
 #
 # Downloads the latest release's per-user installer from GitHub, checks it against the release's
 # SHA256SUMS, and runs it silently. Files fetched this way aren't marked "downloaded from the

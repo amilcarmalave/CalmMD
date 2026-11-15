@@ -2,7 +2,7 @@ name: Website
 
 # Builds the website (npm run site → dist-site/) and publishes it to GitHub Pages.
 # Turn it on in the repository settings: Pages → Source: GitHub Actions. A custom domain
-# (calmmd.app) is set there too.
+# (optional) is set there too.
 on:
   push:
     branches: [main]
