@@ -1423,119 +1423,13 @@ button {
   text-decoration-style: dotted;
 }
 
-/* ---------- CalmMD Pro ---------- */
-.modal.pro-dialog {
-  width: min(480px, calc(100vw - 32px));
-}
-.pro-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-.pro-head svg {
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-.pro-head h2 {
-  margin: 0;
-}
-.pro-head .pro-sub {
-  margin: 2px 0 0;
-}
-.pro-why {
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--fg) !important;
-}
-.pro-features {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-}
-.pro-features li {
-  display: flex;
-  gap: 10px;
-  padding: 5px 0;
-  color: var(--fg);
-}
-.pro-check {
-  color: var(--accent-strong);
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-.pro-check svg {
-  width: 14px;
-  height: 14px;
-}
-.pro-detail {
-  display: block;
-  color: var(--fg-muted);
-  font-size: 12.5px;
-}
-.pro-free {
-  font-size: 12.5px;
-}
-.pro-buy {
-  margin: 4px 0 14px;
-}
-.pro-soon {
-  color: var(--fg-muted);
-  font-style: italic;
-}
-.pro-key-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--fg-muted);
-  font-size: 12.5px;
-}
-.pro-key-row {
-  display: flex;
-  gap: 8px;
-}
-.pro-key-row .modal-input {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-}
-.pro-active p {
-  margin-bottom: 10px;
-  color: var(--fg);
-}
-.pro-error {
-  margin-top: 12px !important;
-  color: var(--danger) !important;
-}
-.link-btn {
-  margin-left: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--link);
-  font: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.pro-badge {
-  margin-left: 8px;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent-strong);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
+/* ---------- Export cover page ---------- */
 .cover-fields {
   margin: 2px 0 6px 26px;
 }
 .cover-fields .modal-input {
   margin: 0;
   height: 30px;
-}
-.check-row .pro-badge {
-  margin-left: 6px;
 }
 
 /* ---------- Quick view ---------- */

@@ -19,8 +19,6 @@ export interface MenuContext {
   clearRecentFolders: () => void;
   userThemes: () => { id: string; name: string }[];
   pickColorTheme: (t: ColorTheme) => void;
-  isPro: () => boolean;
-  runCommand: (id: string) => void;
   /** macOS: the app menu holds About and Quit, so Help and File drop theirs. */
   isMac: boolean;
 }
@@ -46,12 +44,12 @@ export function appMenus(c: MenuContext): TopMenu[] {
       sep,
       cmd('file.save'),
       cmd('file.saveAs'),
-      proItem(c, 'history.save', 'Save Version…'),
+      cmd('history.save', { label: 'Save Version…' }),
       cmd('history.show'),
       sep,
       sub('Share', () => [
-        proItem(c, 'share.zip', 'As .zip with Images…'),
-        proItem(c, 'share.single', 'As One File (Images Inside)…'),
+        cmd('share.zip', { label: 'As .zip with Images…' }),
+        cmd('share.single', { label: 'As One File (Images Inside)…' }),
       ]),
       sub('Export', () => [
         cmd('export.pdf', { label: 'PDF…' }),
@@ -174,13 +172,13 @@ export function appMenus(c: MenuContext): TopMenu[] {
       sub('Highlight', () => [
         cmd('format.highlight.default', { label: 'Default', checked: () => c.settings.highlightColor === 'default' }),
         ...HIGHLIGHT_COLORS.map((h) => cmd(`format.highlight.${h.id}`, { label: h.label, checked: () => c.settings.highlightColor === h.id })),
-        proItem(c, 'format.highlight.custom', 'Custom…', () => /^#/.test(c.settings.highlightColor)),
+        cmd('format.highlight.custom', { label: 'Custom…', checked: () => /^#/.test(c.settings.highlightColor) }),
         sep,
         cmd('format.highlight.none'),
       ]),
       sub('Text Color', () => [
         ...TEXT_COLORS.map((t) => cmd(`format.textColor.${t.id}`, { label: t.label, checked: () => c.settings.textColor === t.id })),
-        proItem(c, 'format.textColor.custom', 'Custom…', () => /^#/.test(c.settings.textColor)),
+        cmd('format.textColor.custom', { label: 'Custom…', checked: () => /^#/.test(c.settings.textColor) }),
         sep,
         cmd('format.textColor.none'),
       ]),
@@ -228,20 +226,15 @@ export function appMenus(c: MenuContext): TopMenu[] {
 
   const help: TopMenu = {
     label: 'Help',
-    items: () => [cmd('help.shortcuts'), cmd('help.welcome'), cmd('help.markdown'), sep, cmd('help.pro'), ...(c.isMac ? [] : [cmd('help.about')])],
+    items: () => [cmd('help.shortcuts'), cmd('help.welcome'), cmd('help.markdown'), ...(c.isMac ? [] : [sep, cmd('help.about')])],
   };
 
   return [file, edit, view, insert, format, tools, help];
 }
 
-/** A Supporter extra, marked "Supporter" until it's unlocked. */
-function proItem(c: MenuContext, id: string, label: string, checked?: () => boolean): MenuEntry {
-  return c.isPro() ? cmd(id, { label, checked }) : act(label, () => c.runCommand(id), { hint: 'Supporter' });
-}
-
 function colorItem(c: MenuContext, t: ColorTheme): MenuEntry {
   return act(t.label, () => c.pickColorTheme(t), {
     checked: () => (t.kind === 'light' ? c.settings.lightTheme : c.settings.darkTheme) === t.id,
-    hint: t.pro && !c.isPro() ? 'Supporter' : t.kind === c.effectiveScheme() && (t.kind === 'light' ? c.settings.lightTheme : c.settings.darkTheme) === t.id ? 'in use' : undefined,
+    hint: t.kind === c.effectiveScheme() && (t.kind === 'light' ? c.settings.lightTheme : c.settings.darkTheme) === t.id ? 'in use' : undefined,
   });
 }

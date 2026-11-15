@@ -1,4 +1,3 @@
-import { DEV_TEST_KEY } from '../app/proConfig';
 import { createMemoryPlatform } from './memory';
 
 /**
@@ -90,9 +89,6 @@ export function createDemoPlatform(params: URLSearchParams) {
     'settings',
     JSON.stringify({ v: 2, viewMode: mode, colorScheme: scheme, previewTheme: theme, splitRatio: 0.5, lightTheme: light, darkTheme: dark, toolbarVisible: toolbar }),
   );
-  // ?pro: start with the test licence active (screenshots of Pro features).
-  if (params.has('pro'))
-    void platform.kvSet('license', JSON.stringify({ key: DEV_TEST_KEY, instanceId: 'dev-instance', email: 'test@example.com', name: null, productId: 1, activatedAt: Date.now(), validatedAt: Date.now() }));
   void platform.kvSet('favorites', JSON.stringify([{ path: '/Notes/Projects/Thesis', isDir: true }]));
   void platform.kvSet(
     'session',

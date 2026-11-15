@@ -2,7 +2,7 @@ import { findImageLinks, markdownUrl, resolveLink, uniqueName } from './assets';
 import { basename, dirname } from './paths';
 
 /**
- * Share bundles (CalmMD Pro): a document that travels with its images.
+ * Share bundles: a document that travels with its images.
  *
  * - zip: the document plus `assets/<image>` for every local image it uses, links rewritten.
  * - single file: every local image inlined as a data: URL (one big but self-contained .md).

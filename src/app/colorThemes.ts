@@ -26,8 +26,6 @@ export interface ColorTheme {
   hint: string;
   /** Background, text and accent, for the swatch in menus. */
   swatch: [string, string, string];
-  /** Part of the CalmMD Pro theme pack. */
-  pro?: boolean;
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -41,12 +39,11 @@ export const COLOR_THEMES: ColorTheme[] = [
   { id: 'code-dark', label: 'Code Dark', kind: 'dark', hint: 'VS Code style', swatch: ['#1f1f1f', '#cccccc', '#0078d4'] },
   { id: 'midnight', label: 'Midnight', kind: 'dark', hint: 'Navy with soft accents', swatch: ['#11151f', '#c9d1e0', '#7aa2f7'] },
   { id: 'solarized-dark', label: 'Solarized Dark', kind: 'dark', hint: 'Low contrast, cool', swatch: ['#002b36', '#93a1a1', '#b58900'] },
-  // CalmMD Pro theme pack
-  { id: 'rose', label: 'Rosé', kind: 'light', hint: 'Warm white, rose accent', swatch: ['#fdf9f8', '#3a2f33', '#d6336c'], pro: true },
-  { id: 'parchment', label: 'Parchment', kind: 'light', hint: 'Aged paper, sepia ink', swatch: ['#f3ead7', '#3f3224', '#a0522d'], pro: true },
-  { id: 'fjord', label: 'Fjord', kind: 'dark', hint: 'Arctic blue-grey', swatch: ['#2e3440', '#d8dee9', '#88c0d0'], pro: true },
-  { id: 'nightshade', label: 'Nightshade', kind: 'dark', hint: 'Deep violet, vivid', swatch: ['#282a36', '#f8f8f2', '#bd93f9'], pro: true },
-  { id: 'forest', label: 'Forest', kind: 'dark', hint: 'Dark moss, green', swatch: ['#1a1f1b', '#d4dcd0', '#7fb069'], pro: true },
+  { id: 'rose', label: 'Rosé', kind: 'light', hint: 'Warm white, rose accent', swatch: ['#fdf9f8', '#3a2f33', '#d6336c'] },
+  { id: 'parchment', label: 'Parchment', kind: 'light', hint: 'Aged paper, sepia ink', swatch: ['#f3ead7', '#3f3224', '#a0522d'] },
+  { id: 'fjord', label: 'Fjord', kind: 'dark', hint: 'Arctic blue-grey', swatch: ['#2e3440', '#d8dee9', '#88c0d0'] },
+  { id: 'nightshade', label: 'Nightshade', kind: 'dark', hint: 'Deep violet, vivid', swatch: ['#282a36', '#f8f8f2', '#bd93f9'] },
+  { id: 'forest', label: 'Forest', kind: 'dark', hint: 'Dark moss, green', swatch: ['#1a1f1b', '#d4dcd0', '#7fb069'] },
 ];
 
 export const LIGHT_THEMES = COLOR_THEMES.filter((t) => t.kind === 'light');

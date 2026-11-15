@@ -3,7 +3,7 @@ import { isWithin, pathKey, rebase } from '../core/paths';
 import type { Platform } from '../platform/types';
 
 /**
- * File history (a Supporter extra): saved versions of a file, kept in the app's own data folder
+ * File history: saved versions of a file, kept in the app's own data folder
  * (the kv store), never next to the user's files.
  *
  * Storage: `history/map` maps each file (by `pathKey`) to a random id, so renames only touch the

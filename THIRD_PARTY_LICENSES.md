@@ -21,8 +21,6 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | markdown-it-mark, markdown-it-sub, markdown-it-sup | MIT | `==highlight==`, `~sub~`, `^sup^` |
 | base64 | MIT / Apache-2.0 | Embedding images, decoding PDFs |
 | tungstenite | MIT / Apache-2.0 | DevTools-protocol connection to the PDF engine |
-| ureq, rustls, rustls-webpki, rustls-pki-types, ring, untrusted | MIT / Apache-2.0 / ISC | HTTPS for Supporter key activation |
-| webpki-roots | CDLA-Permissive-2.0 | Root certificates for HTTPS |
 | Inter (`@fontsource-variable/inter`) | SIL OFL 1.1 | UI and sans font |
 | Literata (`@fontsource-variable/literata`) | SIL OFL 1.1 | Serif reading font |
 | JetBrains Mono (`@fontsource-variable/jetbrains-mono`) | SIL OFL 1.1 | Code and source font |

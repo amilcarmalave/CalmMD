@@ -2,7 +2,6 @@ mod cdp;
 mod export;
 mod fsops;
 mod kv;
-mod license;
 mod search;
 mod tree;
 mod windows;
@@ -64,7 +63,6 @@ pub fn run() {
             fsops::pending_assets_dir,
             tree::list_dir,
             search::search_files,
-            license::license_request,
             tree::create_file,
             tree::create_dir,
             tree::rename_path,

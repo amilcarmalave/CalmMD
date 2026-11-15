@@ -21,7 +21,6 @@ export function AppearanceMenu(props: {
   /** The scheme in effect ("system" resolved). */
   effectiveScheme: 'light' | 'dark';
   pickColorTheme: (t: ColorTheme) => void;
-  isPro: boolean;
   userThemes: { id: string; name: string }[];
   openThemesFolder: () => void;
 }) {
@@ -62,7 +61,6 @@ export function AppearanceMenu(props: {
         <span class="theme-swatch-accent" style={{ background: p.t.swatch[2] }} />
       </span>
       <span class="menu-text">{p.t.label}</span>
-      {p.t.pro && !props.isPro && <span class="pro-badge">Supporter</span>}
       <span class="menu-check">{active(p.t) && <IconCheck />}</span>
     </button>
   );

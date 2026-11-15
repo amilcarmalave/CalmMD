@@ -52,7 +52,7 @@ export interface Settings {
   textWidth: TextWidth;
   /** The file list shows every file (notes first-class, others dimmed), or notes only. */
   showAllFiles: boolean;
-  /** File history (Supporter): save a version when a changed file closes. Off = only Save Version. */
+  /** File history: save a version when a changed file closes. Off = only Save Version. */
   historyOnClose: boolean;
   /** Where pasted and dropped images are saved (links are always relative). */
   imageFolder: ImageFolderMode;

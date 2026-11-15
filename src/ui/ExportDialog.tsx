@@ -12,18 +12,10 @@ export function ExportDialog(props: {
   engine: string | null;
   /** Cover page fields, filled from the document (front matter, first heading, today). */
   coverDefaults: CoverInfo;
-  isPro: boolean;
-  /** Shows the Supporter dialog when it isn't active; returns whether it is. */
-  requirePro: (feature: 'pdfCover' | 'pdfTemplates') => boolean;
   onExport: (prefs: ExportPrefs, cover: CoverInfo | null) => void;
   onClose: () => void;
 }) {
   const [p, setP] = createStore<ExportPrefs>(structuredClone(unwrap(props.prefs)));
-  // A remembered "cover on" or Pro template only applies while Pro is active.
-  if (!props.isPro) {
-    setP('cover', false);
-    setP('pdf', 'template', 'standard');
-  }
   const [cover, setCover] = createStore<CoverInfo>({ ...props.coverDefaults, author: props.coverDefaults.author || props.prefs.coverAuthor });
   const [busy, setBusy] = createSignal(false);
   let first!: HTMLSelectElement;
@@ -70,20 +62,12 @@ export function ExportDialog(props: {
             <select
               id="ex-template"
               value={p.pdf.template}
-              onChange={(e) => {
-                const t = e.currentTarget.value as PdfTemplate;
-                if (PDF_TEMPLATES.find((x) => x.id === t)?.pro && !props.requirePro('pdfTemplates')) {
-                  e.currentTarget.value = p.pdf.template;
-                  return;
-                }
-                setP('pdf', 'template', t);
-              }}
+              onChange={(e) => setP('pdf', 'template', e.currentTarget.value as PdfTemplate)}
             >
               <For each={PDF_TEMPLATES}>
                 {(t) => (
                   <option value={t.id} title={t.hint}>
                     {t.label}
-                    {t.pro && !props.isPro ? ' (Supporter)' : ''}
                   </option>
                 )}
               </For>
@@ -115,22 +99,8 @@ export function ExportDialog(props: {
             </label>
           </Show>
           <label class="check-row">
-            <input
-              type="checkbox"
-              checked={p.cover}
-              onChange={(e) => {
-                const on = e.currentTarget.checked;
-                if (on && !props.requirePro('pdfCover')) {
-                  e.currentTarget.checked = false;
-                  return;
-                }
-                setP('cover', on);
-              }}
-            />
+            <input type="checkbox" checked={p.cover} onChange={(e) => setP('cover', e.currentTarget.checked)} />
             Cover page
-            <Show when={!props.isPro}>
-              <span class="pro-badge">Supporter</span>
-            </Show>
           </label>
           <Show when={p.cover}>
             <div class="form-grid cover-fields">

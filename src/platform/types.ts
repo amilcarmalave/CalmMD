@@ -79,11 +79,6 @@ export interface Platform {
   writeBinaryFile(path: string, data: Uint8Array): Promise<void>;
   /** Copies a file, creating missing folders. Rejects if the target exists. */
   copyFile(from: string, to: string): Promise<void>;
-  /**
-   * CalmMD Pro: a request to the payment provider's public licence API ("activate", "validate",
-   * "deactivate"). Resolves to the provider's JSON reply; rejects only on network failure.
-   */
-  licenseRequest(action: 'activate' | 'validate' | 'deactivate', params: [string, string][]): Promise<unknown>;
   /** Where images pasted into untitled documents wait until the first save. */
   pendingAssetsDir(): Promise<string>;
   findPandoc(): Promise<string | null>;

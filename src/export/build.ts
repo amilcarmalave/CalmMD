@@ -19,7 +19,7 @@ export interface ExportOptions {
   embedImages: boolean;
   /** Printing (PDF): videos become links instead of players. */
   print?: boolean;
-  /** CalmMD Pro: a cover page before everything else. */
+  /** A cover page before everything else. */
   cover?: CoverInfo | null;
 }
 
@@ -32,16 +32,16 @@ export interface PdfOptions {
   pageNumbers: boolean;
   /** Start every top-level heading on a new page. */
   breakBeforeH1: boolean;
-  /** Page design. "standard" is free; the others are Supporter extras. */
+  /** Page design. */
   template: PdfTemplate;
 }
 
 export type PdfTemplate = 'standard' | 'report' | 'academic' | 'minimal';
-export const PDF_TEMPLATES: { id: PdfTemplate; label: string; hint: string; pro: boolean }[] = [
-  { id: 'standard', label: 'Standard', hint: 'Your document style, title header, centred page numbers', pro: false },
-  { id: 'report', label: 'Report', hint: 'Accent headings, title and page in the header', pro: true },
-  { id: 'academic', label: 'Academic', hint: 'Justified serif text, numbered sections', pro: true },
-  { id: 'minimal', label: 'Minimal', hint: 'Airy sans-serif, page numbers only', pro: true },
+export const PDF_TEMPLATES: { id: PdfTemplate; label: string; hint: string }[] = [
+  { id: 'standard', label: 'Standard', hint: 'Your document style, title header, centred page numbers' },
+  { id: 'report', label: 'Report', hint: 'Accent headings, title and page in the header' },
+  { id: 'academic', label: 'Academic', hint: 'Justified serif text, numbered sections' },
+  { id: 'minimal', label: 'Minimal', hint: 'Airy sans-serif, page numbers only' },
 ];
 
 export const DEFAULT_PDF: PdfOptions = { pageSize: 'A4', margins: 'normal', header: true, pageNumbers: true, breakBeforeH1: false, template: 'standard' };

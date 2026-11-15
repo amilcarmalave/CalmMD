@@ -60,7 +60,7 @@ export interface CommandContext {
   /** Applies a colour theme (switching to light or dark to match it). */
   pickColorTheme: (t: ColorTheme) => void;
   clipboard: { read: () => Promise<string>; write: (text: string) => Promise<void> };
-  /** Pro: opens the system colour picker and passes back "#rrggbb". */
+  /** Opens the system colour picker and passes back "#rrggbb". */
   pickCustomColor: (kind: 'highlight' | 'text', apply: (hex: string) => void) => void;
 }
 
@@ -265,7 +265,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
     fmt('format.textColor', 'Text Color', () => textColorWith(ctx.settings.textColor, false)),
     ...TEXT_COLORS.map((c) => fmt(`format.textColor.${c.id}`, `Text Color: ${c.label}`, () => textColorWith(c.id, true))),
     fmt('format.textColor.none', 'Remove Text Color', edit((s) => applyColor(s, 'text', null))),
-    // Pro: any colour, from the system colour picker.
+    // Any colour, from the system colour picker.
     fmt('format.highlight.custom', 'Highlight: Custom Color…', () => ctx.pickCustomColor('highlight', (hex) => highlightWith(hex, true))),
     fmt('format.textColor.custom', 'Text Color: Custom Color…', () => ctx.pickCustomColor('text', (hex) => textColorWith(hex, true))),
     fmt('format.code', 'Inline Code', edit((s) => toggleInline(s, '`')), 'Mod+`'),

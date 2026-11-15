@@ -1,6 +1,5 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
-import { testLicenseReply } from '../app/proConfig';
 import type { DirEntry, Platform, StatResult } from './types';
 
 export interface MemoryPlatformOptions {
@@ -183,10 +182,6 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       if (store.getItem('fs:' + to) !== null) throw new Error('A file with that name already exists.');
       store.setItem('fs:' + to, v);
       mtimes.set(to, tick());
-    },
-    // A stand-in licence server: only the test key works, with one device slot per instance id.
-    async licenseRequest(action, params) {
-      return testLicenseReply(action, params);
     },
     async pendingAssetsDir() {
       return '/appdata/pending-assets';

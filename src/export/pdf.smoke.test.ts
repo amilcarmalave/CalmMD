@@ -74,12 +74,12 @@ describe.skipIf(!out)('export smoke', () => {
       writeFileSync(`${out}/export-${theme}.html`, buildDocument(body, opts, { ...assets, pagedJs: undefined }));
       writeFileSync(`${out}/print-${theme}.html`, buildDocument(body, opts, assets, { ...DEFAULT_PDF, breakBeforeH1: false }));
     }
-    // With a cover page (CalmMD Pro): its own page, no running header or page number.
+    // With a cover page: its own page, no running header or page number.
     const cover = { title: 'The Calm Guide to Writing', subtitle: 'Notes on a quiet tool', author: 'Ada Lovelace', date: 'November 13, 2026' };
     const withCover = { title: 'The Calm Guide to Writing', theme: 'paper' as const, userCss: null, toc: true, embedImages: true, cover };
     const coverBody = await buildBody(SAMPLE, '/docs/guide.md', withCover, { readImage: async () => null });
     writeFileSync(`${out}/print-cover.html`, buildDocument(coverBody, withCover, assets, DEFAULT_PDF));
-    // PDF templates (CalmMD Pro).
+    // PDF templates.
     for (const template of ['report', 'academic', 'minimal'] as const)
       writeFileSync(`${out}/print-${template}.html`, buildDocument(coverBody, withCover, assets, { ...DEFAULT_PDF, template }));
     expect(true).toBe(true);

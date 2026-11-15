@@ -35,7 +35,7 @@ export const TEXT_COLORS: Swatch[] = [
   { id: 'gray', label: 'Gray', value: '#8a8f98' },
 ];
 
-/** A custom colour from the picker (Pro): "#rrggbb". */
+/** A custom colour from the picker: "#rrggbb". */
 export const isCustomColor = (id: string) => /^#[0-9a-f]{6}$/i.test(id);
 
 /** "#rrggbb" → translucent rgba, so a custom highlight reads on light and dark themes like the palette. */

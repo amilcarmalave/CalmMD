@@ -9,7 +9,7 @@ export interface ExportPrefs {
   embedImages: boolean;
   /** Preview style for exports. null = whatever the preview uses. */
   theme: string | null;
-  /** CalmMD Pro: a cover page (the fields are filled per document; the author is remembered). */
+  /** A cover page (the fields are filled per document; the author is remembered). */
   cover: boolean;
   coverAuthor: string;
 }

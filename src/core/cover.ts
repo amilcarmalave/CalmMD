@@ -1,6 +1,6 @@
 import { frontMatterLines } from './frontMatter';
 
-/** A PDF cover page (CalmMD Pro): its own page before the document. */
+/** A PDF cover page: its own page before the document. */
 export interface CoverInfo {
   title: string;
   subtitle: string;

@@ -27,7 +27,6 @@ export function Toolbar(props: {
   hint: (id: string) => string | undefined;
   onCustomize: () => void;
   openMenuAt: (x: number, y: number, items: MenuItem[]) => void;
-  isPro: boolean;
   /** Current colours behind the Highlight and Text Color buttons (CSS values; null = default). */
   colors: { highlight: string | null; text: string };
 }) {
@@ -54,13 +53,13 @@ export function Toolbar(props: {
         ? [
             { label: 'Default', hint: props.hint('format.highlight.default'), swatch: { kind: 'fill', color: 'color-mix(in srgb, var(--accent) 30%, transparent)' }, action: () => props.registry.run('format.highlight.default') },
             ...HIGHLIGHT_COLORS.map((c): MenuItem => ({ label: c.label, swatch: { kind: 'fill', color: c.value }, action: () => props.registry.run(`format.highlight.${c.id}`) })),
-            { label: 'Custom…', detail: props.isPro ? undefined : 'Supporter', swatch: { kind: 'fill', color: 'conic-gradient(#f87171, #facc15, #4ade80, #60a5fa, #c084fc, #f87171)' }, action: () => props.registry.run('format.highlight.custom') },
+            { label: 'Custom…', swatch: { kind: 'fill', color: 'conic-gradient(#f87171, #facc15, #4ade80, #60a5fa, #c084fc, #f87171)' }, action: () => props.registry.run('format.highlight.custom') },
             'separator',
             { label: 'Remove Highlight', swatch: { kind: 'fill', color: null }, action: () => props.registry.run('format.highlight.none') },
           ]
         : [
             ...TEXT_COLORS.map((c): MenuItem => ({ label: c.label, swatch: { kind: 'text', color: c.value }, action: () => props.registry.run(`format.textColor.${c.id}`) })),
-            { label: 'Custom…', detail: props.isPro ? undefined : 'Supporter', swatch: { kind: 'fill', color: 'conic-gradient(#f87171, #facc15, #4ade80, #60a5fa, #c084fc, #f87171)' }, action: () => props.registry.run('format.textColor.custom') },
+            { label: 'Custom…', swatch: { kind: 'fill', color: 'conic-gradient(#f87171, #facc15, #4ade80, #60a5fa, #c084fc, #f87171)' }, action: () => props.registry.run('format.textColor.custom') },
             'separator',
             { label: 'Remove Text Color', swatch: { kind: 'text', color: null }, action: () => props.registry.run('format.textColor.none') },
           ];

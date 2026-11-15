@@ -58,7 +58,7 @@ export function ShortcutsDialog(props: { registry: CommandRegistry; isMac: boole
   );
 }
 
-export function AboutDialog(props: { onClose: () => void; openLicenses?: () => void; licensedTo?: string | null; onPro?: () => void }) {
+export function AboutDialog(props: { onClose: () => void; openLicenses?: () => void }) {
   return (
     <div class="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
       <div class="modal about" role="dialog" aria-labelledby="about-title" onKeyDown={(e) => e.key === 'Escape' && props.onClose()}>
@@ -70,14 +70,6 @@ export function AboutDialog(props: { onClose: () => void; openLicenses?: () => v
           <br />
           MIT License · Free and open source
         </p>
-        <Show when={props.onPro}>
-          <p class="about-meta">
-            {props.licensedTo ? `Supporter · thank you, ${props.licensedTo}` : ''}
-            <button class="link-btn" onClick={() => props.onPro?.()}>
-              {props.licensedTo ? 'Manage' : 'Become a Supporter…'}
-            </button>
-          </p>
-        </Show>
         <Show when={props.openLicenses}>
           <button class="btn btn-small" onClick={() => props.openLicenses?.()}>
             Third-party licenses

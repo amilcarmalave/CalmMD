@@ -17,12 +17,10 @@ import type { BaseTheme } from './export/build';
 import { ExportDialog } from './ui/ExportDialog';
 import { createSettings, SPELL_LANGUAGES, TEXT_WIDTH_SCALE, VIEW_MODES, type PreviewTheme, type ViewMode } from './app/settings';
 import { appMenus } from './app/appMenus';
-import { COLOR_THEMES, type ColorTheme } from './app/colorThemes';
+import type { ColorTheme } from './app/colorThemes';
 import { NATIVE_EDIT_ITEMS, resolveMenu, type ResolvedEntry, type TopMenu } from './app/menuModel';
 import type { NativeMenu, NativeMenuItem } from './platform/types';
 import { AboutDialog, ShortcutsDialog } from './ui/HelpDialogs';
-import { ProDialog } from './ui/ProDialog';
-import { createPro, type ProFeature } from './app/pro';
 import { coverFromDoc } from './core/cover';
 import { inlineImages, localImages, planZipBundle } from './core/bundle';
 import { createZip } from './core/zip';
@@ -100,14 +98,10 @@ export default function App(props: { platform: Platform }) {
     settings.colorScheme === 'system' ? (systemDark() ? 'dark' : 'light') : settings.colorScheme;
   /** The colour theme in effect: the preferred light or dark one. */
   const activeColorTheme = () => {
-    const id = effectiveScheme() === 'dark' ? settings.darkTheme : settings.lightTheme;
-    // A Pro theme shows only while Pro is active; the choice is kept for when it is again.
-    if (COLOR_THEMES.find((t) => t.id === id)?.pro && !pro.isPro()) return effectiveScheme() === 'dark' ? 'ink' : 'snow';
-    return id;
+    return effectiveScheme() === 'dark' ? settings.darkTheme : settings.lightTheme;
   };
   /** Picking a theme makes it the preferred one of its kind, and shows it now. */
   const pickColorTheme = (t: ColorTheme) => {
-    if (t.pro && !requirePro('premiumThemes')) return;
     const patch: Partial<typeof settings> = t.kind === 'light' ? { lightTheme: t.id } : { darkTheme: t.id };
     if (effectiveScheme() !== t.kind) patch.colorScheme = t.kind;
     update(patch);
@@ -669,10 +663,9 @@ export default function App(props: { platform: Platform }) {
     },
   ]);
 
-  // ---------- CalmMD Pro ----------
-  /** Pro: the system colour picker, starting from the colour in use. */
+  // ---------- Custom colours ----------
+  /** The system colour picker, starting from the colour in use. */
   function pickCustomColor(kind: 'highlight' | 'text', apply: (hex: string) => void) {
-    if (!requirePro('customColors')) return;
     const input = document.createElement('input');
     input.type = 'color';
     const current = kind === 'highlight' ? settings.highlightColor : settings.textColor;
@@ -687,28 +680,14 @@ export default function App(props: { platform: Platform }) {
     input.click();
   }
 
-  const pro = createPro({
-    platform,
-    notify,
-    instanceName: () => (isMac ? 'Mac' : navigator.userAgent.includes('Windows') ? 'Windows PC' : 'Linux PC'),
-  });
-  const [proDialog, setProDialog] = createSignal<{ feature?: ProFeature } | null>(null);
-  /** True for Supporters; otherwise explains the extra and returns false. */
-  const requirePro = (feature: ProFeature) => {
-    if (pro.isPro()) return true;
-    setProDialog({ feature });
-    return false;
-  };
-  registry.register([{ id: 'help.pro', title: 'Become a Supporter…', category: 'Help', run: () => setProDialog({}) }]);
-
-  // ---------- File history (Pro) ----------
+  // ---------- File history ----------
   const history = createHistory({ platform });
   const [historyRev, setHistoryRev] = createSignal(0);
   const [versionView, setVersionView] = createSignal<{ path: string; version: Version; text: string } | null>(null);
 
   /** A changed file closed: keep how it was when opened (if that's new) and how it is now. */
   async function captureOnClose(path: string, opened: string, current: string) {
-    if (!pro.isPro() || !settings.historyOnClose) return;
+    if (!settings.historyOnClose) return;
     if (opened.trim()) await history.save(path, opened);
     await history.save(path, current);
     setHistoryRev((n) => n + 1);
@@ -716,7 +695,7 @@ export default function App(props: { platform: Platform }) {
 
   async function saveVersion() {
     const d = activeDoc();
-    if (!requirePro('fileHistory') || !d || !view) return;
+    if (!d || !view) return;
     if (!d.path) {
       notify('Save this document to a file first');
       return;
@@ -784,7 +763,7 @@ export default function App(props: { platform: Platform }) {
     { id: 'history.show', title: 'Show File History', category: 'File', run: () => setSidebar({ open: true, view: 'history' }) },
   ]);
 
-  // ---------- Share bundles (Pro) ----------
+  // ---------- Share bundles ----------
   const dataUrlBytes = (url: string) => {
     const b64 = url.slice(url.indexOf(',') + 1);
     const bin = atob(b64);
@@ -794,7 +773,7 @@ export default function App(props: { platform: Platform }) {
   };
   async function shareBundle(kind: 'zip' | 'single') {
     const d = activeDoc();
-    if (!d || !view || !requirePro('shareBundles')) return;
+    if (!d || !view) return;
     await docs.flushAll();
     const text = view.state.doc.toString();
     const name = (d.path ? stem(d.path) : docName(d).replace(/\.md$/i, '')) || 'Document';
@@ -859,8 +838,6 @@ export default function App(props: { platform: Platform }) {
     userThemes: () => userThemes().map((t) => ({ id: t.id, name: t.name })),
     pickColorTheme,
     isMac,
-    isPro: () => pro.isPro(),
-    runCommand: (id) => void registry.run(id),
   });
   const resolveTop = (m: TopMenu) => resolveMenu(m.items(), registry, hint);
 
@@ -1398,7 +1375,6 @@ export default function App(props: { platform: Platform }) {
 
   onMount(async () => {
     const upgraded = await loadSettings().catch(() => false);
-    void pro.load();
 
     view = new EditorView({ parent: host, state: EditorState.create({ doc: '', extensions: [extensions, spellCompartment.of(spellFor())] }) });
     docs.attachView(view);
@@ -1566,7 +1542,6 @@ export default function App(props: { platform: Platform }) {
               }, 50);
           }
           if (ui === 'spaces') document.querySelector<HTMLButtonElement>('.space-switcher')?.click();
-          if (ui === 'pro') setProDialog({ feature: 'customColors' });
           if (ui.startsWith('qv:')) setQuickView(ui.slice(3));
           if (ui === 'search') {
             registry.run('view.search');
@@ -1661,14 +1636,12 @@ export default function App(props: { platform: Platform }) {
             historyPanel={
               <HistoryPanel
                 path={activeDoc()?.path ?? null}
-                isPro={pro.isPro()}
                 revision={historyRev()}
                 list={(p) => history.list(p)}
                 onSave={() => void saveVersion()}
                 onOpen={(v) => activeDoc()?.path && void openVersion(activeDoc()!.path!, v)}
                 saveOnClose={settings.historyOnClose}
                 setSaveOnClose={(on) => update({ historyOnClose: on })}
-                onSupporter={() => setProDialog({ feature: 'fileHistory' })}
               />
             }
             recentSpaces={recentSpaces()}
@@ -1684,7 +1657,6 @@ export default function App(props: { platform: Platform }) {
               registry={registry}
               hint={hint} onCustomize={() => setCustomizing(true)}
               openMenuAt={menu.openAt}
-              isPro={pro.isPro()}
               colors={{
                 highlight: settings.highlightColor === 'default' ? null : (colorValue('highlight', settings.highlightColor) ?? null),
                 text: colorValue('text', settings.textColor) ?? '#e5484d',
@@ -1758,7 +1730,6 @@ export default function App(props: { platform: Platform }) {
               update={update}
               effectiveScheme={effectiveScheme()}
               pickColorTheme={pickColorTheme}
-              isPro={pro.isPro()}
               userThemes={userThemes()}
               openThemesFolder={() => void openThemesFolder()}
             />
@@ -1793,8 +1764,6 @@ export default function App(props: { platform: Platform }) {
             prefs={d().prefs}
             engine={d().engine}
             coverDefaults={coverFromDoc(view?.state.doc.toString() ?? '', activeDoc() ? docName(activeDoc()!).replace(/\.md$/i, '') : 'Untitled', new Date())}
-            isPro={pro.isPro()}
-            requirePro={(f) => requirePro(f)}
             themes={[...BUILTIN_THEMES.map((t) => ({ id: t.id, label: t.label })), ...userThemes().map((t) => ({ id: t.id, label: t.name }))]}
             previewThemeLabel={currentUserTheme()?.name ?? BUILTIN_THEMES.find((t) => t.id === settings.previewTheme)?.label ?? 'Paper'}
             onClose={() => setExportDialog(null)}
@@ -1811,13 +1780,7 @@ export default function App(props: { platform: Platform }) {
         <ShortcutsDialog registry={registry} isMac={isMac} onClose={() => setHelpDialog(null)} />
       </Show>
       <Show when={helpDialog() === 'about'}>
-        <AboutDialog onClose={() => setHelpDialog(null)} licensedTo={pro.license() ? (pro.license()!.email ?? 'you') : null} onPro={() => {
-          setHelpDialog(null);
-          setProDialog({});
-        }} />
-      </Show>
-      <Show when={proDialog()}>
-        {(d) => <ProDialog pro={pro} feature={d().feature} openExternal={(u) => void platform.openExternal(u)} onClose={() => setProDialog(null)} />}
+        <AboutDialog onClose={() => setHelpDialog(null)} />
       </Show>
       <Show when={versionView()}>
         {(vv) => (
