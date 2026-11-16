@@ -162,42 +162,33 @@ export class TableWidget extends WidgetType {
         };
         return b;
       };
-      const sep = () => {
-        const s = document.createElement('span');
-        s.className = 'cm-live-table-sep';
-        return s;
-      };
       // The cell with the focus, else the last one used, else the end of the table.
       const here = () => {
         const a = document.activeElement as HTMLElement | null;
         if (a && wrap.contains(a) && a.dataset.r !== undefined) return { r: Number(a.dataset.r), c: Number(a.dataset.c) };
         return current ?? { r: table.rows.length, c: table.header.length - 1 };
       };
-      bar.append(
-        button('+ Row', 'Add a row below', () => {
-          const { r, c } = here();
-          restructure(insertRow(table, r + 1), { r: r + 1, c });
-        }),
-        button('+ Column', 'Add a column to the right', () => {
-          const { r, c } = here();
-          restructure(insertColumn(table, c + 1), { r, c: c + 1 });
-        }),
-        sep(),
-        button('⇤', 'Align column left', () => restructure(setAlign(table, here().c, 'left'), here()), 'icon'),
-        button('↔', 'Center column', () => restructure(setAlign(table, here().c, 'center'), here()), 'icon'),
-        button('⇥', 'Align column right', () => restructure(setAlign(table, here().c, 'right'), here()), 'icon'),
-        sep(),
-        button('− Row', 'Delete this row', () => {
-          const { r, c } = here();
-          if (r === 0 && !table.rows.length) return;
-          restructure(deleteRow(table, r), { r: Math.max(0, Math.min(r, table.rows.length - 1)), c });
-        }, 'danger'),
-        button('− Column', 'Delete this column', () => {
-          const { r, c } = here();
-          if (table.header.length <= 1) return;
-          restructure(deleteColumn(table, c), { r, c: Math.max(0, c - 1) });
-        }, 'danger'),
-      );
+      // Icons only: add a row, add a column, and ⋯ for the rest (the same menu as right-click).
+      const icon = (paths: string) => `<svg viewBox="0 0 16 16" aria-hidden="true">${paths}</svg>`;
+      const rowPlus = button('', 'Add a row below', () => {
+        const { r, c } = here();
+        restructure(insertRow(table, r + 1), { r: r + 1, c });
+      }, 'icon');
+      rowPlus.innerHTML = icon('<rect x="2" y="2.5" width="12" height="7" rx="1.5"/><path d="M8 11.5v3M6.5 13h3"/>');
+      const colPlus = button('', 'Add a column to the right', () => {
+        const { r, c } = here();
+        restructure(insertColumn(table, c + 1), { r, c: c + 1 });
+      }, 'icon');
+      colPlus.innerHTML = icon('<rect x="1.5" y="2" width="7" height="12" rx="1.5"/><path d="M11.5 8h3M13 6.5v3"/>');
+      const more = button('', 'More: align, delete', () => {
+        // Opens the cell's menu (App's right-click menu for tables) under the button.
+        const { r, c } = here();
+        const cell = cellEl(r, c);
+        const box = more.getBoundingClientRect();
+        cell?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.left, clientY: box.bottom + 4 }));
+      }, 'icon');
+      more.innerHTML = icon('<circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/>');
+      bar.append(rowPlus, colPlus, more);
       return bar;
     };
     draw();

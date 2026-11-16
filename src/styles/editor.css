@@ -566,56 +566,53 @@
   font-family: var(--font-mono, monospace);
   font-size: 0.9em;
 }
-.pane-editor .cm-live .cm-live-table.md-body.cm-live-table-edit {
-  padding-top: 42px;
-}
 .cm-live-table-bar {
   position: absolute;
-  top: 6px;
-  left: var(--pad, 28px);
+  top: -6px;
+  left: calc(var(--pad, 28px) + 6px);
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
+  gap: 1px;
+  padding: 2px;
   border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--surface-raised);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  font-family: var(--font-ui, sans-serif);
-  opacity: 0.55;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  pointer-events: none;
   transition: opacity 0.12s;
 }
-.cm-live-table-edit:hover .cm-live-table-bar,
 .cm-live-table-edit:focus-within .cm-live-table-bar {
   opacity: 1;
+  pointer-events: auto;
 }
 .cm-live-table-btn {
-  height: 24px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--fg);
-  font: 500 12.5px/1 var(--font-ui, sans-serif);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.cm-live-table-btn.icon {
-  width: 26px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
   padding: 0;
-  font-size: 14px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.cm-live-table-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.cm-live-table-btn svg circle {
+  fill: currentColor;
+  stroke: none;
 }
 .cm-live-table-btn:hover {
   background: var(--hairline);
-}
-.cm-live-table-btn.danger:hover {
-  color: var(--danger, #d14343);
-}
-.cm-live-table-sep {
-  width: 1px;
-  height: 16px;
-  margin: 0 3px;
-  background: var(--hairline);
+  color: var(--fg);
 }
 
 /* Live mode: formatting inside coloured text keeps the colour (the theme gives bold its own colour). */
