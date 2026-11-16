@@ -725,3 +725,14 @@
   box-shadow: none;
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
+
+/* Bold, italic and links inside coloured text keep the colour (bold has its own darker colour otherwise). */
+.md-body [style*="color"] strong,
+.md-body [style*="color"] b,
+.md-body [style*="color"] em,
+.md-body [style*="color"] i,
+.md-body [style*="color"] s,
+.md-body [style*="color"] del,
+.md-body [style*="color"] mark {
+  color: inherit;
+}
