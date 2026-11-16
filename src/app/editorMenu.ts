@@ -9,6 +9,9 @@ import type { MenuItem } from '../ui/ContextMenu';
 import type { CommandRegistry } from './commands';
 import { resolveLocalPath } from './links';
 import { isDrawingPath } from '../core/drawings';
+import { headingsOf } from '../core/headings';
+import { markdownUrl } from '../core/assets';
+import { basename } from '../core/paths';
 import { IMAGE_SIZE_PRESETS, parseAltSize, withAltOptions, type ImageAlign } from '../core/imageSize';
 
 export interface EditorMenuDeps {
@@ -233,6 +236,14 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
   // The same three sections everywhere text can be written (like Obsidian): links; Format, Paragraph
   // and Insert as submenus; then the clipboard.
   const writing = kind !== 'code' && kind !== 'table';
+  const heading = headingsOf(state.doc.lineAt(pos).text)[0];
+  if (writing && heading) {
+    const name = deps.docPath ? basename(deps.docPath) : null;
+    specific.push({
+      label: 'Copy Link to This Section',
+      action: () => copy(`[${heading.text}](${name ? markdownUrl(name) : ''}#${heading.slug})`, 'Link to this section copied: paste it in any note in this folder'),
+    });
+  }
   const maybe = (id: string, label?: string): MenuItem[] => (deps.registry.get(id) ? [cmd(id, label)] : []);
   const links: MenuItem[] = writing
     ? [

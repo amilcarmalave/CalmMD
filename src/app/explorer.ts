@@ -288,7 +288,12 @@ export function createExplorer(deps: ExplorerDeps) {
   }
 
   /** Every Markdown file under the root (for Go to File). Capped, cached until refresh. */
-  function allFiles(limit = 5000): Promise<string[]> {
+  async function allFiles(): Promise<string[]> {
+    return (await everyFile()).filter((p) => isMarkdownPath(p));
+  }
+
+  /** Every file under the root, notes or not (for links to pictures, PDFs and drawings). */
+  function everyFile(limit = 5000): Promise<string[]> {
     const root = state.root;
     if (!root) return Promise.resolve([]);
     if (fileCache?.root === root) return fileCache.files;
@@ -305,7 +310,7 @@ export function createExplorer(deps: ExplorerDeps) {
         }
         for (const e of list) {
           if (e.isDir) queue.push(e.path);
-          else if (isMarkdownPath(e.name)) out.push(e.path);
+          else out.push(e.path);
         }
       }
       return out;
@@ -318,6 +323,7 @@ export function createExplorer(deps: ExplorerDeps) {
     state,
     visible,
     allFiles,
+    everyFile,
     invalidateFiles: () => (fileCache = null),
     setRoot,
     openFolderDialog,

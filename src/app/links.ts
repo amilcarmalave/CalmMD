@@ -4,7 +4,10 @@ import type { Platform } from '../platform/types';
 export interface LinkContext {
   platform: Platform;
   docPath: string | null;
-  openPath: (path: string) => void;
+  /** Opens a note, then scrolls to the heading the anchor names ("Plan.md#budget"). */
+  openPath: (path: string, anchor?: string) => void;
+  /** Opens a file that isn't a note (picture, PDF, drawing) in a tab. */
+  openFile?: (path: string) => void;
   /** In-document anchors ("#section"). */
   gotoAnchor: (id: string) => void;
   /** `[[Wiki links]]`: the target as written ("Note#Heading"). */
@@ -46,15 +49,19 @@ export function openLink(href: string, ctx: LinkContext) {
     return;
   }
   if (!ctx.docPath) return;
-  let target = href.split('#')[0];
+  const hashAt = href.indexOf('#');
+  const anchor = hashAt === -1 ? undefined : href.slice(hashAt + 1) || undefined;
+  let target = hashAt === -1 ? href : href.slice(0, hashAt);
   try {
     target = decodeURI(target);
   } catch {
     // keep as written
   }
-  if (!target || !isMarkdownPath(target)) return;
+  if (!target) return;
   const abs = /^([a-zA-Z]:)?[\\/]/.test(target)
     ? target
     : joinPath(dirname(ctx.docPath), target.replace(/^\.[\\/]/, '').replace(/[\\/]/g, separatorOf(ctx.docPath)));
-  if (!samePath(abs, ctx.docPath)) ctx.openPath(abs);
+  if (!isMarkdownPath(target)) return ctx.openFile?.(abs);
+  if (!samePath(abs, ctx.docPath)) ctx.openPath(abs, anchor);
+  else if (anchor) ctx.gotoAnchor(anchor);
 }

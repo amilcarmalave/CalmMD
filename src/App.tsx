@@ -36,6 +36,7 @@ import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
 import { DrawingEditor } from './ui/DrawingEditor';
+import { headingLine } from './core/headings';
 import type { FileTab } from './ui/TabStrip';
 import { htmlToMarkdown, worthConverting } from './editor/richPaste';
 import { inCode } from './app/editorMenu';
@@ -186,7 +187,17 @@ export default function App(props: { platform: Platform }) {
     extra: [
       registry.editorKeymap(isMac),
       slashCommands(slashItems, () => settings.slashCommands, [
-        notePicker({ files: () => noteFiles(), docPath: () => activeDoc()?.path ?? null, root: () => explorer.state.root }),
+        notePicker({
+          files: () => noteFiles(),
+          allFiles: () => explorer.everyFile().catch(() => []),
+          docPath: () => activeDoc()?.path ?? null,
+          root: () => explorer.state.root,
+          // An open note's current text, otherwise the file on disk.
+          readText: async (p) => {
+            const open = store.docs.find((d) => d.path && samePath(d.path, p));
+            return open ? docs.textOf(open.id) : (await platform.readTextFile(p)).text;
+          },
+        }),
       ]),
       // Pasted and dropped images are saved as files and linked (app/assets.ts).
       // Double-click a drawing's picture to edit it.
@@ -562,7 +573,17 @@ export default function App(props: { platform: Platform }) {
     openLink(href, {
       platform,
       docPath: activeDoc()?.path ?? null,
-      openPath: (p) => void docs.openPaths([p]),
+      openPath: (p, anchor) =>
+        void docs.openPaths([p]).then(() => {
+          if (!anchor) return;
+          // The note is the active tab once it's open; find the heading in its text.
+          setTimeout(() => {
+            const id = store.activeId;
+            const line = id ? headingLine(docs.textOf(id), anchor) : null;
+            if (line !== null) gotoLine(line);
+          }, 60);
+        }),
+      openFile: (p) => openFileTab(p, true),
       openWiki: (t) => void openWiki(t),
       gotoAnchor: (id) => {
         const h = headings().find((x) => slugify(x.text) === id);
