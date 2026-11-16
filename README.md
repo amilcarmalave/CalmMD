@@ -60,16 +60,17 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 | | |
 |---|---|
 | **Four views** | Source · Live · Split · Preview (`Ctrl/⌘+E` to cycle). Enter starts a new paragraph, so files read the same on GitHub |
-| **Writing** | GFM tables, task lists, footnotes, `==highlight==`, any text or highlight colour, sub/superscript, GitHub-style callouts, front matter, HTML, KaTeX math, Mermaid diagrams, syntax-highlighted code, video embeds |
+| **Writing** | Tables you type into in Live mode (Tab and Enter move between cells; add rows and columns from a small toolbar), task lists, footnotes, `==highlight==`, any text or highlight colour, sub/superscript, GitHub-style callouts, front matter, HTML, KaTeX math, Mermaid diagrams, syntax-highlighted code, video embeds |
 | **Images** | Paste or drop images: they're saved in an `assets` folder next to the note and linked relatively. Drag to resize, align left, center or right, all in standard Markdown (`![Photo\|300\|center](photo.png)`) |
 | **Drawings** | Sketch with [Excalidraw](https://excalidraw.com) right in the app (Insert → Drawing, or `/drawing`). Each drawing is its own `.excalidraw.svg` file next to your notes: a picture that shows on GitHub and anywhere else, with the editable drawing inside. Double-click it to edit |
-| **Files** | A folder sidebar with favourites, outline and tabs that come back after a restart. Other files open in a Quick view: images, PDFs, CSV and code. `.txt` files open as plain text |
+| **Files** | A folder sidebar with favourites, outline and tabs that come back after a restart. Drawings, pictures, PDFs, CSV and code open in tabs next to your notes. `.txt` files open as plain text |
 | **File history** | Earlier versions of each file, saved when you ask (Save Version), or every time you close a changed file if you turn that on. Compare side by side and restore in one click. Versions stay in the app's data, never in your folders; the History tab shows how much space they use and clears them |
-| **Links and search** | Search every note in a folder (`Ctrl/⌘+Shift+F`), link notes with a `[[` picker, `[[Wiki links]]`, and "Linked from" for the open note |
+| **Links and search** | Search every note in a folder (`Ctrl/⌘+Shift+F`). `[[` links to any file, `[[Note#` to a heading in another note (or right-click a heading to copy a link to it), plus `[[Wiki links]]` and "Linked from" for the open note |
 | **Spaces** | Save a window (folder, tabs, layout) as a Space and switch with `Ctrl/⌘+Alt+O`, or open Spaces in their own windows |
 | **Finding things** | Command palette (`Ctrl/⌘+Shift+P`), go to file (`Ctrl/⌘+P`), line (`:`), heading (`@`), and `/` on an empty line to insert anything |
 | **Export and share** | PDF with templates (Standard, Report, Academic, Minimal) and cover pages, standalone HTML, Copy as HTML, a note with its images as one file or a `.zip`, and Word/ODT/EPUB when [Pandoc](https://pandoc.org) is installed |
 | **Looks** | Fifteen colour themes, from Snow and Paper to Solarized, Fjord and Nightshade, with separate light and dark choices; five document styles (Book, Studio, Clear, GitHub, Typewriter); text width from narrow to full; your own CSS themes |
+| **Paste** | Formatted text from a web page, Word or Google Docs becomes Markdown (headings, bold, links, lists, tables); Paste as Plain Text (`Ctrl/⌘+Shift+V`) keeps just the text |
 | **Safety** | Autosave with crash-safe atomic writes, drafts for untitled notes, and it never overwrites changes made by other apps |
 
 ### PDF export
