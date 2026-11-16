@@ -124,6 +124,11 @@ src-tauri/
   lists, quotes and code keep the usual Enter). The analyzer hides the backslash of a `HardBreak`.
   Live mode draws a blank line between top-level blocks at the preview's paragraph gap (`cm-live-gap`, full height
   under the cursor), so Enter doesn't look like an empty line.
+- **Formatting over formatting is restyled, not wrapped.** Bold, italic, strike, highlight and colour on a selection
+  go through `editor/restyle.ts`: the affected part of the line is read as runs of styled text (from the syntax tree
+  and the colour tags), the change is applied to the selected characters only, and the part is written back with
+  nested marks, so tags never cross. Code, links, math and unknown spans stay whole. It needs the syntax tree, so
+  plain states (unit tests, .txt) fall back to simple wrapping.
 - **Enter steps out of inline formatting.** When everything after the cursor is closing marks (`**`, `_`, `==`,
   `</span>`, …), `editor/inlineEnter.ts` (highest precedence, every mode) moves past them, or removes an empty pair,
   then returns false so the usual Enter runs from there.

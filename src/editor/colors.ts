@@ -1,4 +1,5 @@
 import { EditorSelection, type EditorState, type TransactionSpec } from '@codemirror/state';
+import { restyle, setColorStyle } from './restyle';
 
 /**
  * Highlight and text colours, written as plain inline HTML so they survive in other editors and
@@ -71,6 +72,9 @@ const OPEN_AT_START: Record<ColorKind, RegExp> = {
  * null). For highlights, `value` "default" means the Markdown `==text==` form.
  */
 export function applyColor(state: EditorState, kind: ColorKind, value: string | null): TransactionSpec {
+  // A selection over existing colours or formatting: restyle the runs so tags never cross.
+  const restyled = restyle(state, setColorStyle(kind === 'text' ? 'color' : 'highlight', value));
+  if (restyled) return restyled;
   const close = closeTag(kind);
   const wrap = (inner: string) => {
     if (value === null) return { text: inner, offset: 0 };

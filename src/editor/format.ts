@@ -1,4 +1,5 @@
 import { EditorSelection, type EditorState, type TransactionSpec } from '@codemirror/state';
+import { restyle, toggleHighlight, toggleStyle } from './restyle';
 
 /**
  * Formatting operations as pure functions: (state) → transaction spec. Commands dispatch them,
@@ -7,6 +8,11 @@ import { EditorSelection, type EditorState, type TransactionSpec } from '@codemi
 
 /** Toggles an inline marker (** for bold, _ for italic, ~~, `) around each selection. */
 export function toggleInline(state: EditorState, marker: string): TransactionSpec {
+  // A selection over existing formatting: restyle the runs so marks never cross (editor/restyle.ts).
+  const change =
+    marker === '**' ? toggleStyle('bold') : marker === '_' || marker === '*' ? toggleStyle('italic') : marker === '~~' ? toggleStyle('strike') : marker === '==' ? toggleHighlight : null;
+  const restyled = change && restyle(state, change);
+  if (restyled) return restyled;
   const m = marker.length;
   return state.changeByRange((range) => {
     const before = state.sliceDoc(range.from - m, range.from);
