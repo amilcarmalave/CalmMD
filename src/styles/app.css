@@ -1787,3 +1787,18 @@ button {
   margin: 16px 12px 0;
   font-size: 12px;
 }
+
+/* Submenus in context menus. */
+.menu-item.has-sub .menu-arrow {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--fg-faint);
+  font-size: 15px;
+  line-height: 1;
+}
+.menu-item.has-sub.open {
+  background: var(--hairline);
+}
+.context-menu.submenu {
+  z-index: 201;
+}

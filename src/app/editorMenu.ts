@@ -1,5 +1,7 @@
+import { startCompletion } from '@codemirror/autocomplete';
 import { syntaxTree } from '@codemirror/language';
-import { EditorSelection } from '@codemirror/state';
+import { EditorSelection, type EditorState } from '@codemirror/state';
+import { htmlToMarkdown, worthConverting } from '../editor/richPaste';
 import type { EditorView } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import type { Platform } from '../platform/types';
@@ -31,6 +33,27 @@ export interface EditorMenuDeps {
 }
 
 export type MenuContext = 'link' | 'image' | 'code' | 'table' | 'text';
+
+/** Whether pos is inside code (a code block or inline code), where pasted text stays as it is. */
+export function inCode(state: EditorState, pos: number): boolean {
+  for (let n: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1); n; n = n.parent)
+    if (n.name === 'FencedCode' || n.name === 'CodeBlock' || n.name === 'InlineCode') return true;
+  return false;
+}
+
+/** The clipboard as Markdown: formatted text (HTML) converted, otherwise the plain text. */
+async function clipboardMarkdown(platform: Platform): Promise<string> {
+  try {
+    for (const item of await navigator.clipboard.read()) {
+      if (!item.types.includes('text/html')) continue;
+      const html = await (await item.getType('text/html')).text();
+      if (worthConverting(html)) return htmlToMarkdown(html);
+    }
+  } catch {
+    // No access to formatted clipboard data here: fall back to the text.
+  }
+  return platform.readClipboard().catch(() => '');
+}
 
 /** The innermost interesting syntax node around a position. */
 export function contextAt(view: EditorView, pos: number): { kind: MenuContext; node: SyntaxNode | null } {
@@ -86,6 +109,17 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
     {
       label: 'Paste',
       hint: deps.platform.isMac ? '⌘V' : 'Ctrl+V',
+      action: async () => {
+        const text = inCode(view.state, view.state.selection.main.head)
+          ? await deps.platform.readClipboard().catch(() => '')
+          : await clipboardMarkdown(deps.platform);
+        if (text) view.dispatch(view.state.replaceSelection(text), { userEvent: 'input.paste', scrollIntoView: true });
+        view.focus();
+      },
+    },
+    {
+      label: 'Paste as Plain Text',
+      hint: deps.platform.isMac ? '⇧⌘V' : 'Ctrl+Shift+V',
       action: async () => {
         const text = await deps.platform.readClipboard().catch(() => '');
         if (text) view.dispatch(view.state.replaceSelection(text), { userEvent: 'input.paste', scrollIntoView: true });
@@ -194,22 +228,82 @@ export function editorMenuItems(view: EditorView, pos: number, deps: EditorMenuD
       { ...cmd('table.deleteRow'), danger: true },
       { ...cmd('table.deleteCol'), danger: true },
     );
-  } else {
-    specific.push(cmd('format.bold'), cmd('format.italic'), cmd('format.link'), {
-      label: 'Format…',
-      action: () => deps.openPalette('>Format: '),
-    }, {
-      label: 'Insert…',
-      action: () => deps.openPalette('>Insert: '),
-    });
   }
+
+  // The same three sections everywhere text can be written (like Obsidian): links; Format, Paragraph
+  // and Insert as submenus; then the clipboard.
+  const writing = kind !== 'code' && kind !== 'table';
+  const maybe = (id: string, label?: string): MenuItem[] => (deps.registry.get(id) ? [cmd(id, label)] : []);
+  const links: MenuItem[] = writing
+    ? [
+        {
+          label: 'Add Link…',
+          hint: '[[',
+          action: () => {
+            // Opens the note picker; selected text becomes what it searches for.
+            const s = view.state.selection.main;
+            const text = view.state.sliceDoc(s.from, s.to).replace(/[[\]\n]/g, ' ');
+            view.dispatch({ changes: { from: s.from, to: s.to, insert: '[[' + text }, selection: { anchor: s.from + 2 + text.length }, userEvent: 'input' });
+            view.focus();
+            startCompletion(view);
+          },
+        },
+        cmd('format.link', 'Add External Link'),
+      ]
+    : [];
+  const sections: MenuItem[] = writing
+    ? [
+        {
+          label: 'Format',
+          submenu: () => [
+            cmd('format.bold'),
+            cmd('format.italic'),
+            cmd('format.strike'),
+            cmd('format.highlight'),
+            cmd('format.code'),
+            cmd('format.textColor'),
+            'separator',
+            cmd('format.clear'),
+          ],
+        },
+        {
+          label: 'Paragraph',
+          submenu: () => [
+            cmd('format.paragraph', 'Body Text'),
+            cmd('format.heading1'),
+            cmd('format.heading2'),
+            cmd('format.heading3'),
+            'separator',
+            cmd('format.bulletList'),
+            cmd('format.orderedList'),
+            cmd('format.taskList', 'Task List'),
+            cmd('format.quote'),
+            cmd('insert.codeBlock'),
+          ],
+        },
+        {
+          label: 'Insert',
+          submenu: () => [
+            ...maybe('insert.imageFile'),
+            cmd('insert.table'),
+            ...maybe('insert.drawing'),
+            cmd('insert.footnote'),
+            'separator',
+            cmd('insert.math'),
+            cmd('insert.mermaid'),
+            cmd('insert.hr'),
+          ],
+        },
+      ]
+    : [];
 
   const nativeHint: MenuItem[] =
     deps.spellcheck && kind === 'text' && !deps.spelling
       ? ['separator', { label: 'Spelling suggestions', hint: 'Shift+Right-click', disabled: true, action: () => {} }]
       : [];
   const spelling = deps.spelling?.length ? [...deps.spelling, 'separator' as const] : [];
-  return [...spelling, ...specific, 'separator', ...clipboard, 'separator', cmd('edit.selectAll'), ...nativeHint];
+  const groups = [specific, links, sections, [...clipboard, cmd('edit.selectAll')]].filter((g) => g.length);
+  return [...spelling, ...groups.flatMap((g, i) => (i ? ['separator' as const, ...g] : g)), ...nativeHint];
 }
 
 /** The word around a position (letters, marks, digits and inner apostrophes), or null. */

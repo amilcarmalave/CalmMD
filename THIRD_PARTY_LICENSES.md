@@ -22,6 +22,7 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | base64 | MIT / Apache-2.0 | Embedding images, decoding PDFs |
 | tungstenite | MIT / Apache-2.0 | DevTools-protocol connection to the PDF engine |
 | Excalidraw (`@excalidraw/excalidraw`) and its bundled dependencies (roughjs, perfect-freehand, Radix UI, jotai, pako, harfbuzzjs, …) | MIT / ISC / BSD-3 / Apache-2.0 / Zlib / 0BSD / CC0 | Drawings (lazy-loaded) |
+| Turndown, turndown-plugin-gfm | MIT | Pasting formatted text as Markdown |
 | React, React DOM (`react`, `react-dom`) | MIT | Hosts the Excalidraw editor (lazy-loaded) |
 | Excalidraw fonts: Excalifont, Virgil, Nunito, Lilita One, Cascadia Code, Liberation Sans, Assistant | SIL OFL 1.1 | Text in drawings |
 | Excalidraw font: Comic Shanns | MIT | Text in drawings |

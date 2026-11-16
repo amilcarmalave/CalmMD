@@ -36,6 +36,8 @@ import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
 import { DrawingEditor } from './ui/DrawingEditor';
+import { htmlToMarkdown, worthConverting } from './editor/richPaste';
+import { inCode } from './app/editorMenu';
 import { compareVersions, isCheckDue, parseRelease, RELEASES_API, shouldAnnounce, type Release } from './app/updates';
 import { drawingFileName, drawingMarkdown, drawingTitle } from './core/drawings';
 import { withAssetVersions } from './platform/assetVersions';
@@ -199,9 +201,20 @@ export default function App(props: { platform: Platform }) {
         },
       }),
       EditorView.domEventHandlers({
-        paste: (e) => {
+        paste: (e, v) => {
           const data = e.clipboardData;
           if (!data) return false;
+          // Formatted text from a web page, Word or Google Docs becomes Markdown (not inside code).
+          // Ctrl/Cmd+Shift+V pastes only the plain text, so it skips this.
+          const html = data.getData('text/html');
+          if (html && worthConverting(html) && !inCode(v.state, v.state.selection.main.head)) {
+            const md = htmlToMarkdown(html);
+            if (md) {
+              e.preventDefault();
+              v.dispatch(v.state.replaceSelection(md), { userEvent: 'input.paste', scrollIntoView: true });
+              return true;
+            }
+          }
           // Office apps put a picture of the text on the clipboard too: text wins when there is any.
           if (data.getData('text/plain').trim()) return false;
           const files = [...data.files].filter((f) => f.type.startsWith('image/'));
@@ -1498,8 +1511,8 @@ export default function App(props: { platform: Platform }) {
   // ---------- Context menus ----------
   async function onEditorContextMenu(e: MouseEvent) {
     if (!view || e.shiftKey) return; // Shift+right-click: the native menu
-    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-    if (pos === null) return;
+    // The nearest position, also for empty space below the text or in the margins.
+    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
     e.preventDefault();
     e.stopPropagation();
     const sel = view.state.selection.main;
@@ -1629,6 +1642,15 @@ export default function App(props: { platform: Platform }) {
       registry.run(e.deltaY < 0 ? 'view.zoomIn' : 'view.zoomOut');
     };
     window.addEventListener('wheel', onWheel, { passive: false });
+    // The webview's own menu (Emoji, Writing direction, More tools…) never shows: CalmMD's menus cover
+    // the editor, sidebar and preview, and text fields keep theirs. Shift+right-click still opens it.
+    const onNativeMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.shiftKey) return;
+      if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]:not(.cm-content)')) return;
+      e.preventDefault();
+    };
+    window.addEventListener('contextmenu', onNativeMenu);
+    onCleanup(() => window.removeEventListener('contextmenu', onNativeMenu));
     onCleanup(() => window.removeEventListener('wheel', onWheel));
     const onFocus = () => {
       void docs.checkExternalChanges();

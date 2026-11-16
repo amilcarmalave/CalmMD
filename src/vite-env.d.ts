@@ -23,3 +23,9 @@ declare module 'katex/dist/katex.min.css?raw' {
   const source: string;
   export default source;
 }
+
+/** turndown-plugin-gfm ships without types. */
+declare module 'turndown-plugin-gfm' {
+  import type TurndownService from 'turndown';
+  export const gfm: TurndownService.Plugin;
+}
