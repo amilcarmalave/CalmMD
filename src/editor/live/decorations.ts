@@ -138,24 +138,6 @@ const handlers = EditorView.domEventHandlers({
       return true;
     }
 
-    const table = target.closest('.cm-live-table') as HTMLElement | null;
-    if (table) {
-      e.preventDefault();
-      // Put the cursor in the clicked cell's row if we can find it, otherwise at the table start.
-      const pos = Number(table.dataset.pos);
-      const rows = [...table.querySelectorAll('tr')];
-      const row = target.closest('tr');
-      const rowIndex = row ? rows.indexOf(row) : 0;
-      const doc = view.state.doc;
-      const first = doc.lineAt(pos).number;
-      // Source line for the row: the header is line 0, then the delimiter, then the body rows.
-      const lineNo = Math.min(doc.lines, first + (rowIndex <= 0 ? 0 : rowIndex + 1));
-      const line = doc.line(lineNo);
-      view.dispatch({ selection: { anchor: Math.min(line.to, line.from + 2) } });
-      view.focus();
-      return true;
-    }
-
     const locate = target.closest('.cm-live-image-locate') as HTMLElement | null;
     if (locate) {
       e.preventDefault();

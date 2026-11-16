@@ -39,8 +39,12 @@ src/
   editor/live/        live (hybrid) mode
     analyze.ts        PURE: syntax tree + selection → LiveItems (hide, mark, line, widgets). Tested.
     decorations.ts    LiveItems → CM decorations (ViewPlugin, visible ranges); tables as block widgets
-                      (StateField); mousedown handlers (task toggle, table click, Mod+click link)
+                      (StateField); mousedown handlers (task toggle, Mod+click link)
     widgets.ts        bullet, task, hr, image (+ companion image while editing), table
+    tableWidget.ts    editable tables: cells are contenteditable (raw Markdown while focused, rendered
+                      after), Tab/Enter move and add rows, changes written back with formatTable; the
+                      widget updates its own source so redraws from its edits keep focus; right-click
+                      actions via the element's tableActions (App onEditorContextMenu)
     config.ts         facet with app hooks (image resolution, table rendering, link opening)
   styles/editor.css   centred column (--pad via container units) and live typography
   app/links.ts        one link policy for preview and live (anchors, web, relative .md, else ignore)

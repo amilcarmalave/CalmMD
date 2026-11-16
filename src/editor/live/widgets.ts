@@ -323,33 +323,4 @@ export class HtmlBlockWidget extends WidgetType {
   }
 }
 
-export class TableWidget extends WidgetType {
-  constructor(
-    readonly source: string,
-    readonly pos: number,
-  ) {
-    super();
-  }
-  eq(other: TableWidget) {
-    return other.source === this.source && other.pos === this.pos;
-  }
-  toDOM(view: EditorView) {
-    const wrap = document.createElement('div');
-    wrap.className = 'cm-live-table md-body';
-    wrap.dataset.pos = String(this.pos);
-    wrap.innerHTML = view.state.facet(liveConfig).renderMarkdown(this.source);
-    // Strip source-line attributes so they don't confuse anything that looks for them.
-    for (const el of wrap.querySelectorAll('[data-line-start]')) {
-      el.removeAttribute('data-line-start');
-      el.removeAttribute('data-line-end');
-    }
-    return wrap;
-  }
-  get estimatedHeight() {
-    return (this.source.split('\n').length - 1) * 34 + 16;
-  }
-  ignoreEvent(e: Event) {
-    // Let clicks through to the mousedown handler, which moves the cursor into the table.
-    return e.type !== 'mousedown';
-  }
-}
+export { TableWidget } from './tableWidget';

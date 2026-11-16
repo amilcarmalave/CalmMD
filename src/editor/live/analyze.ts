@@ -540,7 +540,7 @@ export function analyzeBlocks(state: EditorState): BlockItem[] {
         const to = doc.lineAt(ref.to).to;
         const editing = touches(state, from, to);
         if (ref.name === 'Table') {
-          if (!editing) out.push({ kind: 'table', from, to });
+          out.push({ kind: 'table', from, to }); // editable in place (tableWidget.ts)
         } else if (ref.name === 'BlockMath') {
           const tex = blockMathTex(doc.sliceString(ref.from, ref.to));
           out.push(editing ? { kind: 'math-preview', at: to, tex } : { kind: 'math', from, to, tex });

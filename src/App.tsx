@@ -36,6 +36,7 @@ import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
 import { DrawingEditor } from './ui/DrawingEditor';
+import type { TableActions } from './editor/live/tableWidget';
 import { headingLine } from './core/headings';
 import type { FileTab } from './ui/TabStrip';
 import { htmlToMarkdown, worthConverting } from './editor/richPaste';
@@ -1557,6 +1558,28 @@ export default function App(props: { platform: Platform }) {
   // ---------- Context menus ----------
   async function onEditorContextMenu(e: MouseEvent) {
     if (!view || e.shiftKey) return; // Shift+right-click: the native menu
+    // A cell of an editable table (Live mode): rows, columns and alignment.
+    const tableEl = (e.target as HTMLElement).closest('.cm-live-table') as (HTMLElement & { tableActions?: (t: Element) => TableActions | null }) | null;
+    const actions = tableEl?.tableActions?.(e.target as Element);
+    if (actions) {
+      e.preventDefault();
+      e.stopPropagation();
+      const header = actions.row === 0;
+      menu.openAt(e.clientX, e.clientY, [
+        { label: 'Insert Row Above', disabled: header, action: () => actions.insertRow(false) },
+        { label: 'Insert Row Below', action: () => actions.insertRow(true) },
+        { label: 'Insert Column Left', action: () => actions.insertColumn(false) },
+        { label: 'Insert Column Right', action: () => actions.insertColumn(true) },
+        'separator',
+        { label: 'Align Left', action: () => actions.align('left') },
+        { label: 'Align Center', action: () => actions.align('center') },
+        { label: 'Align Right', action: () => actions.align('right') },
+        'separator',
+        { label: header ? 'Delete Header Row' : 'Delete Row', danger: true, action: () => actions.deleteRow() },
+        { label: 'Delete Column', danger: true, action: () => actions.deleteColumn() },
+      ]);
+      return;
+    }
     // The nearest position, also for empty space below the text or in the margins.
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
     e.preventDefault();

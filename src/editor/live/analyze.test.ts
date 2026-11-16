@@ -281,10 +281,8 @@ describe('tables', () => {
     const s = state('intro\n\n' + table + '\n\nafter‸');
     expect(analyzeBlocks(s)).toEqual([{ kind: 'table', from: 7, to: 7 + table.length }]);
   });
-  it('shows table source when the cursor is inside', () => {
+  it('keeps the table as an editable table even with the cursor inside', () => {
     const s = state('intro\n\n| a | ‸b |\n|---|---|\n| 1 | 2 |');
-    expect(analyzeBlocks(s)).toEqual([]);
-    const lines = analyzeInline(s, 0, s.doc.length).filter((i) => i.kind === 'line' && i.cls !== 'cm-live-gap');
-    expect(lines).toHaveLength(3);
+    expect(analyzeBlocks(s)).toEqual([{ kind: 'table', from: 7, to: s.doc.length }]);
   });
 });
