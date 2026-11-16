@@ -1,4 +1,5 @@
-import { syntaxTree } from '@codemirror/language';
+import { ensureSyntaxTree } from '@codemirror/language';
+import type { Tree } from '@lezer/common';
 import { EditorSelection, type EditorState, type SelectionRange, type TransactionSpec } from '@codemirror/state';
 
 /**
@@ -42,9 +43,9 @@ interface Element {
 }
 
 /** Styled elements and atomic syntax on one line, from the syntax tree and the colour tags. */
-function elementsOn(state: EditorState, from: number, to: number): Element[] {
+function elementsOn(state: EditorState, tree: Tree, from: number, to: number): Element[] {
   const out: Element[] = [];
-  syntaxTree(state).iterate({
+  tree.iterate({
     from,
     to,
     enter: (n) => {
@@ -94,11 +95,17 @@ interface Token {
   atomic: boolean;
 }
 
-/** Rewrites [region.from, region.to) with `change` applied to the tokens inside the selection. */
-function rewrite(state: EditorState, range: SelectionRange, change: StyleChange): { from: number; to: number; insert: string; selFrom: number; selTo: number } | null {
+interface Prepared {
+  from: number;
+  to: number;
+  tokens: Token[];
+  selected: Token[];
+}
+
+/** Reads the part of one line around a selection (which must lie on that line) as styled tokens. */
+function prepare(state: EditorState, tree: Tree, range: { from: number; to: number }): Prepared | null {
   const line = state.doc.lineAt(range.from);
-  if (state.doc.lineAt(range.to).number !== line.number) return null; // one line at a time
-  const elements = elementsOn(state, line.from, line.to);
+  const elements = elementsOn(state, tree, line.from, line.to);
 
   // The region: the selection, grown until no element crosses its edges.
   let from = range.from;
@@ -139,16 +146,42 @@ function rewrite(state: EditorState, range: SelectionRange, change: StyleChange)
     p++;
   }
   const selected = tokens.filter((t) => t.from < selTo && t.to > selFrom);
-  if (!selected.length) return null;
-  const letters = selected.filter((t) => t.text.trim());
-  const apply = change((letters.length ? letters : selected).map((t) => t.style));
-  for (const t of selected) t.style = apply(t.style);
+  if (!selected.some((t) => t.text.trim())) return null;
+  return { from, to, tokens, selected };
+}
 
+/** Applies a style change to a prepared line and writes it back with nested marks. */
+function finish(state: EditorState, prep: Prepared, apply: (s: Style) => Style) {
+  const { from, to, tokens, selected } = prep;
+  for (const t of selected) t.style = apply(t.style);
   const { text, offsets } = serialize(tokens, state.sliceDoc(from - 1, from), state.sliceDoc(to, to + 1));
   const first = tokens.indexOf(selected.find((t) => t.text.trim()) ?? selected[0]);
   const lastTok = [...selected].reverse().find((t) => t.text.trim()) ?? selected[selected.length - 1];
   const last = tokens.indexOf(lastTok);
   return { from, to, insert: text, selFrom: from + offsets[first][0], selTo: from + offsets[last][1] };
+}
+
+/** Block syntax at the start of a line that styles never wrap: quote marks, list and task marks, heading marks. */
+const LINE_PREFIX = /^\s*(?:>\s?)*\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)?(?:#{1,6}\s+)?/;
+/** Blocks whose lines aren't styled text. */
+const NOT_PROSE = new Set(['FencedCode', 'CodeBlock', 'HTMLBlock', 'Table', 'HorizontalRule', 'FrontMatter', 'BlockMath', 'CommentBlock']);
+
+/** The parts of a selection that are styleable text, one per line (Markdown styles can't cross lines). */
+function lineParts(state: EditorState, tree: Tree, range: SelectionRange): { from: number; to: number }[] {
+  const parts: { from: number; to: number }[] = [];
+  const last = state.doc.lineAt(range.to).number;
+  for (let n = state.doc.lineAt(range.from).number; n <= last; n++) {
+    const line = state.doc.line(n);
+    let inBlock = false;
+    for (let node: ReturnType<Tree['resolveInner']> | null = tree.resolveInner(line.from, 1); node; node = node.parent)
+      if (NOT_PROSE.has(node.name)) inBlock = true;
+    if (inBlock || !line.text.trim()) continue;
+    const start = line.from + (LINE_PREFIX.exec(line.text)?.[0].length ?? 0);
+    const from = Math.max(range.from, start);
+    const to = Math.min(range.to, line.to);
+    if (to > from && state.sliceDoc(from, to).trim()) parts.push({ from, to });
+  }
+  return parts;
 }
 
 const KEYS = ['color', 'highlight', 'strike', 'bold', 'italic'] as const;
@@ -231,23 +264,38 @@ export function serialize(
 
 /** Applies a style change to every selection; null when there's nothing to do this way. */
 export function restyle(state: EditorState, change: StyleChange): TransactionSpec | null {
-  if (syntaxTree(state).length < state.doc.length) return null; // not parsed yet (or no Markdown language)
   if (state.selection.ranges.some((r) => r.empty)) return null;
-  const edits: { from: number; to: number; insert: string; selFrom: number; selTo: number }[] = [];
-  for (const r of state.selection.ranges) {
-    const e = rewrite(state, r, change);
-    if (!e) return null;
-    edits.push(e);
-  }
+  // The whole document parsed (no Markdown language, as in plain states: the caller falls back).
+  const tree = ensureSyntaxTree(state, state.doc.length, 300);
+  if (!tree || tree.length < state.doc.length) return null;
+
+  // Each selection, split into its lines; one decision (on or off) for everything selected.
+  const groups = state.selection.ranges.map((r) =>
+    lineParts(state, tree, r)
+      .map((part) => prepare(state, tree, part))
+      .filter((x): x is Prepared => !!x),
+  );
+  const all = groups.flat();
+  if (!all.length) return { selection: state.selection };
+  const letters = all.flatMap((g) => g.selected.filter((t) => t.text.trim()));
+  const apply = change(letters.map((t) => t.style));
+  const edits = groups.map((g) => g.map((prep) => finish(state, prep, apply)));
+
+  // Selections keep covering what was selected, now inside the new marks.
   let shift = 0;
-  const ranges = edits.map((e) => {
-    const r = EditorSelection.range(e.selFrom + shift, e.selTo + shift);
-    shift += e.insert.length - (e.to - e.from);
-    return r;
+  const ranges: SelectionRange[] = [];
+  edits.forEach((lineEdits, i) => {
+    if (!lineEdits.length) return void ranges.push(state.selection.ranges[i].map(state.changes([])));
+    const start = lineEdits[0].selFrom + shift;
+    for (const e of lineEdits.slice(0, -1)) shift += e.insert.length - (e.to - e.from);
+    const lastEdit = lineEdits[lineEdits.length - 1];
+    const end = lastEdit.selTo + shift;
+    shift += lastEdit.insert.length - (lastEdit.to - lastEdit.from);
+    ranges.push(EditorSelection.range(start, end));
   });
   return {
-    changes: edits.map((e) => ({ from: e.from, to: e.to, insert: e.insert })),
-    selection: EditorSelection.create(ranges, state.selection.mainIndex),
+    changes: edits.flat().map((e) => ({ from: e.from, to: e.to, insert: e.insert })),
+    selection: EditorSelection.create(ranges, Math.min(state.selection.mainIndex, ranges.length - 1)),
     scrollIntoView: true,
   };
 }

@@ -69,3 +69,27 @@ describe('restyle: bold and italic over existing formatting', () => {
     expect(run('a «b» c', toggleHighlight)).toBe('a ==«b»== c');
   });
 });
+
+describe('restyle: selections over several lines', () => {
+  const ORANGE = '#e2781f';
+  const PURPLE = '#9061f0';
+  const orange = (s: string) => `<span style="color: ${ORANGE}">${s}</span>`;
+  const purple = (s: string) => `<span style="color: ${PURPLE}">${s}</span>`;
+  const doc = `«Hello\n\n${orange('My name is john')}\n\nnice to meet you»`;
+
+  it('colours each paragraph, replacing the colour that was there', () => {
+    expect(run(doc, setColorStyle('color', PURPLE))).toBe(`${purple('«Hello')}\n\n${purple('My name is john')}\n\n${purple('nice to meet you»')}`);
+  });
+  it('bolds each paragraph and keeps the coloured one coloured', () => {
+    expect(run(doc, toggleStyle('bold'))).toBe(`**«Hello**\n\n${orange('**My name is john**')}\n\n**nice to meet you»**`);
+  });
+  it('unbolds when every selected line is already bold', () => {
+    expect(run('«**one**\n\n**two**»', toggleStyle('bold'))).toBe('«one\n\ntwo»');
+  });
+  it('leaves heading, list and quote marks outside the style', () => {
+    expect(run('«## Title\n- item\n> quote»', toggleStyle('bold'))).toBe('## **«Title**\n- **item**\n> **quote»**');
+  });
+  it('skips code blocks', () => {
+    expect(run('«before\n```\ncode\n```\nafter»', toggleStyle('bold'))).toBe('**«before**\n```\ncode\n```\n**after»**');
+  });
+});
