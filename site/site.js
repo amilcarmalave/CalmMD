@@ -177,21 +177,35 @@ function setDownloads(release) {
     const mine = os ? pick[os](assets) : null;
     for (const a of document.querySelectorAll('[data-download]')) a.href = mine ? mine.browser_download_url : '#download';
     for (const a of document.querySelectorAll('[data-releases]')) a.href = releasesPage;
-    // When a download starts, show that system's first-launch steps right under the button.
+    // Download buttons open the first-launch steps first; the download starts from the button inside,
+    // once the steps have been seen. (Without scripts the links still download directly.)
     const after = document.querySelector('[data-after-download]');
-    const showSteps = (system) => {
-      if (!after || !system) return;
+    const start = document.querySelector('[data-start-download]');
+    const mb = (n) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+    const showSteps = (system, asset) => {
+      if (!after || !system || !asset) return false;
       for (const ol of after.querySelectorAll('[data-steps]')) ol.hidden = ol.dataset.steps !== system;
+      start.href = asset.browser_download_url;
+      start.textContent = `Start download · ${osName[system]} · ${mb(asset.size)}`;
       after.hidden = false;
-      after.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // After the card is laid out, bring it (and its download button) to the middle of the screen.
+      setTimeout(() => after.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+      // If smooth scrolling didn't run (some browsers pause it), jump so the download button is in view.
+      setTimeout(() => {
+        const r = start.getBoundingClientRect();
+        if (r.bottom > innerHeight || r.top < 0) after.scrollIntoView({ behavior: 'instant', block: 'center' });
+      }, 900);
+      return true;
     };
-    for (const a of document.querySelectorAll('[data-download]')) a.addEventListener('click', () => mine && showSteps(os));
+    for (const a of document.querySelectorAll('[data-download]')) {
+      a.addEventListener('click', (e) => {
+        if (showSteps(os, mine)) e.preventDefault();
+      });
+    }
     for (const card of document.querySelectorAll('.platform')) {
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
         if (card.classList.contains('disabled')) return;
-        showSteps(card.dataset.os);
-        // The steps sit under the hero button: bring them into view from the download section too.
-        document.querySelector('.hero')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (showSteps(card.dataset.os, pick[card.dataset.os](assets))) e.preventDefault();
       });
     }
     if (fine) fine.textContent = `Version ${release.tag_name.replace(/^v/, '')} · Free · Also for ${Object.entries(osName).filter(([k]) => k !== os).map(([, v]) => v).join(' and ')}`;

@@ -287,3 +287,5 @@ footer a:hover { color: var(--strong); }
 .after-download a { color: var(--amber-soft); }
 .after-download .after-why { margin: 0; font-size: 13.5px; color: rgba(233,236,242,0.6); }
 @keyframes rise-in { from { opacity: 0; transform: translateY(6px); } }
+.after-download .after-go { margin: 14px 0 12px; }
+.after-download .after-go .btn { height: 46px; font-size: 15px; }
