@@ -1,6 +1,8 @@
 # CalmMD installer for Windows (technical users):
 #
-#   irm https://amilcarmalave.github.io/CalmMD/install.ps1 | iex
+#   powershell -NoProfile -Command "irm https://amilcarmalave.github.io/CalmMD/install.ps1 | iex"
+#
+# (works from Command Prompt and PowerShell). irm downloads the whole script before it runs.
 #
 # Downloads the latest release's per-user installer from GitHub, checks it against the release's
 # SHA256SUMS, and runs it silently. Files fetched this way aren't marked "downloaded from the
@@ -8,6 +10,8 @@
 #
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on older Windows 10 may not offer TLS 1.2, which GitHub requires.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $Repo = 'amilcarmalave/CalmMD'
 
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }

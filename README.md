@@ -124,7 +124,8 @@ The installers aren't signed with a paid certificate yet, so the first launch sh
 - **macOS:** CalmMD isn't notarized by Apple yet, so macOS says it "could not verify CalmMD is free of
   malware". Click **Done** (not Move to Trash), then open **System Settings → Privacy & Security**, scroll
   down to "CalmMD was blocked" and click **Open Anyway**. You only do this once. Or install from the
-  terminal, which avoids the warning: `curl -fsSL https://amilcarmalave.github.io/CalmMD/install.sh | sh`
+  terminal, which avoids the warning: `curl -fsSL https://amilcarmalave.github.io/CalmMD/install.sh | sh`. On Windows, the same
+  from Command Prompt or PowerShell: `powershell -NoProfile -Command "irm https://amilcarmalave.github.io/CalmMD/install.ps1 | iex"`
 
 ## Building from source
 

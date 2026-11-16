@@ -176,6 +176,24 @@ function setDownloads(release) {
   if (release) {
     const mine = os ? pick[os](assets) : null;
     for (const a of document.querySelectorAll('[data-download]')) a.href = mine ? mine.browser_download_url : '#download';
+    for (const a of document.querySelectorAll('[data-releases]')) a.href = releasesPage;
+    // When a download starts, show that system's first-launch steps right under the button.
+    const after = document.querySelector('[data-after-download]');
+    const showSteps = (system) => {
+      if (!after || !system) return;
+      for (const ol of after.querySelectorAll('[data-steps]')) ol.hidden = ol.dataset.steps !== system;
+      after.hidden = false;
+      after.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+    for (const a of document.querySelectorAll('[data-download]')) a.addEventListener('click', () => mine && showSteps(os));
+    for (const card of document.querySelectorAll('.platform')) {
+      card.addEventListener('click', () => {
+        if (card.classList.contains('disabled')) return;
+        showSteps(card.dataset.os);
+        // The steps sit under the hero button: bring them into view from the download section too.
+        document.querySelector('.hero')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
     if (fine) fine.textContent = `Version ${release.tag_name.replace(/^v/, '')} · Free · Also for ${Object.entries(osName).filter(([k]) => k !== os).map(([, v]) => v).join(' and ')}`;
   } else {
     if (fine) fine.textContent = 'The first release is almost here. Star the project on GitHub to hear about it.';
