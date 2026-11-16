@@ -124,6 +124,9 @@ src-tauri/
   lists, quotes and code keep the usual Enter). The analyzer hides the backslash of a `HardBreak`.
   Live mode draws a blank line between top-level blocks at the preview's paragraph gap (`cm-live-gap`, full height
   under the cursor), so Enter doesn't look like an empty line.
+- **Enter steps out of inline formatting.** When everything after the cursor is closing marks (`**`, `_`, `==`,
+  `</span>`, …), `editor/inlineEnter.ts` (highest precedence, every mode) moves past them, or removes an empty pair,
+  then returns false so the usual Enter runs from there.
 - **Line prefixes move the cursor.** Headings, lists and quotes (`editor/format.ts`) map the selection with assoc 1,
   so a cursor at the start of the line ends up after the new marker.
 - **.txt files are plain text.** `isPlainTextPath`: the tab shows in Source mode with no Markdown language

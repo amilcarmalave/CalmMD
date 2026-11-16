@@ -1,4 +1,5 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { inlineEnter } from './inlineEnter';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { indentOnInput } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
@@ -52,6 +53,8 @@ export function editorExtensions(opts: EditorExtensionOptions): Extension[] {
     opts.language ?? markdownSupport,
     calmHighlighting,
     search({ top: true }),
+    // Enter at the end of **bold** (and the like) keeps the closing marks on the line.
+    inlineEnter,
     keymap.of([...searchKeymap, ...historyKeymap, indentWithTab, ...defaultKeymap]),
     placeholder('Start writing…'),
     // Spellcheck is configured by the app (a compartment: on/off and language).
