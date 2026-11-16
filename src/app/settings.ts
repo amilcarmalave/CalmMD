@@ -115,7 +115,7 @@ export const DEFAULT_TOOLBAR = [
 export const DEFAULT_SETTINGS: Settings = {
   v: SETTINGS_VERSION,
   // Split shows both the source and the result, which is the clearest first view.
-  viewMode: 'split',
+  viewMode: 'live',
   splitRatio: 0.5,
   scrollSync: true,
   previewTheme: 'paper',
@@ -167,7 +167,7 @@ export function parseSettings(raw: string | null): Settings {
       const seen = new Set<string>();
       out.toolbarItems = items.filter((x) => x === TOOLBAR_SEPARATOR || (!seen.has(x) && seen.add(x))).slice(0, TOOLBAR_MAX);
     }
-    // Version 2 changed the defaults (split view, visible full toolbar). Older settings were
+    // Version 2 changed the defaults (visible full toolbar; the default view is now Live). Older settings were
     // mostly the old defaults written back, not choices, so they move to the new ones once.
     if (typeof s.v !== 'number' || s.v < 2) {
       out.viewMode = DEFAULT_SETTINGS.viewMode;

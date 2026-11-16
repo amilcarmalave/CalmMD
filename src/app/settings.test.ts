@@ -27,7 +27,7 @@ describe('settings', () => {
 
   it('moves settings from before version 2 to the new defaults once', () => {
     const old = parseSettings(JSON.stringify({ viewMode: 'live', toolbarVisible: false, scrollSync: false }));
-    expect(old).toMatchObject({ v: 3, viewMode: 'split', toolbarVisible: true, scrollSync: false });
+    expect(old).toMatchObject({ v: 3, viewMode: 'live', toolbarVisible: true, scrollSync: false });
     const current = parseSettings(JSON.stringify({ v: 2, viewMode: 'live', toolbarVisible: false }));
     expect(current).toMatchObject({ viewMode: 'live', toolbarVisible: false });
   });
