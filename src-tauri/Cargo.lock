@@ -427,7 +427,7 @@ dependencies = [
 
 [[package]]
 name = "calmmd"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "base64 0.22.1",
  "objc2-app-kit",
