@@ -120,8 +120,10 @@ Get the latest version for your system from [Releases](../../releases/latest), o
 The installers aren't signed with a paid certificate yet, so the first launch shows a warning:
 
 - **Windows:** "Windows protected your PC" → **More info** → **Run anyway**.
-- **macOS:** right-click CalmMD in Applications → **Open** → **Open**. On recent macOS, go to
-  System Settings → Privacy & Security → **Open Anyway**.
+- **macOS:** CalmMD isn't notarized by Apple yet, so macOS says it "could not verify CalmMD is free of
+  malware". Click **Done** (not Move to Trash), then open **System Settings → Privacy & Security**, scroll
+  down to "CalmMD was blocked" and click **Open Anyway**. You only do this once. Or install from the
+  terminal, which avoids the warning: `curl -fsSL https://amilcarmalave.github.io/CalmMD/install.sh | sh`
 
 ## Building from source
 

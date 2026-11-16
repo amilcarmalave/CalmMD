@@ -195,6 +195,7 @@
         <strong>Linux</strong><span>AppImage, .deb and .rpm</span>
       </a>
     </div>
+    <p class="first-launch"><strong>First launch:</strong> CalmMD isn’t signed with a paid certificate yet, so Windows and macOS warn the first time. On Windows click <strong>More info → Run anyway</strong>. On a Mac, after the warning, open <strong>System Settings → Privacy &amp; Security → Open Anyway</strong> (<a href="#faq">step by step</a>). The terminal install below avoids both.</p>
     <div class="terminal launch-only">
       <p>Or from the terminal. Both check the download against the release checksums:</p>
       <pre><code><span class="c"># Windows (PowerShell)</span>
@@ -215,8 +216,8 @@ curl -fsSL https://amilcarmalave.github.io/CalmMD/install.sh | sh</code></pre>
       <p>CalmMD isn't signed with a paid certificate yet. Click <strong>More info → Run anyway</strong>. Installing from the terminal (below the download buttons) avoids the message.</p>
     </details>
     <details>
-      <summary>macOS says the app “can't be opened”</summary>
-      <p>Right-click CalmMD in Applications and choose <strong>Open</strong>, then <strong>Open</strong> again. On recent macOS, go to System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>. Installing from the terminal avoids it.</p>
+      <summary>macOS says it “could not verify CalmMD is free of malware”</summary>
+      <p>CalmMD isn’t notarized by Apple yet (that needs Apple’s paid developer program), so macOS blocks it the first time. <strong>1.</strong> Open the .dmg and drag CalmMD to Applications. <strong>2.</strong> Open CalmMD; when macOS says it can’t verify it, click <strong>Done</strong> (not Move to Trash). <strong>3.</strong> Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down to “CalmMD was blocked”, click <strong>Open Anyway</strong> and confirm with your password or Touch ID. You only do this once. Or skip it all: install from the terminal with the one line below the download buttons.</p>
     </details>
     <details>
       <summary>How do I sync my notes between computers?</summary>
