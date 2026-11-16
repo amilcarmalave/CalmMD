@@ -1802,3 +1802,31 @@ button {
 .context-menu.submenu {
   z-index: 201;
 }
+
+/* ---------- File tabs: drawings, images, PDFs and other files shown in the main area ---------- */
+.file-tab-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.drawing-editor.embedded {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: 1;
+  min-height: 0;
+}
+.quickview.embedded {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--bg);
+}
+.tab.file-tab .tab-kind {
+  margin-right: 5px;
+  color: var(--fg-faint);
+  font-size: 11px;
+}

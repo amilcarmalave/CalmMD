@@ -20,6 +20,8 @@ export function DrawingEditor(props: {
   notify: (msg: string) => void;
   /** Receives a function that saves any pending change (for closing the window). */
   onFlush?: (flush: () => Promise<void>) => void;
+  /** Shown in a tab: fills the main area, no Done button (the tab closes it). */
+  embedded?: boolean;
 }) {
   let host!: HTMLDivElement;
   let drawing: MountedDrawing | null = null;
@@ -75,15 +77,25 @@ export function DrawingEditor(props: {
   });
   createEffect(() => drawing?.setTheme(props.theme));
   onCleanup(() => {
+    // Closing the tab or switching away: save what's pending, then take the editor down.
     clearTimeout(timer);
-    drawing?.unmount();
+    const d = drawing;
+    drawing = null;
+    if (!d) return;
+    if (!d.changed()) return d.unmount();
+    void saving
+      .then(() => d.serialize())
+      .then((text) => props.writeText(props.path, text))
+      .then(() => props.onSaved(props.path, !onDisk))
+      .catch((e) => props.notify(`Couldn’t save the drawing: ${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => d.unmount());
   });
 
   const statusText = () =>
     ({ loading: 'Opening…', ready: onDisk ? 'Saved' : 'Draw something to create the file', saving: 'Saving…', saved: 'Saved', error: 'Not saved' })[status()];
 
   return (
-    <div class="drawing-editor" role="dialog" aria-label={`Drawing ${drawingTitle(props.path)}`}>
+    <div class="drawing-editor" classList={{ embedded: !!props.embedded }} role={props.embedded ? 'region' : 'dialog'} aria-label={`Drawing ${drawingTitle(props.path)}`}>
       <header class="drawing-head">
         <div class="quickview-title">
           <strong>{drawingTitle(props.path)}</strong>
@@ -91,9 +103,11 @@ export function DrawingEditor(props: {
             {dirname(props.path)} · {statusText()}
           </span>
         </div>
-        <button class="btn btn-small btn-primary" onClick={() => void done()}>
-          Done
-        </button>
+        <Show when={!props.embedded}>
+          <button class="btn btn-small btn-primary" onClick={() => void done()}>
+            Done
+          </button>
+        </Show>
       </header>
       <Show when={error()}>
         <div class="drawing-error">

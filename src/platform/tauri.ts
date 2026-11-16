@@ -138,8 +138,6 @@ export function createTauriPlatform(): Platform {
     windowLabel: getCurrentWindow().label,
     initialSpaceId: () => (window as unknown as { __CALMMD_SPACE__?: string | null }).__CALMMD_SPACE__ ?? null,
     openWindow: async (spaceId) => void (await invoke<string>('open_window', { spaceId })),
-    openDrawingWindow: async (path, title) => void (await invoke<string>('open_drawing_window', { path, title })),
-    initialDrawing: () => (window as unknown as { __CALMMD_DRAWING__?: string | null }).__CALMMD_DRAWING__ ?? null,
     claimSpace: (spaceId) => invoke<string | null>('claim_space', { spaceId }),
     spaceWindow: (spaceId) => invoke<string | null>('space_window', { spaceId }),
     focusWindow: (label) => invoke<void>('focus_window', { label }),

@@ -16,6 +16,8 @@ export function QuickView(props: {
   reveal: (path: string) => void;
   revealLabel: string;
   onClose: () => void;
+  /** Shown in a tab (no backdrop, no close button, keys left alone) instead of as a peek. */
+  embedded?: boolean;
 }) {
   const kind = fileKind(props.path);
   const [zoom, setZoom] = createSignal(false);
@@ -39,7 +41,7 @@ export function QuickView(props: {
       props.onClose();
     }
   };
-  onMount(() => window.addEventListener('keydown', onKey, true));
+  onMount(() => !props.embedded && window.addEventListener('keydown', onKey, true));
   onCleanup(() => window.removeEventListener('keydown', onKey, true));
 
   const table = () => {
@@ -48,9 +50,8 @@ export function QuickView(props: {
     return parseDelimited(t.text, /\.tsv$/i.test(props.path) ? '\t' : ',');
   };
 
-  return (
-    <div class="modal-backdrop quickview-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div class="quickview" role="dialog" aria-label={`Quick view: ${basename(props.path)}`}>
+  const panel = () => (
+      <div class="quickview" classList={{ embedded: !!props.embedded }} role={props.embedded ? 'region' : 'dialog'} aria-label={`${props.embedded ? '' : 'Quick view: '}${basename(props.path)}`}>
         <header class="quickview-head">
           <div class="quickview-title">
             <strong>{basename(props.path)}</strong>
@@ -70,9 +71,11 @@ export function QuickView(props: {
           <button class="btn btn-small" onClick={() => props.reveal(props.path)}>
             {props.revealLabel}
           </button>
-          <button class="icon-btn quickview-close" aria-label="Close" title="Close (Esc)" onClick={props.onClose}>
-            ✕
-          </button>
+          <Show when={!props.embedded}>
+            <button class="icon-btn quickview-close" aria-label="Close" title="Close (Esc)" onClick={props.onClose}>
+              ✕
+            </button>
+          </Show>
         </header>
         <div class="quickview-body" classList={{ [`qv-${kind}`]: true }}>
           <Show when={kind === 'image'}>
@@ -133,6 +136,12 @@ export function QuickView(props: {
           </Show>
         </div>
       </div>
-    </div>
+  );
+  return (
+    <Show when={!props.embedded} fallback={panel()}>
+      <div class="modal-backdrop quickview-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
+        {panel()}
+      </div>
+    </Show>
   );
 }

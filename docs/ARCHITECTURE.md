@@ -235,12 +235,12 @@ src-tauri/
 - Browser checks: on `?demo` pages the Excalidraw API is on `window.__excalidraw` (and
   `__excalidrawConvert`), because synthetic clicks don't reach Excalidraw's canvas. `?doc=lisbon` opens a
   note with a picture.
-- **Own window on the desktop:** `open_drawing_window` (Rust, `windows.rs`) opens `drawing-<hash of path>`, so a
-  file always gets the same window (focused if open), with `window.__CALMMD_DRAWING__` set; `main.tsx` then
-  renders `ui/DrawingWindow.tsx` instead of the editor. Saves are broadcast (`drawing-saved`); the editor
-  window refreshes pictures and, on the first save, links a new drawing into the note that asked for it
-  (`waitingForDrawing`). Closing the window flushes pending changes. The browser build has no windows and
-  shows the drawing in the page.
+- **Tabs:** drawings, images, PDFs and other files open as file tabs after the note tabs (`FileTab`, `TabStrip`),
+  shown in the main area instead of the editor (`DrawingEditor embedded`, `QuickView embedded`). Note tabs stay in
+  `documents.ts`; file tabs are a list in App with `activeFile`. Switching or opening a note clears `activeFile`;
+  Mod+W closes the file tab shown. A drawing saves pending changes when its tab closes or loses focus. On the first
+  save of a new drawing, the note that asked for it gets the link (`waitingForDrawing`). Space in the sidebar still
+  opens a Quick view peek.
 
 ### New-version notices
 

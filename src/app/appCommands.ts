@@ -54,6 +54,8 @@ export interface CommandContext {
   openPalette: (kind: 'commands' | 'files' | 'line' | 'headings') => void;
   customizeToolbar: () => void;
   cycleTab: (dir: 1 | -1) => void;
+  /** Closes the file tab being shown (a drawing, image, PDF…); false when a note is shown. */
+  closeFileTab?: () => boolean;
   reopenClosed: () => void;
   revealActive: () => void;
   notify: (msg: string) => void;
@@ -217,7 +219,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
     { id: 'file.closeFolder', title: 'Close Folder', category: 'File', when: () => !!ctx.explorer.state.root, run: () => ctx.explorer.setRoot(null) },
     { id: 'file.save', title: 'Save', category: 'File', keys: 'Mod+S', run: () => ctx.docs.save() },
     { id: 'file.saveAs', title: 'Save As…', category: 'File', keys: 'Mod+Shift+S', run: () => ctx.docs.saveAs() },
-    { id: 'file.close', title: 'Close Tab', category: 'File', keys: 'Mod+W', run: () => ctx.docs.close() },
+    { id: 'file.close', title: 'Close Tab', category: 'File', keys: 'Mod+W', run: () => (ctx.closeFileTab?.() ? undefined : ctx.docs.close()) },
     { id: 'file.reopen', title: 'Reopen Closed Tab', category: 'File', keys: 'Mod+Shift+T', run: ctx.reopenClosed },
     { id: 'file.reveal', title: 'Reveal Active File in Sidebar', category: 'File', run: ctx.revealActive },
 

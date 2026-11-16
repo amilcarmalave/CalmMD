@@ -75,7 +75,6 @@ pub fn run() {
             windows::claim_space,
             windows::space_window,
             windows::open_window,
-            windows::open_drawing_window,
             windows::focus_window,
             windows::window_labels,
             export::find_browser,

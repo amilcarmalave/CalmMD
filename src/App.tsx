@@ -36,6 +36,7 @@ import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
 import { DrawingEditor } from './ui/DrawingEditor';
+import type { FileTab } from './ui/TabStrip';
 import { htmlToMarkdown, worthConverting } from './editor/richPaste';
 import { inCode } from './app/editorMenu';
 import { compareVersions, isCheckDue, parseRelease, RELEASES_API, shouldAnnounce, type Release } from './app/updates';
@@ -298,27 +299,46 @@ export default function App(props: { platform: Platform }) {
   const [quickView, setQuickView] = createSignal<string | null>(null);
   /** Notes open in the editor, drawings in the drawing editor; anything else opens in Quick view. */
   function openFileOrView(path: string) {
-    const kind = fileKind(path);
-    if (kind === 'note') void docs.openPaths([path]);
-    else if (kind === 'drawing') openDrawing(path);
-    else setQuickView(path);
+    if (fileKind(path) === 'note') {
+      setActiveFile(null);
+      void docs.openPaths([path]);
+    } else openFileTab(path, true);
   }
 
-  // ---------- Drawings (Excalidraw) ----------
-  // A drawing is its own file next to the notes (Name.excalidraw.svg). Notes show it as a picture.
-  // On the desktop each drawing gets its own window (platform.openDrawingWindow); the browser build
-  // shows it in the page. A note waiting for a new drawing gets its link on the drawing's first save.
-  const [drawing, setDrawing] = createSignal<{ path: string; exists: boolean } | null>(null);
-  const waitingForDrawing = new Map<string, string>(); // drawing path key -> document id
-  function showDrawing(path: string, exists: boolean) {
-    if (platform.openDrawingWindow) void platform.openDrawingWindow(path, `${drawingTitle(path)} — CalmMD`).catch((e) => notify(String(e)));
-    else setDrawing({ path, exists });
+  // ---------- File tabs ----------
+  // Drawings, images, PDFs and other files open in tabs next to the notes and fill the main area.
+  // (Space in the sidebar still gives a quick peek.)
+  const [fileTabs, setFileTabs] = createSignal<FileTab[]>([]);
+  const [activeFile, setActiveFile] = createSignal<string | null>(null);
+  let fileTabCount = 0;
+  const activeFileTab = () => fileTabs().find((t) => t.id === activeFile()) ?? null;
+  function openFileTab(path: string, exists: boolean) {
+    const open = fileTabs().find((t) => samePath(t.path, path));
+    if (open) return setActiveFile(open.id);
+    const tab: FileTab = { id: `file-${++fileTabCount}`, path, exists };
+    setFileTabs([...fileTabs(), tab]);
+    setActiveFile(tab.id);
   }
+  function closeFileTab(id: string) {
+    const list = fileTabs();
+    const i = list.findIndex((t) => t.id === id);
+    if (i === -1) return;
+    const next = list.filter((t) => t.id !== id);
+    setFileTabs(next);
+    if (activeFile() === id) {
+      setActiveFile(next[Math.min(i, next.length - 1)]?.id ?? null);
+      if (!activeFile()) queueMicrotask(() => view?.focus());
+    }
+  }
+  // Opening or switching notes shows the note.
+  createEffect(on(() => store.activeId, () => setActiveFile(null), { defer: true }));
+
+  // ---------- Drawings (Excalidraw) ----------
+  // A drawing is its own file next to the notes (Name.excalidraw.svg), opened in a tab. Notes show it
+  // as a picture. A note waiting for a new drawing gets its link on the drawing's first save.
+  const waitingForDrawing = new Map<string, string>(); // drawing path key -> document id
+  const showDrawing = (path: string, exists: boolean) => openFileTab(path, exists);
   const openDrawing = (path: string) => showDrawing(path, true);
-  platform.onBroadcast('drawing-saved', (p) => {
-    const { path, first } = p as { path: string; first: boolean };
-    drawingSaved(path, first);
-  });
 
   /** Insert → Drawing (insert: true) or File → New Drawing: asks for a name, then opens the editor. */
   async function newDrawing(insert: boolean) {
@@ -609,6 +629,11 @@ export default function App(props: { platform: Platform }) {
       openPalette,
       customizeToolbar: () => setCustomizing(true),
       cycleTab,
+      closeFileTab: () => {
+        const id = activeFile();
+        if (id) closeFileTab(id);
+        return !!id;
+      },
       reopenClosed,
       revealActive: () => void revealActive(),
       notify,
@@ -1917,8 +1942,56 @@ export default function App(props: { platform: Platform }) {
           <div class="sidebar-resizer" role="separator" aria-orientation="vertical" onPointerDown={startSidebarResize} />
         </Show>
         <div class="main-col">
-          <TabStrip docs={docs} newTabHint={hint('file.new')} />
-          <Show when={settings.toolbarVisible && showsEditor(mode()) && !plainText()}>
+          <TabStrip
+            docs={docs}
+            newTabHint={hint('file.new')}
+            files={fileTabs()}
+            activeFile={activeFile()}
+            onFile={setActiveFile}
+            onCloseFile={closeFileTab}
+            onDoc={() => {
+              setActiveFile(null);
+              queueMicrotask(() => view?.focus());
+            }}
+          />
+          <Show when={activeFileTab()} keyed>
+            {(t) => (
+              <div class="file-tab-view">
+                <Show
+                  when={fileKind(t.path) === 'drawing'}
+                  fallback={
+                    <QuickView
+                      embedded
+                      path={t.path}
+                      assetUrl={(x) => platform.assetUrl(x)}
+                      readText={(x) => platform.readTextFile(x).then((r) => r.text)}
+                      stat={(x) => platform.stat(x)}
+                      openWithDefault={(x) => void platform.openPath(x).catch((e) => notify(String(e)))}
+                      reveal={(x) => void platform.revealPath(x).catch((e) => notify(String(e)))}
+                      revealLabel={revealLabel}
+                      onClose={() => closeFileTab(t.id)}
+                    />
+                  }
+                >
+                  <DrawingEditor
+                    embedded
+                    path={t.path}
+                    exists={t.exists}
+                    theme={effectiveScheme()}
+                    readText={(p) => platform.readTextFile(p).then((r) => r.text)}
+                    writeText={(p, text) => platform.writeTextFile(p, text).then(() => undefined)}
+                    onSaved={(p, first) => {
+                      if (first) setFileTabs(fileTabs().map((x) => (x.id === t.id ? { ...x, exists: true } : x)));
+                      drawingSaved(p, first);
+                    }}
+                    onClose={() => closeFileTab(t.id)}
+                    notify={notify}
+                  />
+                </Show>
+              </div>
+            )}
+          </Show>
+          <Show when={settings.toolbarVisible && showsEditor(mode()) && !plainText() && !activeFile()}>
             <Toolbar
               items={settings.toolbarItems}
               registry={registry}
@@ -1933,7 +2006,7 @@ export default function App(props: { platform: Platform }) {
           <Show when={activeDoc()?.conflict ? activeDoc() : undefined}>
             {(d) => <ConflictBanner doc={d()} docs={docs} />}
           </Show>
-          <div class="workspace" data-mode={mode()} ref={workspace}>
+          <div class="workspace" data-mode={mode()} ref={workspace} style={activeFile() ? { display: 'none' } : undefined}>
             <main
               class="pane pane-editor"
               data-preview-theme={activeBase()}
@@ -2059,23 +2132,6 @@ export default function App(props: { platform: Platform }) {
             onRestore={() => void restoreVersion()}
             onDelete={() => void deleteVersion()}
             onClose={() => setVersionView(null)}
-          />
-        )}
-      </Show>
-      <Show when={drawing()}>
-        {(d) => (
-          <DrawingEditor
-            path={d().path}
-            exists={d().exists}
-            theme={effectiveScheme()}
-            readText={(p) => platform.readTextFile(p).then((r) => r.text)}
-            writeText={(p, text) => platform.writeTextFile(p, text).then(() => undefined)}
-            onSaved={drawingSaved}
-            onClose={() => {
-              setDrawing(null);
-              view?.focus();
-            }}
-            notify={notify}
           />
         )}
       </Show>

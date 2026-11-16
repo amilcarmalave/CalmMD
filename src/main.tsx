@@ -10,12 +10,5 @@ import './styles/editor.css';
 import './styles/commands.css';
 import App from './App';
 import { getPlatform } from './platform';
-import { DrawingWindow } from './ui/DrawingWindow';
 
-const platform = getPlatform();
-// A drawing window (desktop) shows just that drawing; every other window is the editor.
-const drawing = platform.initialDrawing?.() ?? null;
-render(
-  () => (drawing ? <DrawingWindow platform={platform} path={drawing} /> : <App platform={platform} />),
-  document.getElementById('root')!,
-);
+render(() => <App platform={getPlatform()} />, document.getElementById('root')!);
