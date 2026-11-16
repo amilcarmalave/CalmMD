@@ -52,6 +52,14 @@ export class TableWidget extends WidgetType {
   ignoreEvent() {
     return true; // the table handles its own clicks and keys
   }
+  /**
+   * Our own edits change the table's Markdown (adding a row changes its lines), and the editor then
+   * offers a new widget. When that Markdown is exactly what this table wrote, keep the DOM: the cell
+   * you're typing in keeps the focus.
+   */
+  updateDOM(dom: HTMLElement) {
+    return (dom as HTMLElement & { tableSource?: () => string }).tableSource?.() === this.source;
+  }
   get estimatedHeight() {
     return (this.source.split('\n').length - 1) * 34 + 16;
   }
@@ -130,23 +138,67 @@ export class TableWidget extends WidgetType {
         void row;
       });
       wrap.appendChild(el);
-      const addRow = document.createElement('button');
-      addRow.className = 'cm-live-table-add row';
-      addRow.title = 'Add a row';
-      addRow.textContent = '+';
-      addRow.onmousedown = (e) => {
-        e.preventDefault();
-        restructure(insertRow(table, table.rows.length + 1), { r: table.rows.length + 1, c: 0 });
+      wrap.appendChild(toolbar());
+    };
+
+    // A small toolbar over the table: it acts on the cell you're in (or the table's end).
+    let current: { r: number; c: number } | null = null;
+    const toolbar = () => {
+      const bar = document.createElement('div');
+      bar.className = 'cm-live-table-bar';
+      bar.setAttribute('role', 'toolbar');
+      bar.setAttribute('aria-label', 'Table');
+      const button = (label: string, title: string, run: () => void, cls = '') => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cm-live-table-btn' + (cls ? ' ' + cls : '');
+        b.textContent = label;
+        b.title = title;
+        // mousedown, so the cell keeps its place while the button acts.
+        b.onmousedown = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          run();
+        };
+        return b;
       };
-      const addCol = document.createElement('button');
-      addCol.className = 'cm-live-table-add col';
-      addCol.title = 'Add a column';
-      addCol.textContent = '+';
-      addCol.onmousedown = (e) => {
-        e.preventDefault();
-        restructure(insertColumn(table, table.header.length), { r: 0, c: table.header.length });
+      const sep = () => {
+        const s = document.createElement('span');
+        s.className = 'cm-live-table-sep';
+        return s;
       };
-      wrap.append(addRow, addCol);
+      // The cell with the focus, else the last one used, else the end of the table.
+      const here = () => {
+        const a = document.activeElement as HTMLElement | null;
+        if (a && wrap.contains(a) && a.dataset.r !== undefined) return { r: Number(a.dataset.r), c: Number(a.dataset.c) };
+        return current ?? { r: table.rows.length, c: table.header.length - 1 };
+      };
+      bar.append(
+        button('+ Row', 'Add a row below', () => {
+          const { r, c } = here();
+          restructure(insertRow(table, r + 1), { r: r + 1, c });
+        }),
+        button('+ Column', 'Add a column to the right', () => {
+          const { r, c } = here();
+          restructure(insertColumn(table, c + 1), { r, c: c + 1 });
+        }),
+        sep(),
+        button('⇤', 'Align column left', () => restructure(setAlign(table, here().c, 'left'), here()), 'icon'),
+        button('↔', 'Center column', () => restructure(setAlign(table, here().c, 'center'), here()), 'icon'),
+        button('⇥', 'Align column right', () => restructure(setAlign(table, here().c, 'right'), here()), 'icon'),
+        sep(),
+        button('− Row', 'Delete this row', () => {
+          const { r, c } = here();
+          if (r === 0 && !table.rows.length) return;
+          restructure(deleteRow(table, r), { r: Math.max(0, Math.min(r, table.rows.length - 1)), c });
+        }, 'danger'),
+        button('− Column', 'Delete this column', () => {
+          const { r, c } = here();
+          if (table.header.length <= 1) return;
+          restructure(deleteColumn(table, c), { r, c: Math.max(0, c - 1) });
+        }, 'danger'),
+      );
+      return bar;
     };
     draw();
 
@@ -156,6 +208,7 @@ export class TableWidget extends WidgetType {
     };
     wrap.addEventListener('focusin', (e) => {
       const hit = at(e);
+      if (hit) current = { r: hit.r, c: hit.c };
       if (!hit || hit.td.classList.contains('editing')) return;
       hit.td.classList.add('editing');
       hit.td.textContent = raw(hit.r, hit.c); // the cell's Markdown while editing it
@@ -220,6 +273,7 @@ export class TableWidget extends WidgetType {
     });
 
     // The right-click menu reads these (App's onEditorContextMenu).
+    (wrap as HTMLElement & { tableSource?: () => string }).tableSource = () => formatTable(table).join('\n');
     (wrap as HTMLElement & { tableActions?: (target: Element) => TableActions | null }).tableActions = (target) => {
       const td = target.closest<HTMLElement>('[data-r]');
       if (!td) return null;
