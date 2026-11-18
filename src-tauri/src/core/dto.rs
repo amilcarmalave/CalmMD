@@ -65,7 +65,7 @@ fn default_true() -> bool {
 }
 
 fn default_theme() -> String {
-    "InspiredGitHub".to_owned()
+    "CalmMD Snow".to_owned()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ mod tests {
         let opts = MarkdownRenderOptions::default();
         assert!(opts.gfm && opts.footnotes && opts.attributes && opts.auto_heading_ids);
         assert!(!opts.highlight_code);
-        assert_eq!(opts.theme, "InspiredGitHub");
+        assert_eq!(opts.theme, "CalmMD Snow");
     }
 
     #[test]

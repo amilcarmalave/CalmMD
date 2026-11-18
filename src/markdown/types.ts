@@ -29,6 +29,7 @@ export interface MarkdownRenderOptions {
   attributes?: boolean;
   autoHeadingIds?: boolean;
   highlightCode?: boolean;
+  /** CalmMD colour/preview theme id or a Mordant theme name. */
   theme?: string;
 }
 

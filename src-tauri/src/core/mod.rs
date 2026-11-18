@@ -1,6 +1,7 @@
-//! Rust core services: Markdown parsing/rendering and native spellchecking behind Tauri commands.
+//! Rust core services: Markdown parsing/rendering, syntax themes and native spellchecking.
 
 pub mod dto;
+pub mod highlight;
 pub mod markdown;
 pub mod spell;
 
@@ -25,9 +26,6 @@ pub fn markdown_highlight_code(
     code: String,
     theme: Option<String>,
 ) -> HighlightCodeResult {
-    markdown::highlight_code_block(
-        &language,
-        &code,
-        theme.as_deref().unwrap_or("InspiredGitHub"),
-    )
+    let theme = highlight::resolve(theme.as_deref(), None);
+    markdown::highlight_code_block(&language, &code, &theme)
 }

@@ -17,6 +17,7 @@ use mordant::{
 
 use super::parse::parse_document;
 use crate::core::dto::{HighlightCodeResult, MarkdownRenderOptions, MarkdownRenderResult};
+use crate::core::highlight::resolve;
 
 fn renderer_options() -> html::Options {
     html::Options {
@@ -36,7 +37,7 @@ fn parser_options(opts: &MarkdownRenderOptions) -> parser::Options {
 
 fn highlighter_options(opts: &MarkdownRenderOptions) -> HighlightingRendererOptions {
     HighlightingRendererOptions {
-        theme: opts.theme.clone(),
+        theme: resolve(Some(&opts.theme), None),
         mode: HighlightingMode::Attribute,
         ..HighlightingRendererOptions::default()
     }
@@ -100,7 +101,12 @@ pub fn highlight_code_block(
     theme: &str,
 ) -> HighlightCodeResult {
     HighlightCodeResult {
-        html: mordant_highlight_code(language, code, theme, &HighlightingMode::Attribute),
+        html: mordant_highlight_code(
+            language,
+            code,
+            &resolve(Some(theme), None),
+            &HighlightingMode::Attribute,
+        ),
     }
 }
 
@@ -121,9 +127,9 @@ mod tests {
 
     #[test]
     fn highlighting_emits_inline_styles() {
-        let result = highlight_code_block("rust", "fn main() {}", "InspiredGitHub");
+        let result = highlight_code_block("rust", "fn main() {}", "CalmMD Snow");
         assert!(result.html.contains("<pre"));
-        assert!(result.html.contains("font"));
+        assert!(result.html.contains("#7a3e9d"), "keyword colour missing: {}", result.html);
     }
 
     #[test]
@@ -133,6 +139,6 @@ mod tests {
             ..MarkdownRenderOptions::default()
         };
         let result = render_html(CORPUS, &opts).unwrap();
-        assert!(result.html.contains("font"));
+        assert!(result.html.contains("#2f5e9e"), "function colour missing: {}", result.html);
     }
 }

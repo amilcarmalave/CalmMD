@@ -82,7 +82,7 @@ describe('buildBody', () => {
   it('uses an injected Rust renderer when provided', async () => {
     const renderMarkdown = vi.fn(async () => '<h1 id="from-rust">Rust</h1>');
     const body = await buildBody('# TS', null, { ...opts, toc: true }, { readImage: async () => null, renderMarkdown });
-    expect(renderMarkdown).toHaveBeenCalledWith('# TS', null);
+    expect(renderMarkdown).toHaveBeenCalledWith('# TS', null, 'paper');
     expect(body).toContain('<h1 id="from-rust">Rust</h1>');
     expect(body).toContain('href="#from-rust"');
     expect(body).not.toContain('From rust'); // heading text comes from the injected HTML

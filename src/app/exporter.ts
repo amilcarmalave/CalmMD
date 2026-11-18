@@ -95,7 +95,8 @@ export function createExporter(deps: ExporterDeps) {
         readImage: (p) => platform.readImageDataUrl(p).catch(() => null),
         postProcess: deps.postProcess,
         renderMarkdown: useRustMarkdown()
-          ? async (text) => (await markdown.render(text, { highlightCode: true })).html
+          ? async (text, _docPath, theme) =>
+              (await markdown.render(text, { highlightCode: true, theme })).html
           : undefined,
       }),
     ]);

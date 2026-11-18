@@ -31,6 +31,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 - **Phase 1 — first slice landed:** Mordant parses front matter, headings and a top-level source map;
   Mordant renders HTML and highlights standalone code. Commands `markdown_parse`, `markdown_render`
   and `markdown_highlight_code` are exposed through the TypeScript platform layer.
+- **Phase 2 — first slice landed:** all 15 CalmMD syntax palettes are registered as custom Mordant
+  themes in `core/highlight`. Rust highlighting resolves CalmMD colour/preview theme ids to those
+  themes; export passes the active preview theme through `MarkdownRenderOptions.theme`.
 - The preview still uses the TypeScript renderer. `useRustMarkdown()` defaults to false until the
   extension corpus and scroll-sync snapshots match.
 - **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
@@ -39,7 +42,7 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 - **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
   `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in
   TypeScript, so parity is checked against the new baseline snapshots before switching defaults.
-- **Phases 2, 5–7:** not started.
+- **Phases 5–7:** not started.
 
 ---
 
@@ -132,7 +135,7 @@ Solid / CodeMirror UI
   ▼
 Rust core services                  src-tauri/src/core/
   markdown/   Mordant parse, AST, HTML, headings, source map
-  highlight/  Mordant syntect highlighter, theme mapping
+  highlight/  Mordant/syntect highlighter themes generated from CalmMD's CSS palette
   spell/      zspell dictionaries, UTF-16 ranges, learns
   export/     HTML via markdown, PDF via browser/Takumi/ikat
   docs/       buffers, drafts, autosave, history (later phases)
@@ -223,9 +226,13 @@ Keep the old TS implementation during feature-flagged rollout; delete only after
 
 ### Phase 2 — Syntax highlighting with Mordant (3–5 days)
 
-- Wire `mordant::Highlighter` into fenced code blocks during `render_html`.
-- Map current theme tokens to Mordant/syntect themes.
-- Remove JS highlighting from the export path once snippets match.
+- Wire `mordant::Highlighter` into fenced code blocks during `render_html`; this is enabled by
+  `MarkdownRenderOptions.highlightCode`.
+- Map current theme tokens to Mordant/syntect themes. The first slice generates a Mordant theme for
+  every `ColorThemeId` from a Rust palette table in `core/highlight/mod.rs`, and a test checks those
+  colours against `src/styles/tokens.css`. Preview themes map to the nearest full colour palette.
+- Remove JS highlighting from the export path once snippets match. The Rust export path already
+  passes the selected preview theme and uses Mordant highlighting.
 - Keep CodeMirror's Lezer highlighting in the editor for now; it is interactive and incrementally
   reparses, which Mordant is not designed to replace.
 
