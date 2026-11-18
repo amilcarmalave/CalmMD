@@ -1,4 +1,6 @@
+import { createMarkdownService } from '../core/markdownService';
 import { basename, dirname, joinPath, stem } from '../core/paths';
+import { useRustMarkdown } from '../core/rustFlags';
 import type { CoverInfo } from '../core/cover';
 import { buildBody, buildDocument, DEFAULT_PDF, hasMath, type BaseTheme, type ExportOptions, type PdfOptions } from '../export/build';
 import type { Platform, SaveKind } from '../platform/types';
@@ -58,6 +60,7 @@ export type Exporter = ReturnType<typeof createExporter>;
 
 export function createExporter(deps: ExporterDeps) {
   const { platform } = deps;
+  const markdown = createMarkdownService(platform);
 
   async function loadPrefs() {
     return parseExportPrefs(await platform.kvGet(KEY).catch(() => null));
@@ -91,6 +94,9 @@ export function createExporter(deps: ExporterDeps) {
       buildBody(d.text, d.path, opts, {
         readImage: (p) => platform.readImageDataUrl(p).catch(() => null),
         postProcess: deps.postProcess,
+        renderMarkdown: useRustMarkdown()
+          ? async (text) => (await markdown.render(text, { highlightCode: true })).html
+          : undefined,
       }),
     ]);
     const assets = await loadExportAssets(withPaged, hasMath(body));

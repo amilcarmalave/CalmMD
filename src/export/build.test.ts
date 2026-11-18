@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { buildBody, buildDocument, DEFAULT_PDF, pdfCss, type ExportOptions } from './build';
 
@@ -6,6 +7,13 @@ const opts: ExportOptions = { title: 'My "Notes"', theme: 'paper', userCss: null
 const assets = { baseCss: '.md-body{}', fontCss: '@font-face{}', pagedJs: 'console.log("paged")' };
 
 describe('buildBody', () => {
+  const fixture = readFileSync('src-tauri/src/core/markdown/tests/fixtures/extension-corpus.md', 'utf8');
+
+  it('matches the TypeScript baseline snapshot', async () => {
+    const body = await buildBody(fixture, '/notes/extension-corpus.md', opts, { readImage: async () => null });
+    expect(body).toMatchSnapshot();
+  });
+
   it('strips editor-only attributes and disables checkboxes', async () => {
     const body = await buildBody('# T\n\n- [ ] task', null, opts, { readImage: async () => null });
     expect(body).not.toContain('data-line-start');
@@ -69,6 +77,15 @@ describe('buildBody', () => {
       postProcess: async (root) => root.insertAdjacentHTML('beforeend', '<p class="added">ok</p>'),
     });
     expect(body).toContain('class="added"');
+  });
+
+  it('uses an injected Rust renderer when provided', async () => {
+    const renderMarkdown = vi.fn(async () => '<h1 id="from-rust">Rust</h1>');
+    const body = await buildBody('# TS', null, { ...opts, toc: true }, { readImage: async () => null, renderMarkdown });
+    expect(renderMarkdown).toHaveBeenCalledWith('# TS', null);
+    expect(body).toContain('<h1 id="from-rust">Rust</h1>');
+    expect(body).toContain('href="#from-rust"');
+    expect(body).not.toContain('From rust'); // heading text comes from the injected HTML
   });
 });
 

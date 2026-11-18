@@ -26,7 +26,8 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 
 ## Implementation status
 
-- **Phase 0 — in progress:** frozen Markdown fixture corpus and feature flags are in place.
+- **Phase 0 — done:** frozen Markdown fixture corpus, TypeScript renderer and export-body baseline
+  snapshots, and feature flags are in place.
 - **Phase 1 — first slice landed:** Mordant parses front matter, headings and a top-level source map;
   Mordant renders HTML and highlights standalone code. Commands `markdown_parse`, `markdown_render`
   and `markdown_highlight_code` are exposed through the TypeScript platform layer.
@@ -35,7 +36,10 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 - **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
   misspelling ranges, suggestions and a local personal word list behind `useRustSpell()`. The OS
   checker remains the fallback for other languages and when the flag is off.
-- **Phases 2, 4–5:** not started.
+- **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
+  `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in
+  TypeScript, so parity is checked against the new baseline snapshots before switching defaults.
+- **Phases 2, 5–7:** not started.
 
 ---
 
@@ -242,7 +246,8 @@ behave as before when `useRustSpell()` is enabled and only en_US is bundled so f
 
 ### Phase 4 — HTML export via Mordant (3–5 days)
 
-- Replace `buildBody()`'s Markdown conversion with the Rust `markdown_render` service.
+- Replace `buildBody()`'s Markdown conversion with the Rust `markdown_render` service. The first
+  slice injects a renderer through `BodyDeps.renderMarkdown` and is enabled only by the flag.
 - Keep the existing document shell/CSS until visual parity is accepted.
 - Use Mordant highlighter output for code blocks.
 - Add source-map-aware tests comparing HTML snapshots.
