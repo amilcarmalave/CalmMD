@@ -32,7 +32,10 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   and `markdown_highlight_code` are exposed through the TypeScript platform layer.
 - The preview still uses the TypeScript renderer. `useRustMarkdown()` defaults to false until the
   extension corpus and scroll-sync snapshots match.
-- **Phases 2–5:** not started.
+- **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
+  misspelling ranges, suggestions and a local personal word list behind `useRustSpell()`. The OS
+  checker remains the fallback for other languages and when the flag is off.
+- **Phases 2, 4–5:** not started.
 
 ---
 
@@ -111,8 +114,9 @@ Keep the browser engine as default until Takumi visual parity is explicitly acce
 service must convert `(byte_start, byte_end)` to `(u32, u32)` UTF-16 ranges exactly as
 `src-tauri/src/spell.rs` does today.
 
-zspell suggestions are behind an unstable feature. Phase 1 can keep OS suggestions where available
-and use zspell only for misspelling ranges; Phase 2 decides whether to enable bundled suggestions.
+zspell suggestions are behind `unstable-suggestions`. The first implementation enables that feature
+and caps results at six suggestions; the OS checker stays available as a fallback for languages we
+do not bundle. Revisit if the suggestion algorithm's cost becomes noticeable.
 
 ---
 
@@ -225,16 +229,16 @@ Keep the old TS implementation during feature-flagged rollout; delete only after
 
 ### Phase 3 — zspell spellchecking (1 week)
 
-- Add `zspell = "0.5"`.
-- Bundle at least `en_US` `.aff`/`.dic` as Tauri resources; add more languages by settings.
-- Implement `spell_check`, `spell_check_text`, `spell_learn` with the same command signatures.
-- Convert byte ranges to UTF-16 ranges.
-- Store learned words in app data (replace the OS personal dictionary call).
-- Keep OS spellchecker as fallback where a requested language has no bundled dictionary.
-- Fix/remove the two OS-dictionary-dependent Rust tests by using the bundled dictionary.
+- Add `zspell = { version = "0.5.5", features = ["unstable-suggestions"] }`.
+- Bundle `en_US` `.aff`/`.dic` with their `(MIT AND BSD)` licence; add more languages by settings.
+- Expose `core_spell_check`, `core_spell_check_text`, `core_spell_learn`; the TS platform layer
+  switches to them when `useRustSpell()` is enabled and falls back to the OS commands otherwise.
+- Convert byte ranges to UTF-16 ranges (`core/spell/utf16.rs`).
+- Store learned words in `<appData>/state/spell~personal~en_US.kv` via the existing kv store.
+- Remove the two OS-dictionary-dependent Rust tests; `cargo test` now uses the bundled dictionary.
 
 **Exit:** `npm run test:rust` passes on this machine; editor underlines and right-click suggestions
-behave as before.
+behave as before when `useRustSpell()` is enabled and only en_US is bundled so far.
 
 ### Phase 4 — HTML export via Mordant (3–5 days)
 
@@ -380,7 +384,8 @@ Phases 0–4 are considered a successful first milestone when:
 
 - Mordant renders preview and HTML export behind a flag with matching snapshots;
 - fenced code blocks use Mordant highlighting;
-- zspell replaces the OS spellchecker on all platforms and `cargo test` passes locally;
+- zspell is available behind a flag for en_US with local personal words, and `cargo test` passes
+  locally on every platform;
 - MCP tests and the full MCP client smoke test still pass;
 - no Tauri capabilities or privacy guarantees were widened.
 

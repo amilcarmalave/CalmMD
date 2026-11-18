@@ -1,7 +1,8 @@
-//! Rust core services. Phase 1 adds Markdown parsing/rendering behind Tauri commands.
+//! Rust core services: Markdown parsing/rendering and native spellchecking behind Tauri commands.
 
 pub mod dto;
 pub mod markdown;
+pub mod spell;
 
 use dto::{HighlightCodeResult, MarkdownParseResult, MarkdownRenderOptions, MarkdownRenderResult};
 

@@ -106,6 +106,9 @@ pub fn run() {
             core::markdown_parse,
             core::markdown_render,
             core::markdown_highlight_code,
+            core::spell::core_spell_check,
+            core::spell::core_spell_check_text,
+            core::spell::core_spell_learn,
             launch_paths,
         ])
         .run(tauri::generate_context!())

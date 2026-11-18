@@ -98,13 +98,14 @@ export interface Platform {
   pendingAssetsDir(): Promise<string>;
   findPandoc(): Promise<string | null>;
   /**
-   * Asks the OS spellchecker about one word (lang: BCP 47, or undefined for the system language).
-   * Null when this system has no checker the app can ask (the webview may still underline).
+   * Checks one word (lang: BCP 47, or undefined for the system language). Uses the bundled Rust
+   * dictionary when `useRustSpell()` is on, otherwise the OS checker. Null when neither has a
+   * dictionary for that language (the webview may still underline).
    */
   spellCheck(word: string, lang?: string): Promise<{ misspelled: boolean; suggestions: string[] } | null>;
-  /** Misspelled ranges in text ([from, to) string offsets), or null when there's no OS checker to ask. */
+  /** Misspelled ranges in text ([from, to) string offsets), or null when no checker is available. */
   spellCheckText(text: string, lang?: string): Promise<[number, number][] | null>;
-  /** Adds a word to the OS user dictionary. */
+  /** Adds a word to the active checker's user dictionary. */
   spellLearn(word: string, lang?: string): Promise<void>;
   pandocConvert(markdown: string, outPath: string, resourceDir: string | null): Promise<void>;
   /** User themes folder (created with an example on first use). */

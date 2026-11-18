@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { useRustSpell } from '../core/rustFlags';
 import type { SearchHit } from '../core/search';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
 import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
@@ -14,6 +15,36 @@ const MARKDOWN_FILTERS = [
   { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
   { name: 'All files', extensions: ['*'] },
 ];
+
+type SpellCheckResult = { misspelled: boolean; suggestions: string[] } | null;
+
+/**
+ * When the Rust spell flag is on, the bundled zspell service answers for bundled languages and
+ * supports learned words on every platform. Other languages still use the OS checker.
+ */
+async function spellCheck(word: string, lang: string | undefined): Promise<SpellCheckResult> {
+  if (useRustSpell()) {
+    const native = await invoke<SpellCheckResult>('core_spell_check', { word, lang: lang ?? null });
+    if (native !== null) return native;
+  }
+  return invoke<SpellCheckResult>('spell_check', { word, lang: lang ?? null });
+}
+
+async function spellCheckText(text: string, lang: string | undefined): Promise<[number, number][] | null> {
+  if (useRustSpell()) {
+    const native = await invoke<[number, number][] | null>('core_spell_check_text', { text, lang: lang ?? null });
+    if (native !== null) return native;
+  }
+  return invoke<[number, number][] | null>('spell_check_text', { text, lang: lang ?? null });
+}
+
+async function spellLearn(word: string, lang: string | undefined): Promise<void> {
+  if (useRustSpell()) {
+    const handled = await invoke<boolean>('core_spell_learn', { word, lang: lang ?? null });
+    if (handled) return;
+  }
+  await invoke<void>('spell_learn', { word, lang: lang ?? null });
+}
 
 const SAVE_FILTERS: Record<Exclude<SaveKind, 'markdown'>, { name: string; extensions: string[] }> = {
   html: { name: 'Web page', extensions: ['html'] },
@@ -125,9 +156,9 @@ export function createTauriPlatform(): Platform {
     copyFile: (from, to) => invoke<void>('copy_file', { from, to }),
     pendingAssetsDir: () => invoke<string>('pending_assets_dir'),
     findPandoc: () => invoke<string | null>('find_pandoc'),
-    spellCheck: (word, lang) => invoke('spell_check', { word, lang: lang ?? null }),
-    spellCheckText: (text, lang) => invoke('spell_check_text', { text, lang: lang ?? null }),
-    spellLearn: (word, lang) => invoke<void>('spell_learn', { word, lang: lang ?? null }),
+    spellCheck,
+    spellCheckText,
+    spellLearn,
     pandocConvert: (markdown, out, resourceDir) => invoke<void>('pandoc_convert', { markdown, out, resourceDir }),
     themesDir: () => invoke<string>('themes_dir'),
     writeClipboardHtml: (html, plain) => writeHtml(html, plain),

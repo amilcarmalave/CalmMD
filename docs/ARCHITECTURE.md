@@ -76,7 +76,8 @@ src/
 src-tauri/
   src/fsops.rs        read/stat/atomic write (temp + fsync + rename, Windows retry)
   src/kv.rs           durable key/value files in <appData>/state (drafts, session, settings)
-  src/core/           feature-flagged Rust services: Mordant Markdown parsing/rendering/highlighting
+  src/core/           feature-flagged Rust services: Mordant Markdown parsing/rendering/highlighting,
+                      zspell spellchecking with a bundled en_US dictionary
   src/tree.rs         list_dir (folders first, natural order, skips .git/node_modules), create,
                       rename (never overwrites), trash (OS trash via the `trash` crate)
   src/windows.rs      SpaceClaims (window label → space id, released on window destroy), open_window
