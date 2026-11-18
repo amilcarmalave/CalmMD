@@ -10,7 +10,8 @@ something simpler, faster or more reliable rather than adding UI.
   screen capture or plugin marketplace in v1).
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture, the rules that keep things from breaking (scroll sync,
   live mode, saving, export), and the debugging tips.
-- For work on the local MCP server, also read [docs/MCP.md](docs/MCP.md),
+- For work on Rust-side rendering, spellchecking or PDF generation, read
+  [docs/RUST-CORE-PLAN.md](docs/RUST-CORE-PLAN.md). For the local MCP server read [docs/MCP.md](docs/MCP.md),
   [docs/MCP-CLIENT-SETUP.md](docs/MCP-CLIENT-SETUP.md) and [skills/calmmd/SKILL.md](skills/calmmd/SKILL.md).
   The MCP bridge exposes live app state to an external client; it is not an in-app AI chat and has no built-in LLM.
 - For anything larger than a bug fix, open an issue first so we can agree on the approach.

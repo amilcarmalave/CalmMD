@@ -2,6 +2,8 @@
 
 How CalmMD is put together, and the rules that keep it working. Read [SPEC.md](../SPEC.md) first for the
 product decisions and design principles, and [CONTRIBUTING.md](../CONTRIBUTING.md) for how to work on it.
+The planned Rust service layer (Mordant, zspell, Takumi and ikat) is described in
+[`RUST-CORE-PLAN.md`](RUST-CORE-PLAN.md).
 
 ## Commands
 

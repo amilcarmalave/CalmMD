@@ -1,0 +1,378 @@
+# Rust core plan: Mordant, zspell, Takumi and ikat inside Tauri
+
+This is an implementation plan for moving CalmMD's heavy document processing into Rust **without
+replacing Tauri**. The Solid/CodeMirror UI stays the shell; Rust gains authoritative services for
+Markdown parsing/rendering, syntax highlighting, spellchecking and PDF production. Takumi is the
+LaTeX-free, CSS-compatible PDF path; ikat is an optional typeset engine. The existing
+MCP server can then call those services directly instead of round-tripping through the webview.
+
+See [`MCP.md`](MCP.md) for the current MCP implementation and [`ARCHITECTURE.md`](ARCHITECTURE.md)
+for the present TypeScript-centric architecture.
+
+---
+
+## 1. Goal
+
+Move the parts of CalmMD that are expensive, CPU-bound or duplicated between preview and export into
+Rust, while preserving the current:
+
+- Tauri windowing and OS integration;
+- Solid + CodeMirror editor and UI;
+- local/privacy posture: no account, no cloud, no built-in LLM;
+- opt-in loopback MCP server;
+- file format: plain Markdown plus front matter.
+
+The first milestone is **not** a GPUI migration. Rust becomes a service layer behind Tauri commands.
+
+---
+
+## 2. Selected dependencies
+
+| Need | Choice | Why | License |
+|---|---|---|---|
+| Markdown parse/render/AST | `mordant` 0.10.1 | CommonMark 0.31.2 + GFM, full AST, HTML renderer, features for front matter/footnotes/math/diagrams/highlighter | MIT |
+| Fenced-code highlighting | `mordant` `highlighter` feature | 190+ languages via syntect; VSCode/Sublime themes; standalone `Highlighter` API | MIT (+ transitive syntect deps) |
+| Spellchecking | `zspell` 0.5.5 | Native Rust, Hunspell-compatible, `check_indices()` gives byte offsets; no OS dependency | Apache-2.0 |
+| CSS-based PDF export | `takumi` / `takumi-pdf` | Rust HTML/CSS layout → paged PDF without a browser; closest LaTeX-free replacement for Paged.js | MIT OR Apache-2.0 |
+| Typeset PDF export | `ikat` 0.13.6 | Rust Markdown → LaTeX → PDF pipeline; Mermaid→TikZ, pgfplots, templates; no browser/Paged.js | MIT OR Apache-2.0 |
+
+`takumi` crate 2.20.0 currently requires Rust 1.91, above CalmMD's 1.88 MSRV. The first spike may
+therefore call `takumi-pdf`/`takumi-cli` as a tool rather than raising the main app's MSRV. Decide
+after the spike.
+
+Not chosen yet:
+
+- Vivliostyle.js — conceptually close to Paged.js, but AGPL-3.0 and browser-based; incompatible with
+  the project's permissive dependency policy.
+- `spellbook` (Helix) — good API and fast, but MPL-2.0 is not in the permissive allow-list in
+  `CONTRIBUTING.md`. Revisit only if the licence policy is relaxed.
+- OS spellchecker (`windows` crate / NSSpellChecker) — remains the fallback until zspell dictionaries
+  are bundled for all supported platforms.
+
+Record every runtime dependency and version in `THIRD_PARTY_LICENSES.md`.
+
+---
+
+## 3. Important reality checks
+
+### 3.1 Mordant is not a UI renderer
+
+Mordant parses Markdown, exposes an AST, renders HTML and highlights code. It does **not** paint
+GPUI or DOM elements. With Tauri kept, the webview still paints the preview.
+
+Two preview strategies exist:
+
+- **Phase 1 (recommended):** Rust renders HTML with Mordant; the webview keeps DOMPurity sanitisation
+  and the existing DOM patcher.
+- **Phase 2 (optional):** walk Mordant's AST in Rust and emit a semantic block JSON that the webview
+  renders into Solid components. This avoids HTML round-trips but is a larger rewrite.
+
+Phase 1 gives the biggest win with the least risk.
+
+### 3.2 Source-line mapping is critical
+
+CalmMD's scroll sync depends on `data-line-start` attributes produced by the current renderer.
+Mordant's AST must be checked for source spans. If spans are not exposed directly, add a small
+source-map pass that associates top-level AST nodes with line numbers before rendering.
+
+Acceptance criterion: split-view scroll sync stays within 0.03 lines in the existing 500-line test.
+
+### 3.3 Takumi is the comparable LaTeX-free PDF engine; ikat is a different style
+
+The current PDF path uses Paged.js + CSS templates (Standard, Report, Academic, Minimal) in a
+Chromium engine. For a LaTeX-free, browser-free engine that still consumes HTML/CSS, **Takumi** is
+the closest match: it supports paged layout, page breaks, running headers/footers, page numbers,
+repeat table headers, selectable text and font embedding.
+
+ikat instead produces camera-ready LaTeX/TikZ output. It is not a drop-in for the current CSS
+designs, but is attractive as a separate high-end typesetting engine.
+
+Plan: add `prefs.pdf.engine` with these values:
+
+- `browser` — current Paged.js/Chromium default;
+- `takumi` — CSS-compatible, LaTeX-free, browser-free;
+- `ikat` — optional LaTeX/TikZ engine.
+
+Keep the browser engine as default until Takumi visual parity is explicitly accepted.
+
+### 3.4 zspell needs dictionaries and UTF-16 conversion
+
+`zspell::check_indices()` returns byte offsets. CodeMirror uses UTF-16 code-unit offsets. The Rust
+service must convert `(byte_start, byte_end)` to `(u32, u32)` UTF-16 ranges exactly as
+`src-tauri/src/spell.rs` does today.
+
+zspell suggestions are behind an unstable feature. Phase 1 can keep OS suggestions where available
+and use zspell only for misspelling ranges; Phase 2 decides whether to enable bundled suggestions.
+
+---
+
+## 4. Target architecture
+
+```text
+Solid / CodeMirror UI
+  │  Tauri commands + events (typed DTOs)
+  ▼
+Rust core services                  src-tauri/src/core/
+  markdown/   Mordant parse, AST, HTML, headings, source map
+  highlight/  Mordant syntect highlighter, theme mapping
+  spell/      zspell dictionaries, UTF-16 ranges, learns
+  export/     HTML via markdown, PDF via Paged.js or ikat
+  docs/       buffers, drafts, autosave, history (later phases)
+  explorer/   tree, create/rename/move/trash (later phases)
+  mcp/        existing server; eventually calls core services directly
+  ▼
+Disk / app data
+```
+
+The webview remains authoritative for UI state until the relevant Rust service exists. During
+migration, a Tauri command may delegate to Rust for one concern and still to the webview for another.
+
+---
+
+## 5. Proposed module layout
+
+```text
+src-tauri/src/
+  core/
+    mod.rs
+    dto.rs            // shared serde DTOs used by commands and MCP
+    markdown/
+      mod.rs
+      parse.rs        // parse_document, headings, front matter
+      render.rs       // Mordant HTML with data-line-start + ids
+      sourcemap.rs    // AST node → source line/range
+      extensions.rs   // wiki links, callouts, tasks, attributes
+      tests/
+    highlight/
+      mod.rs          // Mordant Highlighter wrapper, theme cache
+    spell/
+      mod.rs          // public spell_check / spell_check_text / spell_learn
+      dictionary.rs   // zspell builder, bundled .aff/.dic, personal words
+      utf16.rs        // byte offsets → UTF-16 ranges
+    export/
+      mod.rs
+      html.rs         // Mordant HTML + standalone document shell
+      pdf_browser.rs  // existing Paged.js/Chromium path
+      pdf_ikat.rs     // ikat weaver + TeX engine driver
+      prefs.rs        // convert ExportPrefs to ikat BuildSpec
+  mcp/                // existing; later uses core services directly
+```
+
+TS side:
+
+```text
+src/core/
+  markdownService.ts   // client for Rust render/parse commands
+  spellService.ts      // client for Rust spell commands
+src/platform/types.ts  // new command declarations
+```
+
+Keep the old TS implementation during feature-flagged rollout; delete only after parity.
+
+---
+
+## 6. Phased implementation
+
+### Phase 0 — Guardrails (2–3 days)
+
+- Freeze current renderer/preview/export behaviour with snapshot fixtures:
+  - headings and source-line attributes;
+  - wiki links, callouts, footnotes, tasks, tables, math, diagrams;
+  - export HTML and PDF metadata.
+- Add a `CALMMD_RUST_MARKDOWN` / `CALMMD_RUST_SPELL` / `CALMMD_PDF_ENGINE=ikat` style debug switch
+  (env var or settings field) so changes are reversible.
+- Update `THIRD_PARTY_LICENSES.md` with Mordant, zspell, ikat and dictionary licences.
+
+**Exit:** baseline snapshots committed; feature flags in place.
+
+### Phase 1 — Mordant Markdown service (1–2 weeks)
+
+- Add `mordant = { version = "0.10", features = ["meta", "footnotes", "math", "diagram", "highlighter"] }`.
+- Implement `parse_document(text) -> { headings, frontMatter, blocks }`.
+- Implement `render_html(text, opts) -> { html, sourceMap }`.
+- Port CalmMD extensions:
+  - wiki links → `wiki:` hrefs;
+  - callouts → current CSS classes;
+  - task lists and `==highlight==`;
+  - sub/superscript;
+  - heading ids and `data-line-start`;
+  - front matter hidden in preview/export.
+- Expose Tauri commands: `markdown_render`, `markdown_parse`, `markdown_highlight_code`.
+- In the webview, add `markdownService.ts` and use it behind the flag. Keep DOMPurify and the current
+  patcher.
+
+**Exit:** preview and outline snapshots match for the fixture corpus; scroll-sync test passes.
+
+### Phase 2 — Syntax highlighting with Mordant (3–5 days)
+
+- Wire `mordant::Highlighter` into fenced code blocks during `render_html`.
+- Map current theme tokens to Mordant/syntect themes.
+- Remove JS highlighting from the export path once snippets match.
+- Keep CodeMirror's Lezer highlighting in the editor for now; it is interactive and incrementally
+  reparses, which Mordant is not designed to replace.
+
+**Exit:** code blocks in preview and HTML export use Mordant; dark/light themes pass visual snapshots.
+
+### Phase 3 — zspell spellchecking (1 week)
+
+- Add `zspell = "0.5"`.
+- Bundle at least `en_US` `.aff`/`.dic` as Tauri resources; add more languages by settings.
+- Implement `spell_check`, `spell_check_text`, `spell_learn` with the same command signatures.
+- Convert byte ranges to UTF-16 ranges.
+- Store learned words in app data (replace the OS personal dictionary call).
+- Keep OS spellchecker as fallback where a requested language has no bundled dictionary.
+- Fix/remove the two OS-dictionary-dependent Rust tests by using the bundled dictionary.
+
+**Exit:** `npm run test:rust` passes on this machine; editor underlines and right-click suggestions
+behave as before.
+
+### Phase 4 — HTML export via Mordant (3–5 days)
+
+- Replace `buildBody()`'s Markdown conversion with the Rust `markdown_render` service.
+- Keep the existing document shell/CSS until visual parity is accepted.
+- Use Mordant highlighter output for code blocks.
+- Add source-map-aware tests comparing HTML snapshots.
+
+**Exit:** `calmmd_export_html` output is byte-stable or diff-reviewed against current output.
+
+### Phase 5a — Takumi PDF engine (1–2 weeks)
+
+This is the LaTeX-free, CSS-compatible path and should be prototyped first.
+
+- Spike integration: `takumi-pdf`/`takumi-cli` tool call vs direct Rust binding. Direct `takumi`
+  2.20.0 requires Rust 1.91, so prefer the CLI/npm path until an MSRV decision is made.
+- Feed the same standalone HTML used by current export into Takumi.
+- Map `ExportPrefs` to Takumi options:
+  - `pdf.pageSize` → page size;
+  - `pdf.margins` → page margins;
+  - `header`, `pageNumbers` → running header/footer templates;
+  - `pdf.template` → four CalmMD-inspired CSS templates;
+  - `toc` → generated contents block;
+  - `cover`, `coverAuthor` → cover page;
+  - `breakBeforeH1` → top-level heading page breaks.
+- Add engine selection:
+  - `browser` — current Paged.js/Chromium default;
+  - `takumi` — CSS-based, LaTeX-free, browser-free;
+  - `ikat` — later, optional typeset engine.
+- Compare sample exports against Paged.js: headings, TOC, headers/footers, tables, code blocks,
+  images, link annotations and text selectability.
+
+**Exit:** a representative note exports to a paged PDF via Takumi with selectable text and no TeX
+or browser dependency; visual differences are reviewed and accepted or fixed.
+
+### Phase 5b — ikat PDF engine (1–2 weeks, plus TeX packaging decision)
+
+Optional high-end typesetting path; not the default replacement for Paged.js.
+
+- Add `ikat = "0.13"`.
+- Implement `pdf_ikat::weave(text, prefs) -> .tex` first. No TeX needed for this step.
+- Map `ExportPrefs`:
+  - `pdf.pageSize` → ikat page geometry;
+  - `pdf.margins` → geometry margins;
+  - `header`, `pageNumbers` → head/foot templates;
+  - `pdf.template` → initial four CalmMD-inspired ikat templates;
+  - `toc`, `cover`, `coverAuthor` → document preamble;
+  - `breakBeforeH1` → sectioning hooks.
+- Compile with `pdflatex`, `tectonic` binary, or `texres` when available.
+- Add `ikat_check` command to report missing TeX packages with actionable messages.
+- Do not enable the `tectonic` Cargo feature initially; use an external binary where available.
+
+**Exit:** a sample note exports to PDF with ikat where TeX is available; errors are clear when it is
+not.
+
+### Phase 6 — Rust document/explorer services (3–6 weeks)
+
+This is where MCP gets simpler.
+
+- Port `documents.ts` state machine into Rust: tabs, buffers, drafts, autosave targets, conflict
+  flags, `set_content_by_path`.
+- Port `history.ts` snapshots into Rust.
+- Port `explorer.ts` create/rename/move/trash and link retargeting into Rust.
+- Keep the webview as an event-driven view of Rust state; CodeMirror documents are mirrors, not the
+  only source of truth.
+- Expose the same operations through Tauri commands and direct MCP calls.
+
+**Exit:** MCP tools no longer need `calmmd://mcp/request` for read/write/rename/move; the webview
+receives state-change events instead.
+
+### Phase 7 — Cleanup (1 week)
+
+- Delete superseded TS modules and tests.
+- Remove webview-only sanitisation if Rust output is trusted (or keep it deliberately).
+- Narrow Tauri capabilities now that fewer commands need broad filesystem access.
+- Update `ARCHITECTURE.md`, `MCP.md`, `CONTRIBUTING.md`, `THIRD_PARTY_LICENSES.md`.
+
+---
+
+## 7. MCP impact
+
+Current flow:
+
+```text
+MCP tool → Tauri event → webview dispatcher → TS controllers → Tauri command → disk
+```
+
+Target flow after Phase 6:
+
+```text
+MCP tool → Rust core service → disk
+                         └→ Tauri event → webview state update
+```
+
+Benefits:
+
+- no 120-second webview response timeout for normal calls;
+- reads and writes share the same Rust truth;
+- no duplicate path sandbox logic;
+- MCP tools become callable even before the webview finishes loading.
+
+Until Phase 6, keep the existing bridge. Do not make MCP depend on half-migrated services.
+
+---
+
+## 8. Testing strategy
+
+| Layer | Tests |
+|---|---|
+| Markdown | golden HTML files, heading/source-map fixtures, extension corpus |
+| Highlighting | code-block snapshots in light/dark themes |
+| Spell | bundled dictionary tests, Unicode/UTF-16 ranges, personal words |
+| Export | HTML snapshots; PDF metadata/text extraction where possible |
+| Tauri boundary | command DTO round-trips, error mapping |
+| MCP | existing 3 Rust tests + full client smoke script |
+| UI | existing Vitest suite + manual split-view scroll check |
+
+Run all of these in CI on Windows/macOS/Linux. PDF tests need either TeX or the browser engine; keep
+them marked/conditional appropriately.
+
+---
+
+## 9. Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Mordant output differs from markdown-it | feature flags, golden snapshots, custom renderer extensions |
+| Missing `data-line-start` spans | add source-map pass before renderer; block release if scroll sync regresses |
+| Mordant highlighter themes differ | keep CodeMirror highlighting until visual review; snapshot themes |
+| zspell suggestions unstable | use bundled ranges first; OS/other suggestions as fallback |
+| Dictionary licensing | choose allowed-licence dictionaries and list them explicitly |
+| Takumi visual difference from Paged.js | opt-in engine, golden PDFs, keep browser default until accepted |
+| Takumi Rust MSRV 1.91 | start with `takumi-pdf`/CLI; raise MSRV only if direct embedding is worth it |
+| ikat visual difference from Paged.js | separate engine, opt-in, no default change until accepted |
+| TeX unavailable on user machine | clear engine error; keep browser/Takumi engines default; document `texres`/`tectonic` options |
+| Large migration stalls | ship Phases 1–5 independently; each has user-visible value without Phase 6 |
+
+---
+
+## 10. Definition of done for the first useful milestone
+
+Phases 0–4 are considered a successful first milestone when:
+
+- Mordant renders preview and HTML export behind a flag with matching snapshots;
+- fenced code blocks use Mordant highlighting;
+- zspell replaces the OS spellchecker on all platforms and `cargo test` passes locally;
+- MCP tests and the full MCP client smoke test still pass;
+- no Tauri capabilities or privacy guarantees were widened.
+
+Phase 5a (Takumi) is the preferred next PDF engine; Phase 5b (ikat) can ship later as a separately
+reviewed typeset engine option.
