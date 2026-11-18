@@ -10,6 +10,9 @@ something simpler, faster or more reliable rather than adding UI.
   screen capture or plugin marketplace in v1).
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture, the rules that keep things from breaking (scroll sync,
   live mode, saving, export), and the debugging tips.
+- For work on the local MCP server, also read [docs/MCP.md](docs/MCP.md),
+  [docs/MCP-CLIENT-SETUP.md](docs/MCP-CLIENT-SETUP.md) and [skills/calmmd/SKILL.md](skills/calmmd/SKILL.md).
+  The MCP bridge exposes live app state to an external client; it is not an in-app AI chat and has no built-in LLM.
 - For anything larger than a bug fix, open an issue first so we can agree on the approach.
 
 ## Setup
@@ -27,7 +30,7 @@ Add `?demo` to the browser URL for a showcase document. Options: `&mode=split|li
 
 ```sh
 npm run typecheck
-npm test             # Vitest: ~200 tests
+npm test             # Vitest unit tests
 npm run test:rust    # cargo test
 npm run build
 ```
@@ -39,8 +42,10 @@ npm run build
 
 - **Pure logic lives in `src/core`, `src/editor/format.ts`, `src/editor/table.ts`, `src/sync/scrollMap.ts`
   and `src/editor/live/analyze.ts`**, with tests next to it. If you change behaviour there, add a test.
-- **Every user-facing action is a command** in `src/app/appCommands.ts`. Then it's in the palette, can
-  have a shortcut, and can be put in the toolbar or a context menu. Don't add buttons that bypass the registry.
+- **Every user-facing action is a command** in the registry. Most commands live in
+  `src/app/appCommands.ts`; commands that need window-local state (exports, MCP server status) are
+  registered from `src/App.tsx`. Then it's in the palette, can have a shortcut, and can be put in
+  the toolbar or a context menu. Don't add buttons that bypass the registry.
 - The UI never calls Tauri directly. It goes through the `Platform` interface (`src/platform`), which also
   has an in-memory implementation for the browser build and tests.
 - Colours, fonts and spacing are CSS variables (`src/styles/tokens.css`). Don't hard-code colours.

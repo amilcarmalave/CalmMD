@@ -3,6 +3,7 @@
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
 import type { SearchHit, SearchOptions } from '../core/search';
+import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
 
 export interface ReadResult {
   text: string;
@@ -127,6 +128,16 @@ export interface Platform {
   onBroadcast(channel: string, handler: (payload: unknown) => void): void;
   /** Files opened while the app was already running (single instance). */
   onOpenPaths(handler: (paths: string[]) => void): void;
+
+  // ---------- Local MCP bridge ----------
+  /** Status of the embedded, loopback-only MCP server. */
+  mcpStatus(): Promise<McpConnectionInfo>;
+  mcpStart(): Promise<McpConnectionInfo>;
+  mcpStop(): Promise<McpConnectionInfo>;
+  /** Called for each tool call routed to this window. */
+  onMcpRequest(handler: (request: McpRequest) => void): void;
+  /** Sends the tool result back to the Rust server. */
+  mcpRespond(response: McpResponse): Promise<void>;
 
   setWindowTitle(title: string): Promise<void>;
   /** The handler runs to completion before the window closes. */

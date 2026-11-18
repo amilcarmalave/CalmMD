@@ -8,6 +8,8 @@ import { createDocuments, docName } from './app/documents';
 import { editorMenuItems, spellingItems, wordAt } from './app/editorMenu';
 import { recheckSpelling, spelling } from './editor/spelling';
 import { createExplorer } from './app/explorer';
+import { createMcpBridge } from './app/mcpBridge';
+import type { McpConnectionInfo } from './mcp/types';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
 import { parseSession, type Session, type SidebarView } from './app/session';
@@ -31,7 +33,7 @@ import { createAssets } from './app/assets';
 import { findImageLinks, isImagePath } from './core/assets';
 import { MenuBar } from './ui/MenuBar';
 import { notePicker } from './editor/notePicker';
-import { linksTo, parseWiki, resolveWiki, type Backlink } from './core/noteLinks';
+import { linksTo, parseWiki, resolveWiki, rewriteLinks, type Backlink } from './core/noteLinks';
 import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
@@ -59,7 +61,7 @@ import { isEmbeddableUrl } from './render/embeds';
 import { BRAND } from './brand';
 import { formatBinding } from './core/keys';
 import { extractHeadings, headingIndexAt, type Heading } from './core/outline';
-import { basename, dirname, isPlainTextPath, isWithin, joinPath, pathKey, samePath, stem } from './core/paths';
+import { basename, dirname, isMarkdownPath, isPlainTextPath, isWithin, joinPath, pathKey, samePath, stem } from './core/paths';
 import { notifySavedFiles } from './platform/savedFiles';
 import { countStats, type TextStats } from './core/stats';
 import { editorExtensions, isUserEdit, markdownSupport } from './editor/extensions';
@@ -94,6 +96,7 @@ export default function App(props: { platform: Platform }) {
   const { settings, update, load: loadSettings, flush: flushSettings } = createSettings(platform);
   const [message, setMessage] = createSignal<{ text: string; action?: { label: string; run: () => void } } | null>(null);
   const [stats, setStats] = createSignal<TextStats>(EMPTY_STATS);
+  const [mcpInfo, setMcpInfo] = createSignal<McpConnectionInfo | null>(null);
   const [selection, setSelection] = createSignal<TextStats | null>(null);
   const { confirm, prompt, ConfirmDialog } = createConfirm();
 
@@ -513,6 +516,7 @@ export default function App(props: { platform: Platform }) {
     draftOwner,
     beforeSaveAs: (text, from, to) => assets.relocate(text, from, to),
     onClosing: (path, opened, current) => captureOnClose(path, opened, current),
+    onExternalEdit: (path, before, after) => captureOnMcpEdit(path, before, after),
   });
   const store = docs.store;
   const activeDoc = createMemo(() => store.docs.find((d) => d.id === store.activeId));
@@ -529,9 +533,11 @@ export default function App(props: { platform: Platform }) {
     platform,
     confirm,
     notify,
-    onRenamed: (from, to) => {
+    onRenamed: async (from, to) => {
       docs.renamePaths(from, to);
-      void history.rename(from, to).then(() => setHistoryRev((n) => n + 1));
+      await history.rename(from, to).catch(() => undefined);
+      setHistoryRev((n) => n + 1);
+      await rewriteLinksAfterRename(from, to);
     },
     onTrashed: (path) => docs.closeWithin(path),
     openFile: (path) => void docs.openPaths([path]),
@@ -782,6 +788,9 @@ export default function App(props: { platform: Platform }) {
     setExportDialog({ kind, prefs, engine: engineName(engine) });
   }
   const [pandoc, setPandoc] = createSignal(false);
+  // The MCP bridge needs all four controllers, so it is installed after the exporter exists.
+  createMcpBridge({ platform, docs, explorer, exporter });
+
   registry.register([
     { id: 'export.pdf', title: 'Export as PDF…', category: 'File', run: () => openExport('pdf') },
     { id: 'export.html', title: 'Export as HTML…', category: 'File', run: () => openExport('html') },
@@ -789,6 +798,40 @@ export default function App(props: { platform: Platform }) {
     { id: 'export.docx', title: 'Export as Word (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('docx') },
     { id: 'export.odt', title: 'Export as OpenDocument (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('odt') },
     { id: 'export.epub', title: 'Export as EPUB (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('epub') },
+    {
+      id: 'mcp.start',
+      title: 'Start MCP Server',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: async () => {
+        const s = await platform.mcpStart();
+        setMcpInfo(s);
+        if (!s.url) return notify('Could not start the MCP server');
+        await platform.writeClipboard(`${s.url} · token: ${s.token ?? ''}`).catch(() => undefined);
+        notify(`MCP server: ${s.url} (connection copied)`);
+      },
+    },
+    {
+      id: 'mcp.stop',
+      title: 'Stop MCP Server',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: async () => {
+        setMcpInfo(await platform.mcpStop());
+        notify('MCP server stopped');
+      },
+    },
+    {
+      id: 'mcp.autostart',
+      title: settings.mcpAutostart ? 'MCP Server: Don’t Auto-start' : 'MCP Server: Auto-start',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: () => {
+        const on = !settings.mcpAutostart;
+        update({ mcpAutostart: on });
+        notify(on ? 'CalmMD will start the MCP server on launch' : 'MCP server won’t auto-start');
+      },
+    },
     { id: 'theme.openFolder', title: 'Open Themes Folder…', category: 'Appearance', run: openThemesFolder },
     { id: 'theme.reload', title: 'Reload Themes', category: 'Appearance', run: () => reloadThemes().then(() => notify('Themes reloaded')) },
   ]);
@@ -852,6 +895,42 @@ export default function App(props: { platform: Platform }) {
   const history = createHistory({ platform });
   const [historyRev, setHistoryRev] = createSignal(0);
   const [versionView, setVersionView] = createSignal<{ path: string; version: Version; text: string } | null>(null);
+
+  /** After a rename, retarget links in every note so folders can be reorganised safely. */
+  async function rewriteLinksAfterRename(from: string, to: string) {
+    if (!explorer.state.root) return;
+    const files = (await explorer.everyFile()).filter(isMarkdownPath);
+    let changed = 0;
+    let failed = 0;
+    for (const path of files) {
+      const open = store.docs.find((d) => d.path && samePath(d.path, path));
+      const before = open ? docs.textOf(open.id) : (await platform.readTextFile(path).catch(() => null))?.text;
+      if (before === undefined) continue;
+      const after = rewriteLinks(before, path, from, to, files);
+      if (after === before) continue;
+      try {
+        if (open) await docs.setContentByPath(path, after, { mode: 'replace', flush: true });
+        else {
+          await history.save(path, before);
+          await platform.writeTextFile(path, after);
+          await history.save(path, after);
+        }
+        changed++;
+      } catch {
+        failed++;
+      }
+    }
+    setHistoryRev((n) => n + 1);
+    if (failed) notify(`Updated links in ${changed} notes; ${failed} failed`);
+    else if (changed) notify(`Updated links in ${changed} note${changed === 1 ? '' : 's'}`);
+  }
+
+  /** An MCP edit: keep the previous text and the result, so an agent change is reversible. */
+  async function captureOnMcpEdit(path: string, before: string, after: string) {
+    if (before.trim()) await history.save(path, before);
+    await history.save(path, after);
+    setHistoryRev((n) => n + 1);
+  }
 
   /** A changed file closed: keep how it was when opened (if that's new) and how it is now. */
   async function captureOnClose(path: string, opened: string, current: string) {
@@ -1682,6 +1761,17 @@ export default function App(props: { platform: Platform }) {
 
   onMount(async () => {
     const upgraded = await loadSettings().catch(() => false);
+    if (platform.kind === 'tauri') {
+      const current = await platform.mcpStatus().catch(() => null);
+      setMcpInfo(current);
+      if (settings.mcpAutostart && !current?.enabled) {
+        const started = await platform.mcpStart().catch(() => null);
+        if (started?.url) {
+          setMcpInfo(started);
+          notify(`MCP server: ${started.url}`);
+        }
+      }
+    }
 
     view = new EditorView({ parent: host, state: EditorState.create({ doc: '', extensions: [extensions, spellCompartment.of(spellFor())] }) });
     docs.attachView(view);
@@ -2098,6 +2188,9 @@ export default function App(props: { platform: Platform }) {
         }
         trailing={
           <>
+            <Show when={mcpInfo()?.enabled}>
+              <span class="mcp-indicator" title={mcpInfo()?.url ?? ''}>MCP</span>
+            </Show>
             <span class="zoom-control" role="group" aria-label="Zoom">
               <button class="icon-btn" title={`Zoom out  ${hint('view.zoomOut') ?? ''}`} aria-label="Zoom out" onClick={() => registry.run('view.zoomOut')}>
                 −

@@ -1,5 +1,6 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
+import type { McpConnectionInfo } from '../mcp/types';
 import type { DirEntry, Platform, StatResult } from './types';
 
 export interface MemoryPlatformOptions {
@@ -290,6 +291,19 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       handlers.set(name, [...(handlers.get(name) ?? []), handler]);
     },
     onOpenPaths() {},
+
+    // The browser/memory platforms have no embedded server; the bridge stays inert there.
+    async mcpStatus(): Promise<McpConnectionInfo> {
+      return { enabled: false, url: null, token: null, windowLabel: label };
+    },
+    async mcpStart(): Promise<McpConnectionInfo> {
+      return this.mcpStatus();
+    },
+    async mcpStop(): Promise<McpConnectionInfo> {
+      return this.mcpStatus();
+    },
+    onMcpRequest() {},
+    async mcpRespond() {},
 
     async setWindowTitle(title) {
       if (typeof document !== 'undefined') document.title = title;

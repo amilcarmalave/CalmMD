@@ -62,6 +62,10 @@ export function appMenus(c: MenuContext): TopMenu[] {
         cmd('export.copyHtml'),
       ]),
       sep,
+      sep,
+      cmd('mcp.start', { label: 'Start MCP Server' }),
+      cmd('mcp.stop', { label: 'Stop MCP Server' }),
+      cmd('mcp.autostart', { label: 'Auto-start MCP Server', checked: () => c.settings.mcpAutostart }),
       sub('Spaces', () => [
         ...c.spaces().map((s) => act(s.name, () => c.switchSpace(s.id), { checked: () => s.current })),
         ...(c.spaces().length ? [sep] : []),

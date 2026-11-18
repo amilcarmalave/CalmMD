@@ -5,7 +5,7 @@ description = "CalmMD: a calm, beautiful Markdown editor"
 authors = ["CalmMD contributors"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.88"
 
 [lib]
 name = "calmmd_lib"
@@ -20,6 +20,11 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-single-instance = "2"
+rmcp = { version = "=3.11.0", features = ["transport-streamable-http-server"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "time", "sync", "macros"] }
+uuid = { version = "1", features = ["v4"] }
+schemars = "1.0"
 trash = "5"
 base64 = "0.22"
 tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }

@@ -246,6 +246,44 @@ src-tauri/
   save of a new drawing, the note that asked for it gets the link (`waitingForDrawing`). Space in the sidebar still
   opens a Quick view peek.
 
+### Local MCP bridge
+
+See [`MCP.md`](MCP.md) for the full implementation record, tool reference and open topics, and
+[`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md) for client configuration and discovery.
+
+CalmMD can host a **local MCP server** (`src-tauri/src/mcp/`, official `rmcp` SDK, Streamable HTTP on
+`127.0.0.1:<random port>/mcp`). It is **off until started** from File → Start MCP Server, the command
+palette, or the `--mcp` launch flag. The connection URL and a per-launch bearer token are copied to
+the clipboard; the server validates the token and the `Origin` header and never binds beyond loopback.
+
+The server never edits files itself. Each tool call becomes a Tauri event
+(`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the **live**
+controllers and answers with the `mcp_respond` command. That keeps autosave, drafts, conflicts,
+undo, file history and the explorer in charge. Paths are resolved against the open Space root and
+`..`/outside-root paths are rejected in the bridge. Every tool accepts an optional `windowLabel`
+or `spaceId`; the latter is resolved through `SpaceClaims`, so calls can be routed to the window
+that holds a Space. Without a target they go to `main`. The server can be started from File → Start
+MCP Server, the palette, `--mcp`, or the persisted **Auto-start MCP Server** setting; a small `MCP`
+marker appears in the status bar while it is running.
+
+Tools: `calmmd_status`, `calmmd_windows`, `calmmd_list_documents`, `calmmd_read_document`,
+`calmmd_search`, `calmmd_outline`, `calmmd_create_document`, `calmmd_create_folder`,
+`calmmd_rename_document`, `calmmd_move_document`, `calmmd_write_document`, `calmmd_trash_document`,
+`calmmd_triage_folder`, `calmmd_apply_organization`, `calmmd_export_pdf`, `calmmd_export_html`.
+Prompts: `calmmd_summarize`, `calmmd_follow_up_guide` (live note → client-side LLM instruction,
+written back with `calmmd_write_document`) and `calmmd_organize_folder` (live folder inventory →
+JSON move plan applied with `calmmd_apply_organization`).
+Read-only resources: `calmmd://status`, `calmmd://windows`, `calmmd://document/{path}` and
+`calmmd://folder/{path}` (percent-encoded paths; optional `windowLabel`/`spaceId` query).
+Reads use the in-memory buffer for open tabs (so unsaved edits are visible). Writes go through
+`docs.setContentByPath()` with `userEvent: 'input.mcp'`, snapshot the old and new text into file
+history, and flush the atomic save. Triage inventories live note text; organisation plans are
+validated, then `explorer.move()` / `explorer.rename()` create folders, move notes and retarget
+tabs, favorites, history and links with `rewriteLinks()`. The AI client generates summaries
+and follow-up guides and writes them back with `calmmd_write_document`; CalmMD has no built-in LLM.
+
+Because `rmcp` 3.11 requires Rust 1.88, the desktop build's MSRV is now 1.88 (edition stays 2021).
+
 ### New-version notices
 
 - Asked once (`settings.updateCheck`: `'ask'` → `'on'`/`'off'`, a confirm 4 s after the first window opens;

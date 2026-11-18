@@ -3,6 +3,12 @@ import type { CoverInfo } from '../core/cover';
 import { buildBody, buildDocument, DEFAULT_PDF, hasMath, type BaseTheme, type ExportOptions, type PdfOptions } from '../export/build';
 import type { Platform, SaveKind } from '../platform/types';
 
+export interface ExportSource {
+  text: string;
+  path: string | null;
+  name: string;
+}
+
 export interface ExportPrefs {
   pdf: PdfOptions;
   toc: boolean;
@@ -67,9 +73,7 @@ export function createExporter(deps: ExporterDeps) {
     return d?.path ? joinPath(dirname(d.path), `${name}.${ext}`) : `${name}.${ext}`;
   }
 
-  async function prepare(prefs: ExportPrefs, withPaged: boolean, cover: CoverInfo | null) {
-    const d = deps.current();
-    if (!d) throw new Error('Nothing to export');
+  async function prepareFor(d: ExportSource, prefs: ExportPrefs, withPaged: boolean, cover: CoverInfo | null) {
     const { base, css } = deps.theme(prefs.theme);
     const title = d.path ? stem(d.path) : d.name;
     // PDF always embeds images, since the browser printing it can't see relative files.
@@ -91,6 +95,12 @@ export function createExporter(deps: ExporterDeps) {
     ]);
     const assets = await loadExportAssets(withPaged, hasMath(body));
     return { opts, body, assets };
+  }
+
+  async function prepare(prefs: ExportPrefs, withPaged: boolean, cover: CoverInfo | null) {
+    const d = deps.current();
+    if (!d) throw new Error('Nothing to export');
+    return prepareFor(d, prefs, withPaged, cover);
   }
 
   const reveal = (path: string) => ({ label: 'Show', run: () => void platform.revealPath(path) });
@@ -144,6 +154,19 @@ export function createExporter(deps: ExporterDeps) {
     document.body.append(frame);
   }
 
+  /** Headless exports for MCP: the caller supplies the source and the exact output path. */
+  async function exportPdfData(doc: ExportSource, out: string, prefs: ExportPrefs = DEFAULT_EXPORT_PREFS, cover: CoverInfo | null = null) {
+    const { opts, body, assets } = await prepareFor(doc, prefs, true, cover);
+    await platform.printPdf(buildDocument(body, opts, assets, prefs.pdf), out);
+    return out;
+  }
+
+  async function exportHtmlData(doc: ExportSource, out: string, prefs: ExportPrefs = DEFAULT_EXPORT_PREFS, cover: CoverInfo | null = null) {
+    const { opts, body, assets } = await prepareFor(doc, prefs, false, cover);
+    await platform.writeTextFile(out, buildDocument(body, opts, assets));
+    return out;
+  }
+
   async function exportPandoc(kind: Extract<SaveKind, 'docx' | 'odt' | 'epub'>) {
     const d = deps.current();
     if (!d) return;
@@ -171,5 +194,5 @@ export function createExporter(deps: ExporterDeps) {
     deps.notify('Copied as HTML');
   }
 
-  return { loadPrefs, savePrefs, exportHtml, exportPdf, exportPandoc, copyHtml };
+  return { loadPrefs, savePrefs, exportHtml, exportPdf, exportPdfData, exportHtmlData, exportPandoc, copyHtml };
 }
