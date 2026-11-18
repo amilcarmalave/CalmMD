@@ -4,6 +4,12 @@
  */
 import type { SearchHit, SearchOptions } from '../core/search';
 import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
+import type {
+  HighlightCodeResult,
+  MarkdownParseResult,
+  MarkdownRenderOptions,
+  MarkdownRenderResult,
+} from '../markdown/types';
 
 export interface ReadResult {
   text: string;
@@ -69,6 +75,14 @@ export interface Platform {
   openImageDialog(): Promise<string[]>;
   openFolderDialog(): Promise<string | null>;
   saveFileDialog(suggestedName: string, kind?: SaveKind): Promise<string | null>;
+
+  // ---------- Rust core services (feature-flagged) ----------
+  /** Parses Markdown into headings, front matter and a source map. */
+  markdownParse(text: string): Promise<MarkdownParseResult>;
+  /** Renders Markdown with Mordant and returns its source map. */
+  markdownRender(text: string, options?: MarkdownRenderOptions): Promise<MarkdownRenderResult>;
+  /** Standalone fenced-code highlighting via Mordant/syntect. */
+  markdownHighlightCode(language: string, code: string, theme?: string): Promise<HighlightCodeResult>;
 
   // ---------- Export ----------
   /** Path of a Chromium-family browser for PDF printing, or null. */

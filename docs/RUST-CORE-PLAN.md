@@ -24,6 +24,16 @@ Rust, while preserving the current:
 
 The first milestone is **not** a GPUI migration. Rust becomes a service layer behind Tauri commands.
 
+## Implementation status
+
+- **Phase 0 — in progress:** frozen Markdown fixture corpus and feature flags are in place.
+- **Phase 1 — first slice landed:** Mordant parses front matter, headings and a top-level source map;
+  Mordant renders HTML and highlights standalone code. Commands `markdown_parse`, `markdown_render`
+  and `markdown_highlight_code` are exposed through the TypeScript platform layer.
+- The preview still uses the TypeScript renderer. `useRustMarkdown()` defaults to false until the
+  extension corpus and scroll-sync snapshots match.
+- **Phases 2–5:** not started.
+
 ---
 
 ## 2. Selected dependencies
@@ -116,7 +126,7 @@ Rust core services                  src-tauri/src/core/
   markdown/   Mordant parse, AST, HTML, headings, source map
   highlight/  Mordant syntect highlighter, theme mapping
   spell/      zspell dictionaries, UTF-16 ranges, learns
-  export/     HTML via markdown, PDF via Paged.js or ikat
+  export/     HTML via markdown, PDF via browser/Takumi/ikat
   docs/       buffers, drafts, autosave, history (later phases)
   explorer/   tree, create/rename/move/trash (later phases)
   mcp/        existing server; eventually calls core services directly

@@ -1,4 +1,5 @@
 mod cdp;
+mod core;
 mod export;
 mod mcp;
 mod fsops;
@@ -102,6 +103,9 @@ pub fn run() {
             mcp::mcp_start,
             mcp::mcp_stop,
             mcp::mcp_respond,
+            core::markdown_parse,
+            core::markdown_render,
+            core::markdown_highlight_code,
             launch_paths,
         ])
         .run(tauri::generate_context!())

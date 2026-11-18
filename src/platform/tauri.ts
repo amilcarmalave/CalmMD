@@ -7,6 +7,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type { SearchHit } from '../core/search';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
+import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
 
 const MARKDOWN_FILTERS = [
@@ -110,6 +111,11 @@ export function createTauriPlatform(): Platform {
       const filters = kind === 'markdown' ? MARKDOWN_FILTERS : [SAVE_FILTERS[kind]];
       return (await save({ defaultPath: suggestedName, filters })) ?? null;
     },
+
+    markdownParse: (text) => invoke<MarkdownParseResult>('markdown_parse', { text }),
+    markdownRender: (text, options) => invoke<MarkdownRenderResult>('markdown_render', { text, options: options ?? null }),
+    markdownHighlightCode: (language, code, theme) =>
+      invoke<HighlightCodeResult>('markdown_highlight_code', { language, code, theme: theme ?? null }),
 
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),

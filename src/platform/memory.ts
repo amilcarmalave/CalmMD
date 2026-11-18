@@ -1,7 +1,129 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
 import type { McpConnectionInfo } from '../mcp/types';
+import type {
+  HeadingDto,
+  HighlightCodeResult,
+  MarkdownParseResult,
+  MarkdownRenderOptions,
+  MarkdownRenderResult,
+  SourceBlockDto,
+} from '../markdown/types';
+import { createRenderer } from '../render/markdown';
+import { escapeHtml, highlightToHtml } from '../render/highlight';
 import type { DirEntry, Platform, StatResult } from './types';
+
+/** Browser/test stand-in for the Rust Markdown service. */
+const browserRenderer = createRenderer();
+
+function slugify(text: string): string {
+  const out: string[] = [];
+  let pendingDash = false;
+  for (const ch of text.trim().toLocaleLowerCase()) {
+    if (/\s/u.test(ch)) {
+      pendingDash = out.length > 0;
+      continue;
+    }
+    if (/[\p{L}\p{N}_-]/u.test(ch)) {
+      if (pendingDash) out.push('-');
+      pendingDash = false;
+      out.push(ch);
+    }
+  }
+  return out.join('') || 'section';
+}
+
+function parseSimpleFrontMatter(lines: readonly string[]): Record<string, unknown> {
+  if (lines[0]?.trimEnd() !== '---') return {};
+  const result: Record<string, unknown> = {};
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trimEnd() === '---' || line.trimEnd() === '...') break;
+    const m = /^([\w.-]+):\s*(.*)$/.exec(line);
+    if (!m) continue;
+    const raw = m[2].trim();
+    if (raw === 'true') result[m[1]] = true;
+    else if (raw === 'false') result[m[1]] = false;
+    else if (/^-?\d+(\.\d+)?$/.test(raw)) result[m[1]] = Number(raw);
+    else if (raw.startsWith('[') && raw.endsWith(']'))
+      result[m[1]] = raw
+        .slice(1, -1)
+        .split(',')
+        .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean);
+    else result[m[1]] = raw.replace(/^['"]|['"]$/g, '');
+  }
+  return result;
+}
+
+function browserMarkdownParse(text: string): MarkdownParseResult {
+  const lines = text.split(/\r?\n/);
+  const seen = new Map<string, number>();
+  const headings: HeadingDto[] = [];
+  const blocks: SourceBlockDto[] = [];
+  let paragraphStart: number | null = null;
+  let i = 0;
+  if (lines[0]?.trimEnd() === '---') {
+    while (i < lines.length && i < 400 && lines[i].trimEnd() !== '---' && lines[i].trimEnd() !== '...') i++;
+    if (i < lines.length) i++;
+  }
+  for (; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      const start = i;
+      const marker = fence[1][0];
+      i++;
+      while (i < lines.length && !new RegExp(`^ {0,3}${marker}{3,}`).test(lines[i] ?? '')) i++;
+      blocks.push({ kind: 'CodeBlock', startLine: start, endLine: Math.min(i, lines.length - 1), byteStart: 0 });
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (heading) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      const raw = heading[2];
+      const base = slugify(raw);
+      const count = seen.get(base) ?? 0;
+      seen.set(base, count + 1);
+      headings.push({
+        level: heading[1].length,
+        text: raw,
+        id: count === 0 ? base : `${base}-${count}`,
+        line: i,
+        byteStart: 0,
+      });
+      blocks.push({ kind: 'Heading', startLine: i, endLine: i, byteStart: 0 });
+      continue;
+    }
+    if (!line.trim()) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      continue;
+    }
+    if (paragraphStart === null) paragraphStart = i;
+    if (line.trimStart().startsWith('|')) {
+      blocks.push({ kind: 'Table', startLine: i, endLine: i, byteStart: 0 });
+      paragraphStart = null;
+    }
+  }
+  if (paragraphStart !== null)
+    blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: lines.length - 1, byteStart: 0 });
+  blocks.sort((a, b) => a.startLine - b.startLine);
+  return {
+    headings,
+    frontMatter: parseSimpleFrontMatter(lines),
+    blocks,
+  };
+}
 
 export interface MemoryPlatformOptions {
   files?: Record<string, string>;
@@ -155,6 +277,19 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       }
     },
     async revealPath() {},
+
+    async markdownParse(text) {
+      return browserMarkdownParse(text);
+    },
+    async markdownRender(text, _options?: MarkdownRenderOptions): Promise<MarkdownRenderResult> {
+      return {
+        html: browserRenderer.render(text, { docPath: null }),
+        sourceMap: browserMarkdownParse(text).blocks,
+      };
+    },
+    async markdownHighlightCode(language, code): Promise<HighlightCodeResult> {
+      return { html: `<pre class="code-block" data-lang="${escapeHtml(language)}"><code>${highlightToHtml(code, language)}</code></pre>` };
+    },
 
     async findBrowser() {
       return null;

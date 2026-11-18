@@ -14,6 +14,7 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | `@codemirror/autocomplete` | MIT | Slash-command menu |
 | `tauri-plugin-single-instance` | MIT / Apache-2.0 | Opening files in the running app |
 | serde, serde_json | MIT / Apache-2.0 | Rust serialisation |
+| Mordant (`mordant`) and its highlighting dependencies (syntect, syntect-assets, jsonc-parser) | MIT / MIT / Apache-2.0 | Rust Markdown parsing, rendering and fenced-code highlighting (feature-flagged) |
 | `rmcp` | Apache-2.0 | Embedded local MCP server (`2026-07-28` spec) |
 | axum, tokio | MIT | Loopback HTTP server for MCP |
 | uuid, schemars | MIT / Apache-2.0 | MCP connection tokens and tool schemas |

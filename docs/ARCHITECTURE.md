@@ -34,6 +34,9 @@ src/
   app/spaces.ts       Spaces store: kv "space/<id>" = { name, lastOpened, session }
   app/explorer.ts     explorer state: root, lazy listings, favorites (kv "favorites"), create/rename/trash
   core/outline.ts     heading extraction (line scanner: fences, setext, front matter) for the outline
+  core/markdownService.ts  typed client for the feature-flagged Rust Markdown commands
+  core/rustFlags.ts   VITE_CALMMD_* / localStorage switches for the Rust services and PDF engine
+  markdown/types.ts   DTOs mirrored from src-tauri/src/core/dto.rs
   app/preview.ts      preview controller: debounced render, DOM patch, links, task toggles
   render/markdown.ts  markdown-it + footnotes + task lists + heading ids + source-line attrs,
                       sanitised with DOMPurify. render/highlight.ts reuses the editor's Lezer grammars
@@ -73,6 +76,7 @@ src/
 src-tauri/
   src/fsops.rs        read/stat/atomic write (temp + fsync + rename, Windows retry)
   src/kv.rs           durable key/value files in <appData>/state (drafts, session, settings)
+  src/core/           feature-flagged Rust services: Mordant Markdown parsing/rendering/highlighting
   src/tree.rs         list_dir (folders first, natural order, skips .git/node_modules), create,
                       rename (never overwrites), trash (OS trash via the `trash` crate)
   src/windows.rs      SpaceClaims (window label → space id, released on window destroy), open_window
