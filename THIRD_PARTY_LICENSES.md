@@ -46,3 +46,6 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 `layout: elk` mode. It's aliased to a stub (`src/render/elk-stub.ts`) so no non-permissive code ships.
 
 Dev-only tooling (Vite, Vitest, TypeScript, jsdom, tempfile) is not distributed.
+
+Phase 7 cleanup changed no runtime dependency: it only narrowed Tauri capabilities to the event,
+menu and window APIs actually used by the webview and removed unused internal Rust helpers.

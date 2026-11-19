@@ -387,9 +387,11 @@ because no `en-US` OS dictionary is installed; they are unrelated to MCP.
 ### 9.2 Security and permissions
 
 - **Path scoping lives in the Rust workspace.** PDF/HTML export resolves paths in Rust before the
-  webview bridge; move that to Rust with the exporter in a later phase.
-- **Broad filesystem capability.** The app's Tauri asset scope is `**`; MCP did not narrow it.
-- **No per-root or per-tool permissions.** Today, starting the server grants all 12 tools for the
+  narrow webview body-preparation bridge.
+- **Explicit Tauri capabilities.** `core:default` was replaced with only the event, menu and
+  window permissions the webview uses. `opener:allow-open-path` remains broad for user-initiated
+  local links and export reveals.
+- **No per-root or per-tool permissions.** Today, starting the server grants all 18 tools for the
   open folder. A settings panel with read/write/export/trash scopes is still open.
 - **No audit log.** File history captures content changes, but not which MCP client or tool made
   them.

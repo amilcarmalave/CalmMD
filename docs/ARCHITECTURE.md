@@ -87,7 +87,7 @@ src-tauri/
                       (passes the space via an initialization script), focus_window, space_window
   src/lib.rs          command registration, launch paths, single-instance handoff (emits
                       "calmmd://open-paths" to the main window)
-  capabilities/       Tauri permissions (keep them minimal)
+  capabilities/       Explicit Tauri permissions: core event/menu/window, dialog, opener, clipboard
 ```
 
 ### Key rules

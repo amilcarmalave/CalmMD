@@ -248,11 +248,6 @@ impl<S: HistoryStore + 'static> AutosaveService<S> {
         }
     }
 
-    pub fn flush_all(&self) -> Vec<AutosaveState> {
-        let ids = self.pending.read().ok().map(|all| all.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
-        ids.iter().map(|id| self.flush(id)).collect()
-    }
-
     fn schedule(&self, id: String, generation: u64, delay: Duration) {
         let service = self.clone();
         spawn(async move {

@@ -296,10 +296,6 @@ fn pretty(value: &Value) -> String {
 
 #[tool_router]
 impl CalmMdTools {
-    async fn call(&self, method: &str, params: Value) -> Result<Value, String> {
-        self.bridge.call(None, method, params).await
-    }
-
     async fn call_for(&self, target: &TargetArgs, method: &str, params: Value) -> Result<Value, String> {
         let window = self.bridge.window_for(target)?;
         self.bridge.call(window.as_deref(), method, params).await

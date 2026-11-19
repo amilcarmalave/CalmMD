@@ -122,6 +122,7 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn history(&self) -> &History<S> {
         &self.history
     }
@@ -426,7 +427,7 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
         let path = self.resolve(window, raw_path)?;
         let key = path_key(&path);
         let change = {
-            let mut stacks = if redo { self.redo.write() } else { self.undo.write() };
+            let stacks = if redo { self.redo.write() } else { self.undo.write() };
             let mut stacks = stacks.map_err(|e| e.to_string())?;
             let stack = stacks.get_mut(&key).ok_or_else(|| if redo { "Nothing to redo" } else { "Nothing to undo" })?;
             stack.pop().ok_or_else(|| if redo { "Nothing to redo" } else { "Nothing to undo" })?

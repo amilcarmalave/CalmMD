@@ -82,7 +82,10 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   PDF/HTML export is narrowed: Rust resolves inputs, normalises preferences and cover defaults,
   and assembles the standalone document shell. The webview only prepares the body because its
   Mermaid patch, image readback and CSS/font assets live there.
-- **Phases 5b and 7:** not started.
+- **Phase 7 — done:** the Tauri capability set is explicit instead of `core:default`; dead Rust
+  helpers and compiler warnings were removed. Superseded TS fallbacks and DOMPurify were reviewed
+  and kept deliberately for browser/test builds and webview safety. No runtime dependency changed.
+- **Phase 5b:** not started.
 
 ---
 
@@ -378,12 +381,16 @@ This is where MCP gets simpler.
 **Exit:** MCP tools no longer need `calmmd://mcp/request` for read/write/rename/move; the webview
 receives state-change events instead.
 
-### Phase 7 — Cleanup (1 week)
+### Phase 7 — Cleanup — done
 
-- Delete superseded TS modules and tests.
-- Remove webview-only sanitisation if Rust output is trusted (or keep it deliberately).
-- Narrow Tauri capabilities now that fewer commands need broad filesystem access.
-- Update `ARCHITECTURE.md`, `MCP.md`, `CONTRIBUTING.md`, `THIRD_PARTY_LICENSES.md`.
+- Reviewed every TS module. The TypeScript renderer, OS spellchecker, KV history, browser Takumi
+  engine and webview export bridge are intentional fallbacks; no live module was deleted.
+- Kept DOMPurify deliberately: Rust-rendered HTML is still inserted into a browser DOM.
+- Replaced Tauri's `core:default` bundle with explicit event, menu and window permissions.
+  `opener:allow-open-path` stays broad because local file links and export reveals are
+  user-initiated and can target any path the user chose.
+- Removed unused Rust helpers and cleared all compiler warnings.
+- Updated `ARCHITECTURE.md`, `MCP.md` and `THIRD_PARTY_LICENSES.md`.
 
 ---
 
