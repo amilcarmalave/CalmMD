@@ -6,6 +6,7 @@ import type { SearchHit, SearchOptions } from '../core/search';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
+import type { WorkspaceDocument, WorkspaceEvent, WorkspaceSnapshot } from '../workspace/types';
 import type {
   HighlightCodeResult,
   MarkdownParseResult,
@@ -85,6 +86,14 @@ export interface Platform {
   markdownRender(text: string, options?: MarkdownRenderOptions): Promise<MarkdownRenderResult>;
   /** Standalone fenced-code highlighting via Mordant/syntect. */
   markdownHighlightCode(language: string, code: string, theme?: string): Promise<HighlightCodeResult>;
+
+  // ---------- Rust-owned live workspace (Phase 6) ----------
+  /** Mirrors the webview's live buffers into Rust so MCP can read unsaved edits. */
+  workspaceSync(snapshot: WorkspaceSnapshot): Promise<void>;
+  /** Sends one changed buffer without rebuilding the whole snapshot. */
+  workspaceUpsert(document: WorkspaceDocument, activeDocument?: string | null): Promise<void>;
+  /** Subscribes to state changes made directly by the Rust workspace services. */
+  onWorkspaceEvent(handler: (event: WorkspaceEvent) => void): void;
 
   // ---------- Export ----------
   /** Path of a Chromium-family browser for PDF printing, or null. */

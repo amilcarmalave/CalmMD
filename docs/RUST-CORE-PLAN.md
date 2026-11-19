@@ -69,7 +69,12 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   weight through `VITE_CALMMD_TAKUMI_FONT_WEIGHT` or `localStorage['calmmd.takumi.fontWeight']`
   (default `350`); headings keep their explicit CSS weights. Native and WASM PDF exports inject the
   same CSS, and native form controls are replaced with flow-positioned SVG checkbox marks.
-- **Phases 5b–7:** not started.
+- **Phase 6 — first slice landed:** a Rust workspace owns the rooted path sandbox, live buffer
+  mirror, file operations, history snapshots and link-safe rename/move. MCP calls those services
+  directly for status, list, read, outline, search, create, write, rename, move, trash and triage;
+  webview state-change events update the editor and explorer. PDF/HTML export still uses the
+  webview bridge because the renderer is there.
+- **Phases 5b and 7:** not started.
 
 ---
 
@@ -166,9 +171,10 @@ Rust core services                  src-tauri/src/core/
   highlight/  Mordant/syntect highlighter themes generated from CalmMD's CSS palette
   spell/      zspell dictionaries, UTF-16 ranges, learns
   export/     HTML via markdown, PDF via browser/Takumi/ikat
-  docs/       buffers, drafts, autosave, history (later phases)
-  explorer/   tree, create/rename/move/trash (later phases)
-  mcp/        existing server; eventually calls core services directly
+  workspace/  rooted live buffers, history, links and file operations (Phase 6 first slice)
+  docs/       drafts, conflicts and autosave targets (still in the webview)
+  explorer/   tree UI state (still in the webview)
+  mcp/        calls core services directly except for PDF/HTML export
   ▼
 Disk / app data
 ```
@@ -388,7 +394,9 @@ Benefits:
 - no duplicate path sandbox logic;
 - MCP tools become callable even before the webview finishes loading.
 
-Until Phase 6, keep the existing bridge. Do not make MCP depend on half-migrated services.
+Phase 6's first slice keeps this bridge only for PDF/HTML export. The remaining user-edit state
+machine (drafts, conflicts, autosave targets and explorer UI state) still lives in the webview and
+is mirrored into Rust rather than fully owned there.
 
 ---
 

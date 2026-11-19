@@ -616,6 +616,26 @@ export function createDocuments(deps: DocumentsDeps) {
     openPaths,
     openWithDialog,
     setContentByPath,
+    /** Applies a change already written by the Rust workspace, without another save or snapshot. */
+    async applyWorkspaceContent(path: string, text: string, mtimeMs: number | null) {
+      let d = store.docs.find((x) => x.path && samePath(x.path, path));
+      if (!d) {
+        await openPaths([path]);
+        d = store.docs.find((x) => x.path && samePath(x.path, path));
+      }
+      if (!d) return;
+      // Keep the edit undoable, like the old MCP write path did.
+      const r = runtime.get(d.id)!;
+      const before = r.state.doc.toString();
+      const change = minimalChange(before, text);
+      if (change) {
+        if (view && store.activeId === d.id) view.dispatch({ changes: change, userEvent: 'input.mcp' });
+        else r.state = r.state.update({ changes: change, userEvent: 'input.mcp' }).state;
+      }
+      r.openedText = text;
+      patch(d.id, { mtimeMs, conflict: false, lastError: null });
+      r.autosaver.markSaved();
+    },
     save,
     saveAs,
     close,

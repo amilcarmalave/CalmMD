@@ -12,13 +12,16 @@ user-facing summary see [`README.md`](../README.md), for client setup see
 ## 1. Goal and scope
 
 CalmMD can host a **local MCP server** so an external AI client can work on the documents that are
-currently open in the app. The server is deliberately a *bridge into live app state*, not a
-second filesystem implementation:
+currently open in the app. The server works on the *live app state*, not a second filesystem implementation. Most tools now
+call Rust workspace services directly; the webview mirrors its buffers into those services and
+applies their state-change events. PDF/HTML export still uses the webview bridge because the
+headless exporter lives there.
 
-- reads prefer the open CodeMirror buffer, so unsaved edits are visible;
-- writes go through the document manager, so autosave, conflicts, drafts, undo and file history
-  keep working;
-- renames go through the explorer, so tabs, favorites, history and links are retargeted;
+- reads prefer the mirrored open buffer, so unsaved edits are visible;
+- writes update Rust state, write atomically, snapshot history, and emit an event the editor applies
+  as an undoable change;
+- renames/moves update Rust state and history, rewrite links, and emit events that retarget the
+  explorer and open tabs;
 - PDF/HTML exports go through the existing renderer, so output matches the app.
 
 CalmMD does **not** contain an LLM. The connected MCP client generates summaries and follow-up
@@ -38,7 +41,9 @@ Implemented and building as of this document:
 | Streamable HTTP over loopback with bearer token + `Origin` check | ✅ |
 | Start/stop/status commands and menu/palette entries | ✅ |
 | Persisted auto-start setting and status-bar indicator | ✅ |
-| Tauri event bridge with correlation ids | ✅ |
+| Tauri event bridge for headless exports | ✅ |
+| Rust-owned workspace state for read/write/list/search/outline/status | ✅ |
+| Rust file history and link-safe rename/move | ✅ |
 | 16 live-state tools | ✅ |
 | 3 prompt templates (summary, follow-up guide, folder organisation) | ✅ |
 | 2 static resources + 2 resource templates | ✅ |
@@ -58,15 +63,23 @@ MCP client (Claude Desktop, Cursor, VS Code, …)
         ▼
 Rust MCP server                         src-tauri/src/mcp/
   mod.rs      server lifecycle, auth, commands
-  bridge.rs   request/response correlation, window routing
+  bridge.rs   window routing + export request/response correlation
   tools.rs    tools, prompts and read-only resources
-        │  tauri event: calmmd://mcp/request
+        │  direct Rust calls
         ▼
-Webview bridge                          src/app/mcpBridge.ts
-  dispatch → docs / explorer / exporter / outline / search
-        │  invoke: mcp_respond
+Rust workspace                          src-tauri/src/core/workspace.rs
+  rooted path sandbox, live buffers, history, link rewrites, file ops
+        │  tauri event: calmmd://workspace
         ▼
-Platform interface → Tauri commands → disk
+Webview controllers
+  documents.applyWorkspaceContent / explorer.externalRenamed / externalTrashed
+        │
+        │  tauri commands: core_workspace_sync / core_workspace_upsert_document
+        ▼
+Rust workspace mirror (user edits)
+
+PDF/HTML export only:
+  tools.rs → calmmd://mcp/request → src/app/mcpBridge.ts → exporter → disk
 ```
 
 ### 3.1 Why the server lives in Rust
@@ -102,19 +115,17 @@ token is sufficient and matches CalmMD's no-account privacy model.
 ### 3.3 Request flow
 
 1. An MCP client calls a tool with arguments.
-2. `tools.rs` builds a JSON payload and calls `McpBridge::call(window, method, params)`.
-3. The bridge creates an id, stores a `oneshot` sender in a pending map, and emits
-   `calmmd://mcp/request` to the target window.
-4. `createMcpBridge()` in the webview receives it and calls `dispatchMcpRequest()`.
-5. The dispatcher uses the live controllers and returns a result or throws.
-6. The webview invokes `mcp_respond` with `{ id, ok, result | error }`.
-7. The Rust bridge sends the value through the `oneshot`, the tool formats it as
-   `CallToolResult`, and the client receives it.
+2. `tools.rs` resolves `windowLabel`/`spaceId` to a workspace key.
+3. Read/write/file tools call `WorkspaceRegistry` directly. Path sandbox, live-buffer reads,
+   atomic writes, history snapshots and link rewrites all run in Rust.
+4. Mutations emit `calmmd://workspace` events; the webview applies them to its controllers. User
+   edits flow back with `core_workspace_upsert_document`.
+5. PDF/HTML tools still use `McpBridge::call()`: an id is stored with a `oneshot` sender, a
+   `calmmd://mcp/request` event is emitted, `createMcpBridge()` dispatches it to the exporter, and
+   `mcp_respond` completes the call.
 
-Tools return errors as `CallToolResult::error` with a text message. Prompts map bridge failures to
-`ErrorData::internal_error`.
-
-Timeout: 120 seconds, long enough for slow exports and large folder scans.
+Tools return errors as `CallToolResult::error` with a text message. Prompts map failures to
+`ErrorData::internal_error`. The export bridge keeps its 120-second timeout.
 
 ---
 
@@ -253,9 +264,9 @@ reordering. The replacement is a two-phase triage flow:
 3. `calmmd_apply_organization` validates paths, rejects duplicate/occupied destinations, and
    optionally creates folders, moves files and renames them through `explorer`.
 
-With `apply: false` the tool returns a preview. With `apply: true` each move goes through
-`explorer.move()`, so tabs, favorites, history and links are retargeted. Failures are reported per
-move; the operation is not transactional.
+With `apply: false` the tool returns a preview. With `apply: true` each move runs in the Rust
+workspace service, which rewrites links and emits rename/content events for the webview. Failures
+are reported per move; the operation is not transactional.
 
 ### 5.2 Prompts
 
@@ -309,8 +320,9 @@ When `--mcp` is used, startup begins before the webview has loaded settings; tha
 Rust:
 
 - `src-tauri/src/mcp/mod.rs`, `bridge.rs`, `tools.rs`
+- `src-tauri/src/core/workspace.rs`, `history.rs`, `links.rs`, `paths.rs` — live workspace services
 - `src-tauri/src/lib.rs` — module, setup, commands, `--mcp`
-- `src-tauri/Cargo.toml` / `Cargo.lock` — `rmcp`, `axum`, `tokio`, `uuid`, `schemars`; MSRV 1.91
+- `src-tauri/Cargo.toml` / `Cargo.lock` — `rmcp`, `axum`, `tokio`, `uuid`, `schemars`, `sha2`; MSRV 1.91
 
 TypeScript:
 
@@ -369,8 +381,8 @@ because no `en-US` OS dictionary is installed; they are unrelated to MCP.
 
 ### 9.2 Security and permissions
 
-- **Path scoping lives in the webview.** Rust trusts the bridge's `isWithin()` check. A future
-  hardening pass should give the Rust side the current root(s) and validate there too.
+- **Path scoping lives in the Rust workspace.** PDF/HTML export still validates paths through the
+  webview bridge; move that to Rust with the exporter in a later phase.
 - **Broad filesystem capability.** The app's Tauri asset scope is `**`; MCP did not narrow it.
 - **No per-root or per-tool permissions.** Today, starting the server grants all 12 tools for the
   open folder. A settings panel with read/write/export/trash scopes is still open.

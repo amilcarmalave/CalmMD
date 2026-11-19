@@ -10,6 +10,7 @@ import { recheckSpelling, spelling } from './editor/spelling';
 import { createExplorer } from './app/explorer';
 import { createMcpBridge } from './app/mcpBridge';
 import type { McpConnectionInfo } from './mcp/types';
+import type { WorkspaceEvent, WorkspaceSnapshot } from './workspace/types';
 import type { SpellDictionary } from './core/spellDictionaries';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
@@ -572,6 +573,32 @@ export default function App(props: { platform: Platform }) {
   const activeDoc = createMemo(() => store.docs.find((d) => d.id === store.activeId));
   const menu = createContextMenu();
 
+  /** Mirrors the live webview state into Rust so MCP tools can answer without a webview round trip. */
+  function workspaceSnapshot(): WorkspaceSnapshot {
+    return {
+      root: explorer.state.root,
+      documents: store.docs
+        .filter((d) => !!d.path)
+        .map((d) => ({
+          path: d.path!,
+          text: docs.textOf(d.id),
+          eol: d.eol,
+          bom: d.bom,
+          mtimeMs: d.mtimeMs,
+          dirty: docs.isDirty(d.id),
+          conflict: d.conflict,
+        })),
+      activeDocument: activeDoc()?.path ?? null,
+    };
+  }
+  // Rust-originated events temporarily suppress full snapshots. A rename/rewrite is delivered as
+  // several events; echoing the view between them would overwrite Rust's newer mirror with stale text.
+  let workspaceEventsUntil = 0;
+  function syncWorkspace() {
+    if (Date.now() < workspaceEventsUntil) return;
+    void platform.workspaceSync(workspaceSnapshot()).catch(() => undefined);
+  }
+
   const assets = createAssets({
     platform,
     mode: () => settings.imageFolder,
@@ -594,6 +621,16 @@ export default function App(props: { platform: Platform }) {
     onShowAllFiles: (on) => update({ showAllFiles: on }),
   });
 
+  // The Rust workspace is the live state MCP reads. Keep it in step with the view.
+  createEffect(
+    on(
+      // Structural changes only. Text, mtime and status changes are sent by onUpdate upserts;
+      // echoing them here can overwrite a newer Rust mirror while content events are queued.
+      () => [explorer.state.root, store.docs.map((d) => `${d.id}:${d.path}`).join('|'), store.activeId] as const,
+      () => syncWorkspace(),
+      { defer: false },
+    ),
+  );
   // ---------- Sidebar and outline ----------
   const [sidebar, setSidebar] = createStore<Session['sidebar']>({ open: true, view: 'files', width: 248 });
   const [headings, setHeadings] = createSignal<Heading[]>([]);
@@ -981,6 +1018,28 @@ export default function App(props: { platform: Platform }) {
     await history.save(path, after);
     setHistoryRev((n) => n + 1);
   }
+
+  platform.onWorkspaceEvent((event: WorkspaceEvent) => {
+    workspaceEventsUntil = Date.now() + 2000;
+    if (event.kind === 'content' && event.path && event.text !== undefined && event.mtimeMs !== undefined) {
+      // Rust already persisted this text and updated its mirror. Do not echo a full snapshot
+      // back here: other content events may still be queued and would overwrite newer text.
+      void docs.applyWorkspaceContent(event.path, event.text, event.mtimeMs).then(() => {
+        setHistoryRev((n) => n + 1);
+      });
+    } else if (event.kind === 'renamed' && event.from && event.to) {
+      docs.renamePaths(event.from, event.to);
+      void explorer.externalRenamed(event.from, event.to);
+      setHistoryRev((n) => n + 1);
+    } else if (event.kind === 'created' && event.path) {
+      const parent = dirname(event.path);
+      if (parent) void explorer.refreshDir(parent);
+      // Do not open the file here: a following content event is authoritative and opens it with the final text.
+    } else if (event.kind === 'trashed' && event.path) {
+      docs.closeWithin(event.path);
+      void explorer.externalTrashed(event.path, event.isDir === true);
+    }
+  });
 
   /** A changed file closed: keep how it was when opened (if that's new) and how it is now. */
   async function captureOnClose(path: string, opened: string, current: string) {
@@ -1543,6 +1602,25 @@ export default function App(props: { platform: Platform }) {
     docs.syncState(id, u.state);
     if (isUserEdit(u)) docs.touch(id);
     if (u.docChanged) {
+      const meta = store.docs.find((d) => d.id === id);
+      // Rust already wrote input.mcp transactions; the event handler sends the full snapshot.
+      const fromWorkspace = u.transactions.some((tr) => tr.isUserEvent('input.mcp'));
+      if (meta?.path && !fromWorkspace) {
+        void platform
+          .workspaceUpsert(
+            {
+              path: meta.path,
+              text: u.state.doc.toString(),
+              eol: meta.eol,
+              bom: meta.bom,
+              mtimeMs: meta.mtimeMs,
+              dirty: docs.isDirty(id),
+              conflict: meta.conflict,
+            },
+            activeDoc()?.path ?? null,
+          )
+          .catch(() => undefined);
+      }
       scheduleStats(u.state);
       scheduleOutline(u.state);
       offerEmbed(u);

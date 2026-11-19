@@ -14,6 +14,7 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | `@codemirror/autocomplete` | MIT | Slash-command menu |
 | `tauri-plugin-single-instance` | MIT / Apache-2.0 | Opening files in the running app |
 | serde, serde_json | MIT / Apache-2.0 | Rust serialisation |
+| sha2 | MIT OR Apache-2.0 | Content hashes for Rust-owned file history |
 | Mordant (`mordant`) and its highlighting dependencies (syntect, syntect-assets, jsonc-parser) | MIT / MIT / Apache-2.0 | Rust Markdown parsing, rendering, math and fenced-code highlighting (feature-flagged) |
 | `katex-rs` | MIT | Rust-side KaTeX math rendering in Mordant (feature-flagged) |
 | Takumi (`takumi-core`, `takumi-pdf`, `@takumi-rs/helpers`) | MIT OR Apache-2.0 | Default native Rust PDF engine on desktop and local WASM fallback in the browser; `VITE_CALMMD_PDF_ENGINE=browser` selects the older engine |

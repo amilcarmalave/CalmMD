@@ -34,7 +34,9 @@ fn launch_paths() -> Vec<String> {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let manager = mcp::McpManager::new(app.handle().clone());
+            let workspace = core::workspace::WorkspaceRegistry::new(app.handle().clone());
+            app.manage(workspace.clone());
+            let manager = mcp::McpManager::new(app.handle().clone(), workspace);
             app.manage(manager.clone());
             // `--mcp` starts the loopback server at launch for clients that expect it.
             if std::env::args().any(|a| a == "--mcp") {
@@ -106,6 +108,8 @@ pub fn run() {
             core::markdown_parse,
             core::markdown_render,
             core::markdown_highlight_code,
+            core::workspace::core_workspace_sync,
+            core::workspace::core_workspace_upsert_document,
             core::export::takumi::takumi_pdf,
             core::spell::core_spell_check,
             core::spell::core_spell_check_text,

@@ -262,7 +262,7 @@ src-tauri/
   save of a new drawing, the note that asked for it gets the link (`waitingForDrawing`). Space in the sidebar still
   opens a Quick view peek.
 
-### Local MCP bridge
+### Local MCP server and Rust workspace
 
 See [`MCP.md`](MCP.md) for the full implementation record, tool reference and open topics, and
 [`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md) for client configuration and discovery.
@@ -273,6 +273,11 @@ palette, or the `--mcp` launch flag. The connection URL and a per-launch bearer 
 the clipboard; the server validates the token and the `Origin` header and never binds beyond loopback.
 
 The server never edits files itself. Each tool call becomes a Tauri event
+Most tools now call `src-tauri/src/core/workspace.rs` directly. The webview mirrors live buffers
+into that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, and Rust emits
+`calmmd://workspace` events for content changes, renames, creates and trashes. The remaining
+`docs`/`explorer` controllers apply those events so CodeMirror, favorites and the tree stay in step.
+PDF/HTML export still emits a request
 (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the **live**
 controllers and answers with the `mcp_respond` command. That keeps autosave, drafts, conflicts,
 undo, file history and the explorer in charge. Paths are resolved against the open Space root and

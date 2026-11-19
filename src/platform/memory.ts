@@ -1,6 +1,7 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
 import type { McpConnectionInfo } from '../mcp/types';
+import type { WorkspaceDocument, WorkspaceEvent, WorkspaceSnapshot } from '../workspace/types';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type {
   HeadingDto,
@@ -313,6 +314,9 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async markdownHighlightCode(language, code): Promise<HighlightCodeResult> {
       return { html: `<pre class="code-block" data-lang="${escapeHtml(language)}"><code>${highlightToHtml(code, language)}</code></pre>` };
     },
+    async workspaceSync(_snapshot: WorkspaceSnapshot) {},
+    async workspaceUpsert(_document: WorkspaceDocument, _activeDocument?: string | null) {},
+    onWorkspaceEvent(_handler: (event: WorkspaceEvent) => void) {},
 
     async findBrowser() {
       return null;

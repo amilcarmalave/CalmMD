@@ -5,6 +5,7 @@ mod bridge;
 mod tools;
 
 use bridge::McpBridge;
+use crate::core::workspace::WorkspaceRegistry;
 use rmcp::transport::streamable_http_server::{
     session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
 };
@@ -34,13 +35,15 @@ struct Running {
 
 pub struct McpManager {
     bridge: Arc<McpBridge>,
+    workspace: Arc<WorkspaceRegistry>,
     running: Mutex<Option<Running>>,
 }
 
 impl McpManager {
-    pub fn new(app: AppHandle) -> Arc<Self> {
+    pub fn new(app: AppHandle, workspace: Arc<WorkspaceRegistry>) -> Arc<Self> {
         Arc::new(Self {
-            bridge: McpBridge::new(app.clone()),
+            bridge: McpBridge::new(app),
+            workspace,
             running: Mutex::new(None),
         })
     }
@@ -69,8 +72,9 @@ impl McpManager {
         let (stop, mut stop_rx) = watch::channel(false);
 
         let bridge = self.bridge.clone();
+        let workspace = self.workspace.clone();
         let service = StreamableHttpService::new(
-            move || Ok(CalmMdTools::new(bridge.clone())),
+            move || Ok(CalmMdTools::new(bridge.clone(), workspace.clone())),
             LocalSessionManager::default().into(),
             StreamableHttpServerConfig::default(),
         );

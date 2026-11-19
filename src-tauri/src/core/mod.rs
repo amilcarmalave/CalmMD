@@ -3,8 +3,12 @@
 pub mod dto;
 pub mod export;
 pub mod highlight;
+pub mod history;
+pub mod links;
 pub mod markdown;
+pub mod paths;
 pub mod spell;
+pub mod workspace;
 
 use dto::{HighlightCodeResult, MarkdownParseResult, MarkdownRenderOptions, MarkdownRenderResult};
 

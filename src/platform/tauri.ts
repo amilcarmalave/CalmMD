@@ -10,6 +10,7 @@ import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
 import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
+import type { WorkspaceEvent } from '../workspace/types';
 import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
 
@@ -153,6 +154,13 @@ export function createTauriPlatform(): Platform {
     markdownRender: (text, options) => invoke<MarkdownRenderResult>('markdown_render', { text, options: options ?? null }),
     markdownHighlightCode: (language, code, theme) =>
       invoke<HighlightCodeResult>('markdown_highlight_code', { language, code, theme: theme ?? null }),
+
+    workspaceSync: (snapshot) => invoke<void>('core_workspace_sync', { snapshot }),
+    workspaceUpsert: (document, activeDocument) =>
+      invoke<void>('core_workspace_upsert_document', { document, activeDocument: activeDocument ?? null }),
+    onWorkspaceEvent(handler) {
+      void listen<WorkspaceEvent>('calmmd://workspace', (event) => handler(event.payload));
+    },
 
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),

@@ -1,4 +1,5 @@
 use super::bridge::{McpBridge, TargetArgs};
+use crate::core::workspace::WorkspaceRegistry;
 use rmcp::{
     handler::server::{
         router::{prompt::PromptRouter, tool::ToolRouter},
@@ -210,6 +211,7 @@ pub struct ExportArgs {
 #[derive(Clone)]
 pub struct CalmMdTools {
     bridge: Arc<McpBridge>,
+    workspace: Arc<WorkspaceRegistry>,
     #[allow(dead_code)] // kept alive by #[tool_router]
     tool_router: ToolRouter<Self>,
     #[allow(dead_code)] // kept alive by #[prompt_router]
@@ -217,12 +219,18 @@ pub struct CalmMdTools {
 }
 
 impl CalmMdTools {
-    pub fn new(bridge: Arc<McpBridge>) -> Self {
+    pub fn new(bridge: Arc<McpBridge>, workspace: Arc<WorkspaceRegistry>) -> Self {
         Self {
             bridge,
+            workspace,
             tool_router: Self::tool_router(),
             prompt_router: Self::prompt_router(),
         }
+    }
+
+    /// Resolves a tool target to the window that owns the Rust workspace.
+    fn window(&self, target: &TargetArgs) -> Result<String, String> {
+        Ok(WorkspaceRegistry::window_label(self.bridge.window_for(target)?.as_deref()))
     }
 }
 
@@ -299,8 +307,15 @@ impl CalmMdTools {
 
     #[tool(description = "Status of the running CalmMD app: open folder, open tabs, active document.")]
     async fn calmmd_status(&self) -> Result<CallToolResult, McpError> {
-        match self.call("calmmd_status", json!({})).await {
-            Ok(v) => ok(v),
+        let window = WorkspaceRegistry::window_label(None);
+        let windows = self
+            .bridge
+            .windows()
+            .ok()
+            .and_then(|value| value.get("windows").cloned())
+            .unwrap_or_else(|| json!([]));
+        match self.workspace.status(&window, &window, windows) {
+            Ok(value) => ok(value),
             Err(e) => fail(e),
         }
     }
@@ -315,8 +330,15 @@ impl CalmMdTools {
 
     #[tool(description = "List documents in the folder currently open in CalmMD.")]
     async fn calmmd_list_documents(&self, Parameters(args): Parameters<ListArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "markdownOnly": args.markdown_only.unwrap_or(true), "folder": args.folder });
-        match self.call_for(&args.target, "calmmd_list_documents", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.list_documents(
+                &window,
+                args.markdown_only.unwrap_or(true),
+                args.folder.as_deref(),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -324,8 +346,11 @@ impl CalmMdTools {
 
     #[tool(description = "Read a document from the live buffer (including unsaved edits) or from disk.")]
     async fn calmmd_read_document(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path });
-        match self.call_for(&args.target, "calmmd_read_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.read_document(&window, &args.path),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -333,12 +358,16 @@ impl CalmMdTools {
 
     #[tool(description = "Search all Markdown files in the open folder.")]
     async fn calmmd_search(&self, Parameters(args): Parameters<SearchArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({
-            "query": args.query,
-            "caseSensitive": args.case_sensitive.unwrap_or(false),
-            "wholeWord": args.whole_word.unwrap_or(false),
-        });
-        match self.call_for(&args.target, "calmmd_search", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.search(
+                &window,
+                &args.query,
+                args.case_sensitive.unwrap_or(false),
+                args.whole_word.unwrap_or(false),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -346,8 +375,11 @@ impl CalmMdTools {
 
     #[tool(description = "Headings of a document (line numbers are 0-based).")]
     async fn calmmd_outline(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path });
-        match self.call_for(&args.target, "calmmd_outline", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.outline(&window, &args.path),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -355,8 +387,16 @@ impl CalmMdTools {
 
     #[tool(description = "Create a new Markdown document in the open folder, optionally with initial text.")]
     async fn calmmd_create_document(&self, Parameters(args): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "folder": args.folder, "name": args.name, "text": args.text });
-        match self.call_for(&args.target, "calmmd_create_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.create_document(
+                &window,
+                args.folder.as_deref(),
+                &args.name,
+                args.text.as_deref(),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -364,8 +404,11 @@ impl CalmMdTools {
 
     #[tool(description = "Create a folder inside the folder currently open in CalmMD.")]
     async fn calmmd_create_folder(&self, Parameters(args): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "folder": args.folder, "name": args.name });
-        match self.call_for(&args.target, "calmmd_create_folder", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.create_folder(&window, args.folder.as_deref(), &args.name),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -373,8 +416,11 @@ impl CalmMdTools {
 
     #[tool(description = "Rename a document. CalmMD retargets open tabs, favorites and file history.")]
     async fn calmmd_rename_document(&self, Parameters(args): Parameters<RenameArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path, "name": args.name });
-        match self.call_for(&args.target, "calmmd_rename_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.rename_document(&window, &args.path, &args.name),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -382,8 +428,16 @@ impl CalmMdTools {
 
     #[tool(description = "Move a document into another folder. CalmMD retargets tabs, favorites, file history and links.")]
     async fn calmmd_move_document(&self, Parameters(args): Parameters<MoveArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path, "folder": args.folder, "name": args.name });
-        match self.call_for(&args.target, "calmmd_move_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.move_document(
+                &window,
+                &args.path,
+                &args.folder,
+                args.name.as_deref(),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -392,13 +446,17 @@ impl CalmMdTools {
     #[tool(description = "Write to a live document. The edit is undoable, autosaved, and snapshotted in file history.")]
     async fn calmmd_write_document(&self, Parameters(args): Parameters<WriteArgs>) -> Result<CallToolResult, McpError> {
         let content = args.content.or(args.text).unwrap_or_default();
-        let params = json!({
-            "path": args.path,
-            "content": content,
-            "mode": args.mode.unwrap_or_else(|| "replace".into()),
-            "flush": args.flush.unwrap_or(true),
-        });
-        match self.call_for(&args.target, "calmmd_write_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.write_document(
+                &window,
+                &args.path,
+                &content,
+                &args.mode.unwrap_or_else(|| "replace".into()),
+                args.flush.unwrap_or(true),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -406,8 +464,11 @@ impl CalmMdTools {
 
     #[tool(description = "Move a document to the OS trash. Requires confirm: true.")]
     async fn calmmd_trash_document(&self, Parameters(args): Parameters<TrashArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path, "confirm": args.confirm.unwrap_or(false) });
-        match self.call_for(&args.target, "calmmd_trash_document", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.trash_document(&window, &args.path, args.confirm.unwrap_or(false)),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -415,25 +476,37 @@ impl CalmMdTools {
 
     #[tool(description = "Inventory a folder's Markdown notes with live excerpts and headings for content-aware organisation.")]
     async fn calmmd_triage_folder(&self, Parameters(args): Parameters<TriageArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({
-            "folder": args.folder,
-            "limit": args.limit,
-            "excerptChars": args.excerpt_chars,
-        });
-        match self.call_for(&args.target, "calmmd_triage_folder", params).await {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.triage_folder(
+                &window,
+                args.folder.as_deref(),
+                args.limit.unwrap_or(200) as usize,
+                args.excerpt_chars.unwrap_or(600) as usize,
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
     }
 
-    #[tool(description = "Validate and apply a proposed folder organisation plan; moves and renames go through CalmMD.")]
+    #[tool(description = "Validate or apply a folder organisation plan returned by calmmd_organize_folder.")]
     async fn calmmd_apply_organization(&self, Parameters(args): Parameters<ApplyOrganizationArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({
-            "folder": args.folder,
-            "plan": args.plan,
-            "apply": args.apply.unwrap_or(false),
-        });
-        match self.call_for(&args.target, "calmmd_apply_organization", params).await {
+        let plan = match serde_json::to_value(&args.plan) {
+            Ok(value) => value,
+            Err(e) => return fail(e.to_string()),
+        };
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.apply_organization(
+                &window,
+                args.folder.as_deref(),
+                &plan,
+                args.apply.unwrap_or(false),
+            ),
+            Err(e) => Err(e),
+        };
+        match result {
             Ok(v) => ok(v),
             Err(e) => fail(e),
         }
@@ -466,9 +539,10 @@ impl CalmMdTools {
         Parameters(PathArgs { path, target }): Parameters<PathArgs>,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<GetPromptResult, McpError> {
+        let window = self.window(&target).map_err(|e| McpError::internal_error(e, None))?;
         let text = self
-            .call_for(&target, "calmmd_read_document", json!({ "path": path }))
-            .await
+            .workspace
+            .read_document(&window, &path)
             .map_err(|e| McpError::internal_error(e, None))?;
         let body = text.get("text").and_then(Value::as_str).unwrap_or("").to_string();
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
@@ -486,9 +560,10 @@ impl CalmMdTools {
         Parameters(PathArgs { path, target }): Parameters<PathArgs>,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<GetPromptResult, McpError> {
+        let window = self.window(&target).map_err(|e| McpError::internal_error(e, None))?;
         let text = self
-            .call_for(&target, "calmmd_read_document", json!({ "path": path }))
-            .await
+            .workspace
+            .read_document(&window, &path)
             .map_err(|e| McpError::internal_error(e, None))?;
         let body = text.get("text").and_then(Value::as_str).unwrap_or("").to_string();
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
@@ -506,13 +581,15 @@ impl CalmMdTools {
         Parameters(TriageArgs { folder, limit, excerpt_chars, target }): Parameters<TriageArgs>,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<GetPromptResult, McpError> {
+        let window = self.window(&target).map_err(|e| McpError::internal_error(e, None))?;
         let inventory = self
-            .call_for(
-                &target,
-                "calmmd_triage_folder",
-                json!({ "folder": folder, "limit": limit, "excerptChars": excerpt_chars }),
+            .workspace
+            .triage_folder(
+                &window,
+                folder.as_deref(),
+                limit.unwrap_or(200) as usize,
+                excerpt_chars.unwrap_or(600) as usize,
             )
-            .await
             .map_err(|e| McpError::internal_error(e, None))?;
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             Role::User,
@@ -581,10 +658,16 @@ impl ServerHandler for CalmMdTools {
 
         let contents = match base.as_str() {
             "calmmd://status" => {
-                let value = self
+                let label = WorkspaceRegistry::window_label(None);
+                let windows = self
                     .bridge
-                    .call(None, "calmmd_status", json!({}))
-                    .await
+                    .windows()
+                    .ok()
+                    .and_then(|value| value.get("windows").cloned())
+                    .unwrap_or_else(|| json!([]));
+                let value = self
+                    .workspace
+                    .status(&label, &label, windows)
                     .map_err(|e| McpError::internal_error(e, None))?;
                 ResourceContents::text(pretty(&value), request.uri).with_mime_type("application/json")
             }
@@ -599,10 +682,10 @@ impl ServerHandler for CalmMdTools {
                 let raw = &path["calmmd://document/".len()..];
                 let path = percent_decode(raw, false)
                     .map_err(|e| McpError::invalid_params(e, None))?;
+                let label = WorkspaceRegistry::window_label(window.as_deref());
                 let value = self
-                    .bridge
-                    .call(window.as_deref(), "calmmd_read_document", json!({ "path": path }))
-                    .await
+                    .workspace
+                    .read_document(&label, &path)
                     .map_err(|e| McpError::internal_error(e, None))?;
                 let text = value
                     .get("text")
@@ -615,14 +698,10 @@ impl ServerHandler for CalmMdTools {
                 let raw = &path["calmmd://folder/".len()..];
                 let path = percent_decode(raw, false)
                     .map_err(|e| McpError::invalid_params(e, None))?;
+                let label = WorkspaceRegistry::window_label(window.as_deref());
                 let value = self
-                    .bridge
-                    .call(
-                        window.as_deref(),
-                        "calmmd_list_documents",
-                        json!({ "markdownOnly": true, "folder": path }),
-                    )
-                    .await
+                    .workspace
+                    .list_documents(&label, true, Some(&path))
                     .map_err(|e| McpError::internal_error(e, None))?;
                 ResourceContents::text(pretty(&value), request.uri).with_mime_type("application/json")
             }

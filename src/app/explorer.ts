@@ -367,6 +367,23 @@ export function createExplorer(deps: ExplorerDeps) {
     rename,
     move,
     trash,
+    /** Applies a rename made by the Rust workspace service. */
+    async externalRenamed(from: string, to: string) {
+      const oldParent = dirname(from);
+      const newParent = dirname(to);
+      retarget(from, to);
+      await Promise.all([
+        ...(oldParent && oldParent !== newParent ? [load(oldParent)] : []),
+        ...(newParent ? [load(newParent)] : []),
+      ]);
+    },
+    /** Applies a trash made by the Rust workspace service. */
+    async externalTrashed(path: string, isDir: boolean) {
+      if (isFavorite(path)) await toggleFavorite(path, isDir);
+      fileCache = null;
+      const parent = dirname(path);
+      if (parent) await load(parent);
+    },
     setEditing: (e: Editing) => setState('editing', e),
     setShowAllFiles: (on: boolean) => {
       setState('showAllFiles', on);
