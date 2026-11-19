@@ -6,8 +6,9 @@ import { Autosaver, type SaveStatus } from '../core/autosave';
 import { basename, isWithin, rebase, samePath } from '../core/paths';
 import { scrollLineToTop, topLineOf } from '../editor/geometry';
 import type { SessionTab } from './session';
-import { decodeFromDisk, encodeForDisk, minimalChange, type Eol } from '../core/text';
+import { decodeFromDisk, minimalChange, type Eol } from '../core/text';
 import { ExternalLoad } from '../editor/extensions';
+import type { BufferDraft } from '../buffers/types';
 import type { Platform } from '../platform/types';
 
 export interface DocMeta {
@@ -65,17 +66,6 @@ export interface DocumentsDeps {
 
 export type WriteMode = 'replace' | 'append' | 'prepend';
 
-const DRAFT_PREFIX = 'draft/';
-interface DraftRecord {
-  v: 1;
-  owner?: string;
-  text: string;
-  untitledIndex: number;
-  /** Set when the draft holds edits that conflicted with a file on disk. */
-  path?: string | null;
-  updatedAt: number;
-}
-
 interface DocRuntime {
   state: EditorState;
   autosaver: Autosaver;
@@ -109,7 +99,6 @@ export function createDocuments(deps: DocumentsDeps) {
   const find = (id: string) => store.docs.find((d) => d.id === id);
   const patch = (id: string, p: Partial<DocMeta>) => setStore('docs', (d) => d.id === id, p);
   const textOf = (id: string) => runtime.get(id)?.state.doc.toString() ?? '';
-  const draftKey = (id: string) => DRAFT_PREFIX + id;
 
   function nextUntitledIndex(): number {
     const used = new Set(store.docs.filter((d) => !d.path).map((d) => d.untitledIndex));
@@ -125,7 +114,7 @@ export function createDocuments(deps: DocumentsDeps) {
   async function writeDraft(id: string, path: string | null) {
     const meta = find(id);
     if (!meta) return;
-    const record: DraftRecord = {
+    const record: BufferDraft = {
       v: 1,
       owner: deps.draftOwner?.(),
       text: textOf(id),
@@ -133,33 +122,27 @@ export function createDocuments(deps: DocumentsDeps) {
       path,
       updatedAt: Date.now(),
     };
-    await platform.kvSet(draftKey(id), JSON.stringify(record));
+    await platform.bufferDraftWrite(id, record);
   }
 
-  /** The autosave target: the file on disk, or the draft store for untitled documents. */
+  /** The Rust service owns the autosave target and conflict-safe write decision. */
   async function persist(id: string): Promise<void> {
     const meta = find(id);
     if (!meta) return;
-    const text = textOf(id);
-
-    if (!meta.path) {
-      if (text.length === 0) await platform.kvDelete(draftKey(id));
-      else await writeDraft(id, null);
-      return;
-    }
-    if (meta.conflict) {
-      // Never overwrite someone else's change. Keep our edits safe until the user decides.
-      await writeDraft(id, meta.path);
-      return;
-    }
-    const st = await platform.stat(meta.path);
-    if (st && meta.mtimeMs !== null && Math.abs(st.mtimeMs - meta.mtimeMs) > 1) {
-      patch(id, { conflict: true });
-      await writeDraft(id, meta.path);
-      return;
-    }
-    const { mtimeMs } = await platform.writeTextFile(meta.path, encodeForDisk(text, meta.eol, meta.bom));
-    patch(id, { mtimeMs });
+    const result = await platform.bufferPersist({
+      id,
+      owner: deps.draftOwner?.(),
+      untitledIndex: meta.untitledIndex,
+      path: meta.path,
+      text: textOf(id),
+      eol: meta.eol,
+      bom: meta.bom,
+      mtimeMs: meta.mtimeMs,
+      conflict: meta.conflict,
+    });
+    if (result.conflict) patch(id, { conflict: true });
+    if (!result.wrote && result.conflict) return;
+    patch(id, { mtimeMs: result.mtimeMs, conflict: false });
   }
 
   function addDoc(init: {
@@ -299,7 +282,7 @@ export function createDocuments(deps: DocumentsDeps) {
     const r = runtime.get(id)!;
     r.autosaver.touch(); // force a write even if nothing changed since the last autosave
     const ok = await r.autosaver.flush();
-    if (ok && wasUntitled) await platform.kvDelete(draftKey(id));
+    if (ok && wasUntitled) await platform.bufferDraftDelete(id);
     if (!ok) deps.notify(`Couldn't save to ${basename(path)}: ${find(id)?.lastError ?? 'unknown error'}`);
     return ok;
   }
@@ -309,7 +292,7 @@ export function createDocuments(deps: DocumentsDeps) {
     const r = runtime.get(id);
     r?.autosaver.dispose();
     runtime.delete(id);
-    void platform.kvDelete(draftKey(id));
+    void platform.bufferDraftDelete(id);
     const idx = store.docs.findIndex((d) => d.id === id);
     batch(() => {
       setStore('docs', (docs) => docs.filter((d) => d.id !== id));
@@ -395,7 +378,7 @@ export function createDocuments(deps: DocumentsDeps) {
     const r = runtime.get(id)!;
     r.autosaver.touch();
     const ok = await r.autosaver.flush();
-    if (ok) await platform.kvDelete(draftKey(id));
+    if (ok) await platform.bufferDraftDelete(id);
     return ok;
   }
 
@@ -403,13 +386,12 @@ export function createDocuments(deps: DocumentsDeps) {
     const meta = find(id);
     if (!meta?.path) return false;
     try {
-      const { text: raw, mtimeMs } = await platform.readTextFile(meta.path);
-      const decoded = decodeFromDisk(raw);
-      replaceContent(id, decoded.text);
-      runtime.get(id)!.openedText = decoded.text;
-      patch(id, { conflict: false, mtimeMs, eol: decoded.eol, bom: decoded.bom });
+      const file = await platform.bufferLoad(meta.path);
+      replaceContent(id, file.text);
+      runtime.get(id)!.openedText = file.text;
+      patch(id, { conflict: false, mtimeMs: file.mtimeMs, eol: file.eol, bom: file.bom });
       runtime.get(id)!.autosaver.markSaved();
-      await platform.kvDelete(draftKey(id));
+      await platform.bufferDraftDelete(id);
       return true;
     } catch (e) {
       deps.notify(`Couldn't reload ${docName(meta)}: ${errText(e)}`);
@@ -524,20 +506,8 @@ export function createDocuments(deps: DocumentsDeps) {
   ) {
     const me = deps.draftOwner?.();
     const adopt = opts.adopt ?? ((owner: string | undefined) => owner === undefined || owner === me);
-    const keys = await platform.kvList(DRAFT_PREFIX);
-    const drafts: { id: string; rec: DraftRecord }[] = [];
-    for (const key of keys) {
-      try {
-        const raw = await platform.kvGet(key);
-        if (!raw) continue;
-        const rec = JSON.parse(raw) as DraftRecord;
-        if (rec.v === 1 && typeof rec.text === 'string') drafts.push({ id: key.slice(DRAFT_PREFIX.length), rec });
-      } catch {
-        // A corrupt draft shouldn't block startup.
-      }
-    }
-    drafts.sort((a, b) => a.rec.updatedAt - b.rec.updatedAt);
-    const draftById = new Map(drafts.map((d) => [d.id, d.rec]));
+    const drafts = await platform.bufferDrafts();
+    const draftById = new Map(drafts.map((d) => [d.id, d.record]));
 
     const ids: (string | null)[] = [];
     let missing = 0;

@@ -752,7 +752,7 @@ pub fn decode_from_disk(raw: &str) -> crate::core::dto::DecodedText {
     }
 }
 
-fn encode_for_disk(text: &str, eol: &str, bom: bool) -> String {
+pub(crate) fn encode_for_disk(text: &str, eol: &str, bom: bool) -> String {
     let body = if eol == "\r\n" { text.replace('\n', "\r\n") } else { text.to_owned() };
     if bom { format!("\u{feff}{body}") } else { body }
 }

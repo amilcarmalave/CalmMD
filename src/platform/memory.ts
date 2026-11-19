@@ -1,3 +1,11 @@
+import type {
+  BufferDraft,
+  BufferDraftEntry,
+  BufferFile,
+  BufferPersistRequest,
+  BufferPersistResult,
+} from '../buffers/types';
+import { decodeFromDisk, encodeForDisk } from '../core/text';
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
 import type { McpConnectionInfo } from '../mcp/types';
@@ -317,6 +325,57 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async workspaceSync(_snapshot: WorkspaceSnapshot) {},
     async workspaceUpsert(_document: WorkspaceDocument, _activeDocument?: string | null) {},
     onWorkspaceEvent(_handler: (event: WorkspaceEvent) => void) {},
+
+    async bufferDraftWrite(id, record) {
+      store.setItem('kv:draft/' + id, JSON.stringify(record));
+    },
+    async bufferDraftDelete(id) {
+      store.removeItem('kv:draft/' + id);
+    },
+    async bufferDrafts(): Promise<BufferDraftEntry[]> {
+      const out: BufferDraftEntry[] = [];
+      for (const key of keys('kv:draft/')) {
+        try {
+          const record = JSON.parse(store.getItem(key) ?? '') as BufferDraft;
+          if (record.v !== 1 || typeof record.text !== 'string' || !record.text) continue;
+          out.push({ id: key.slice('kv:draft/'.length), record });
+        } catch {
+          // A corrupt draft shouldn't block startup.
+        }
+      }
+      return out.sort((a, b) => a.record.updatedAt - b.record.updatedAt);
+    },
+    async bufferPersist(req: BufferPersistRequest): Promise<BufferPersistResult> {
+      const draft: BufferDraft = {
+        v: 1,
+        owner: req.owner,
+        text: req.text,
+        untitledIndex: req.untitledIndex,
+        path: req.path,
+        updatedAt: Date.now(),
+      };
+      if (!req.path) {
+        if (!req.text) await this.bufferDraftDelete(req.id);
+        else await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: false, wrote: false, draft: null };
+      }
+      if (req.conflict) {
+        await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: true, wrote: false, draft };
+      }
+      const st = await this.stat(req.path);
+      if (st && req.mtimeMs !== null && Math.abs(st.mtimeMs - req.mtimeMs) > 1) {
+        await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: true, wrote: false, draft };
+      }
+      const { mtimeMs } = await this.writeTextFile(req.path, encodeForDisk(req.text, req.eol, req.bom));
+      await this.bufferDraftDelete(req.id);
+      return { mtimeMs, conflict: false, wrote: true, draft: null };
+    },
+    async bufferLoad(path): Promise<BufferFile> {
+      const { text: raw, mtimeMs } = await this.readTextFile(path);
+      return { ...decodeFromDisk(raw), mtimeMs };
+    },
 
     async findBrowser() {
       return null;

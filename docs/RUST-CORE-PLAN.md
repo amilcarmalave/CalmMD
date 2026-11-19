@@ -69,11 +69,13 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   weight through `VITE_CALMMD_TAKUMI_FONT_WEIGHT` or `localStorage['calmmd.takumi.fontWeight']`
   (default `350`); headings keep their explicit CSS weights. Native and WASM PDF exports inject the
   same CSS, and native form controls are replaced with flow-positioned SVG checkbox marks.
-- **Phase 6 — first slice landed:** a Rust workspace owns the rooted path sandbox, live buffer
-  mirror, file operations, history snapshots and link-safe rename/move. MCP calls those services
-  directly for status, list, read, outline, search, create, write, rename, move, trash and triage;
-  webview state-change events update the editor and explorer. PDF/HTML export still uses the
-  webview bridge because the renderer is there.
+- **Phase 6 — in progress:** a Rust workspace owns the rooted path sandbox, live buffer mirror,
+  file operations, history snapshots and link-safe rename/move. MCP calls those services directly
+  for status, list, read, outline, search, create, write, rename, move, trash and triage; webview
+  state-change events update the editor and explorer. A Rust buffer service now owns durable draft
+  records and the autosave decision: write to disk, or keep unsaved text safe in a draft when a file
+  changed underneath CalmMD. The webview still owns tab/session state, undo and autosave timing.
+  PDF/HTML export still uses the webview bridge because the renderer is there.
 - **Phases 5b and 7:** not started.
 
 ---
@@ -352,10 +354,13 @@ not.
 
 This is where MCP gets simpler.
 
-- Port `documents.ts` state machine into Rust: tabs, buffers, drafts, autosave targets, conflict
-  flags, `set_content_by_path`.
-- Port `history.ts` snapshots into Rust.
-- Port `explorer.ts` create/rename/move/trash and link retargeting into Rust.
+- Port `documents.ts` state machine into Rust: tabs, buffers, autosave timing, undo, session/cursor
+  state and `set_content_by_path`. Draft records, disk writes and conflict detection are now in
+  `core/buffers.rs`; `set_content_by_path` for MCP is in `core/workspace.rs`.
+- Port the remaining `history.ts` UI into Rust. Version storage and compatibility are already in
+  `core/history.rs`; restore/diff UI still lives in the webview.
+- Explorer create/rename/move/trash and link retargeting are in `core/workspace.rs` and
+  `core/links.rs`; the sidebar/tree view is still driven by webview events.
 - Keep the webview as an event-driven view of Rust state; CodeMirror documents are mirrors, not the
   only source of truth.
 - Expose the same operations through Tauri commands and direct MCP calls.

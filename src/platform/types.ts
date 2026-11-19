@@ -2,6 +2,13 @@
  * Everything the app needs from the host OS. The UI only talks to this interface, so it
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
+import type {
+  BufferDraft,
+  BufferDraftEntry,
+  BufferFile,
+  BufferPersistRequest,
+  BufferPersistResult,
+} from '../buffers/types';
 import type { SearchHit, SearchOptions } from '../core/search';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { TakumiPdfOptions } from '../export/takumi';
@@ -94,6 +101,16 @@ export interface Platform {
   workspaceUpsert(document: WorkspaceDocument, activeDocument?: string | null): Promise<void>;
   /** Subscribes to state changes made directly by the Rust workspace services. */
   onWorkspaceEvent(handler: (event: WorkspaceEvent) => void): void;
+
+  // ---------- Rust-owned drafts and autosave targets ----------
+  /** Writes one durable draft record. */
+  bufferDraftWrite(id: string, record: BufferDraft): Promise<void>;
+  bufferDraftDelete(id: string): Promise<void>;
+  bufferDrafts(): Promise<BufferDraftEntry[]>;
+  /** Applies the Rust write/conflict decision for one autosave. */
+  bufferPersist(request: BufferPersistRequest): Promise<BufferPersistResult>;
+  /** Reads and decodes a file using the same EOL/BOM rules as the workspace. */
+  bufferLoad(path: string): Promise<BufferFile>;
 
   // ---------- Export ----------
   /** Path of a Chromium-family browser for PDF printing, or null. */

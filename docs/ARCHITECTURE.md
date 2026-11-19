@@ -272,15 +272,15 @@ CalmMD can host a **local MCP server** (`src-tauri/src/mcp/`, official `rmcp` SD
 palette, or the `--mcp` launch flag. The connection URL and a per-launch bearer token are copied to
 the clipboard; the server validates the token and the `Origin` header and never binds beyond loopback.
 
-The server never edits files itself. Each tool call becomes a Tauri event
-Most tools now call `src-tauri/src/core/workspace.rs` directly. The webview mirrors live buffers
-into that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, and Rust emits
+Most tools call `src-tauri/src/core/workspace.rs` directly. The webview mirrors live buffers into
+that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, and Rust emits
 `calmmd://workspace` events for content changes, renames, creates and trashes. The remaining
 `docs`/`explorer` controllers apply those events so CodeMirror, favorites and the tree stay in step.
-PDF/HTML export still emits a request
-(`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the **live**
-controllers and answers with the `mcp_respond` command. That keeps autosave, drafts, conflicts,
-undo, file history and the explorer in charge. Paths are resolved against the open Space root and
+Autosave now delegates to `src-tauri/src/core/buffers.rs`: Rust owns durable draft records and
+decides whether to write a buffer, keep it as a draft, or flag a disk conflict. The webview keeps
+autosave timing, undo history, tabs, cursors and the explorer view. PDF/HTML export still emits a
+request (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the
+exporter and answers with the `mcp_respond` command. Paths are resolved against the open Space root and
 `..`/outside-root paths are rejected in the bridge. Every tool accepts an optional `windowLabel`
 or `spaceId`; the latter is resolved through `SpaceClaims`, so calls can be routed to the window
 that holds a Space. Without a target they go to `main`. The server can be started from File → Start

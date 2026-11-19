@@ -1,7 +1,6 @@
 //! Link rewriting used when a note moves. Port of the relevant part of `src/core/noteLinks.ts`.
 
 use super::paths::{basename, dirname, is_markdown_path, path_key};
-use std::path::Path;
 
 fn decode_link_path(url: &str) -> String {
     let bytes = url.as_bytes();

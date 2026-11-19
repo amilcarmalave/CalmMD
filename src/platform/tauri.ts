@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+import type { BufferDraftEntry, BufferFile, BufferPersistRequest, BufferPersistResult } from '../buffers/types';
 import { useRustSpell } from '../core/rustFlags';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
@@ -161,6 +162,13 @@ export function createTauriPlatform(): Platform {
     onWorkspaceEvent(handler) {
       void listen<WorkspaceEvent>('calmmd://workspace', (event) => handler(event.payload));
     },
+
+    bufferDraftWrite: (id, record) => invoke<void>('core_buffer_draft_write', { id, record }),
+    bufferDraftDelete: (id) => invoke<void>('core_buffer_draft_delete', { id }),
+    bufferDrafts: () => invoke<BufferDraftEntry[]>('core_buffer_drafts'),
+    bufferPersist: (request: BufferPersistRequest) =>
+      invoke<BufferPersistResult>('core_buffer_persist', { request }),
+    bufferLoad: (path) => invoke<BufferFile>('core_buffer_load', { path }),
 
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),
