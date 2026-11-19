@@ -19,6 +19,7 @@ import type {
 import { useRustSpell } from '../core/rustFlags';
 import type { Session } from '../app/session';
 import type { SpaceRecord } from '../app/spaces';
+import type { HistoryUsage, HistoryVersion } from '../history/types';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
 import type { TakumiPdfOptions } from '../export/takumi';
@@ -181,6 +182,15 @@ export function createTauriPlatform(): Platform {
     spaceSave: (space) => invoke<void>('core_space_save', { space }),
     spaceRemove: (id) => invoke<void>('core_space_remove', { id }),
     spaces: () => invoke<SpaceRecord[]>('core_spaces'),
+
+    historyList: (path) => invoke<HistoryVersion[]>('core_history_list', { path }),
+    historyRead: (path, id) => invoke<string | null>('core_history_read', { path, id }),
+    historySave: (path, text, name) => invoke<HistoryVersion | null>('core_history_save', { path, text, name }),
+    historyRemove: (path, id) => invoke<void>('core_history_remove', { path, id }),
+    historyRename: (from, to) => invoke<void>('core_history_rename', { from, to }),
+    historyClearFile: (path) => invoke<void>('core_history_clear_file', { path }),
+    historyClearAll: () => invoke<void>('core_history_clear_all'),
+    historyUsage: () => invoke<HistoryUsage>('core_history_usage'),
 
     bufferDraftWrite: (id, record) => invoke<void>('core_buffer_draft_write', { id, record }),
     bufferDraftDelete: (id) => invoke<void>('core_buffer_draft_delete', { id }),

@@ -17,6 +17,7 @@ import type {
 import type { Session } from '../app/session';
 import type { SpaceRecord } from '../app/spaces';
 import type { SearchHit, SearchOptions } from '../core/search';
+import type { HistoryUsage, HistoryVersion } from '../history/types';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
@@ -117,6 +118,16 @@ export interface Platform {
   spaceSave(space: SpaceRecord): Promise<void>;
   spaceRemove(id: string): Promise<void>;
   spaces(): Promise<SpaceRecord[]>;
+
+  // ---------- Rust-owned file history ----------
+  historyList(path: string): Promise<HistoryVersion[]>;
+  historyRead(path: string, id: string): Promise<string | null>;
+  historySave(path: string, text: string, name: string | null): Promise<HistoryVersion | null>;
+  historyRemove(path: string, id: string): Promise<void>;
+  historyRename(from: string, to: string): Promise<void>;
+  historyClearFile(path: string): Promise<void>;
+  historyClearAll(): Promise<void>;
+  historyUsage(): Promise<HistoryUsage>;
 
   // ---------- Rust-owned drafts and autosave targets ----------
   /** Writes one durable draft record. */

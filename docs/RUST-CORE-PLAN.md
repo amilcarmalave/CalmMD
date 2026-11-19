@@ -362,8 +362,9 @@ This is where MCP gets simpler.
   records, disk writes and conflict detection are in `core/buffers.rs`; autosave timing and retries
   are in `core/autosave.rs`; `set_content_by_path` for MCP is in `core/workspace.rs`;
   session/cursor/Space records are in `core/session.rs`.
-- Port the remaining `history.ts` UI into Rust. Version storage and compatibility are already in
-  `core/history.rs`; restore/diff UI still lives in the webview.
+- Port the remaining history UI concerns (restore/diff presentation) into Rust if a native view is
+  introduced. Version storage, list/read/save/rename/prune and usage are exposed from
+  `core/history.rs` and used by the webview through `Platform`.
 - Explorer create/rename/move/trash and link retargeting are in `core/workspace.rs` and
   `core/links.rs`; the sidebar/tree view is still driven by webview events.
 - Keep the webview as an event-driven view of Rust state; CodeMirror documents are mirrors, not the

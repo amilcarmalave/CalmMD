@@ -1,4 +1,5 @@
 import { sha256Hex } from '../core/assets';
+import type { HistoryUsage, HistoryVersion } from '../history/types';
 import { isWithin, pathKey, rebase } from '../core/paths';
 import type { Platform } from '../platform/types';
 
@@ -9,15 +10,7 @@ import type { Platform } from '../platform/types';
  * Storage: `history/map` maps each file (by `pathKey`) to a random id, so renames only touch the
  * map. `history/<id>/index` lists the versions; `history/<id>/<version>` holds each text.
  */
-export interface Version {
-  id: string;
-  savedAt: number;
-  /** Set for versions saved with Save Version and a name; those are never pruned. */
-  name: string | null;
-  /** Characters. */
-  size: number;
-  hash: string;
-}
+export type { HistoryVersion as Version } from '../history/types';
 
 /** Unnamed versions kept per file; older ones are removed as new ones arrive. */
 export const HISTORY_KEEP_UNNAMED = 50;
@@ -30,7 +23,7 @@ const hashText = (text: string) => sha256Hex(new TextEncoder().encode(text));
 
 export type History = ReturnType<typeof createHistory>;
 
-export function createHistory(deps: { platform: Platform; now?: () => number }) {
+export function createKvHistory(deps: { platform: Platform; now?: () => number }) {
   const { platform } = deps;
   const now = deps.now ?? Date.now;
   // One change at a time, so two saves never race on the same index.
@@ -53,7 +46,7 @@ export function createHistory(deps: { platform: Platform; now?: () => number }) 
   const indexKey = (fileId: string) => `history/${fileId}/index`;
   const textKey = (fileId: string, id: string) => `history/${fileId}/${id}`;
   const readIndex = async (fileId: string) => {
-    const list = await readJson<Version[]>(indexKey(fileId), []);
+    const list = await readJson<HistoryVersion[]>(indexKey(fileId), []);
     return Array.isArray(list) ? list : [];
   };
 
@@ -69,7 +62,7 @@ export function createHistory(deps: { platform: Platform; now?: () => number }) 
   }
 
   /** Versions of a file, newest first. */
-  async function list(path: string): Promise<Version[]> {
+  async function list(path: string): Promise<HistoryVersion[]> {
     const fileId = await fileIdOf(path, false);
     return fileId ? (await readIndex(fileId)).slice().sort((a, b) => b.savedAt - a.savedAt) : [];
   }
@@ -83,17 +76,17 @@ export function createHistory(deps: { platform: Platform; now?: () => number }) 
    * Saves a version. Without a name, nothing is saved when the text equals the latest version.
    * Resolves to the new version, or null when it was skipped.
    */
-  function save(path: string, text: string, name?: string | null): Promise<Version | null> {
+  function save(path: string, text: string, name?: string | null): Promise<HistoryVersion | null> {
     return serial(async () => {
       const hash = await hashText(text);
       const fileId = (await fileIdOf(path, true))!;
       const index = await readIndex(fileId);
-      const latest = index.reduce<Version | null>((a, v) => (!a || v.savedAt > a.savedAt ? v : a), null);
+      const latest = index.reduce<HistoryVersion | null>((a, v) => (!a || v.savedAt > a.savedAt ? v : a), null);
       const label = name?.trim() || null;
       if (!label && latest?.hash === hash) return null;
       let savedAt = now();
       if (latest && savedAt <= latest.savedAt) savedAt = latest.savedAt + 1;
-      const version: Version = { id: savedAt.toString(36) + newId().slice(0, 4), savedAt, name: label, size: text.length, hash };
+      const version: HistoryVersion = { id: savedAt.toString(36) + newId().slice(0, 4), savedAt, name: label, size: text.length, hash };
       await platform.kvSet(textKey(fileId, version.id), text);
       const next = [...index, version];
       // Prune the oldest unnamed versions beyond the limit.
@@ -168,4 +161,20 @@ export function createHistory(deps: { platform: Platform; now?: () => number }) 
   }
 
   return { list, read, save, remove, rename, clearFile, clearAll, usage };
+}
+
+/** Desktop uses the Rust history service; browser/tests keep the equivalent KV implementation. */
+export function createHistory(deps: { platform: Platform; now?: () => number }) {
+  const { platform } = deps;
+  if (platform.kind !== 'tauri') return createKvHistory(deps);
+  return {
+    list: (path: string) => platform.historyList(path),
+    read: (path: string, id: string) => platform.historyRead(path, id),
+    save: (path: string, text: string, name?: string | null) => platform.historySave(path, text, name ?? null),
+    remove: (path: string, id: string) => platform.historyRemove(path, id),
+    rename: (from: string, to: string) => platform.historyRename(from, to),
+    clearFile: (path: string) => platform.historyClearFile(path),
+    clearAll: () => platform.historyClearAll(),
+    usage: (): Promise<HistoryUsage> => platform.historyUsage(),
+  };
 }

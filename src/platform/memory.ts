@@ -1,3 +1,4 @@
+import { createKvHistory } from '../app/history';
 import type { Session } from '../app/session';
 import { parseSession } from '../app/session';
 import { parseSpace, type SpaceRecord } from '../app/spaces';
@@ -17,6 +18,7 @@ import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
 import type { McpConnectionInfo } from '../mcp/types';
 import type { WorkspaceDocument, WorkspaceEvent, WorkspaceSnapshot } from '../workspace/types';
+import type { HistoryUsage } from '../history/types';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type {
   HeadingDto,
@@ -226,6 +228,7 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     timer: ReturnType<typeof setTimeout>;
     state: BufferAutosaveState;
   }
+  let kvHistory: ReturnType<typeof createKvHistory>;
   const pendingAutosaves = new Map<string, PendingAutosave>();
   const autosaveHandlers = new Set<(event: BufferAutosaveEvent) => void>();
   const emitAutosave = (event: BufferAutosaveEvent) => {
@@ -398,6 +401,15 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       const recs = await Promise.all(keys.map((key) => this.spaceGet(key.slice('space/'.length))));
       return recs.filter((r): r is SpaceRecord => !!r).sort((a, b) => b.lastOpened - a.lastOpened);
     },
+
+    historyList: (path) => kvHistory.list(path),
+    historyRead: (path, id) => kvHistory.read(path, id),
+    historySave: (path, text, name) => kvHistory.save(path, text, name),
+    historyRemove: (path, id) => kvHistory.remove(path, id),
+    historyRename: (from, to) => kvHistory.rename(from, to),
+    historyClearFile: (path) => kvHistory.clearFile(path),
+    historyClearAll: () => kvHistory.clearAll(),
+    historyUsage: (): Promise<HistoryUsage> => kvHistory.usage(),
 
     async bufferDraftWrite(id, record) {
       store.setItem('kv:draft/' + id, JSON.stringify(record));
@@ -701,6 +713,7 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       return Object.fromEntries(keys('fs:').map((k) => [k.slice(3), store.getItem(k) ?? '']));
     },
   };
+  kvHistory = createKvHistory({ platform });
   return platform;
 }
 

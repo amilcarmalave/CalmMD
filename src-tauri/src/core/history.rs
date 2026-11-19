@@ -347,6 +347,57 @@ pub struct HistoryUsage {
     pub chars: usize,
 }
 
+pub type AppHistory = History<AppHistoryStore>;
+
+fn app_history(app: &AppHandle) -> AppHistory {
+    History::new(app.clone())
+}
+
+#[tauri::command]
+pub fn core_history_list(app: AppHandle, path: String) -> Result<Vec<Version>, String> {
+    app_history(&app).list(&path)
+}
+
+#[tauri::command]
+pub fn core_history_read(app: AppHandle, path: String, id: String) -> Result<Option<String>, String> {
+    app_history(&app).read(&path, &id)
+}
+
+#[tauri::command]
+pub fn core_history_save(
+    app: AppHandle,
+    path: String,
+    text: String,
+    name: Option<String>,
+) -> Result<Option<Version>, String> {
+    app_history(&app).save(&path, &text, name.as_deref())
+}
+
+#[tauri::command]
+pub fn core_history_remove(app: AppHandle, path: String, id: String) -> Result<(), String> {
+    app_history(&app).remove(&path, &id)
+}
+
+#[tauri::command]
+pub fn core_history_rename(app: AppHandle, from: String, to: String) -> Result<(), String> {
+    app_history(&app).rename(&from, &to)
+}
+
+#[tauri::command]
+pub fn core_history_clear_file(app: AppHandle, path: String) -> Result<(), String> {
+    app_history(&app).clear_file(&path)
+}
+
+#[tauri::command]
+pub fn core_history_clear_all(app: AppHandle) -> Result<(), String> {
+    app_history(&app).clear_all()
+}
+
+#[tauri::command]
+pub fn core_history_usage(app: AppHandle) -> Result<HistoryUsage, String> {
+    app_history(&app).usage()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
