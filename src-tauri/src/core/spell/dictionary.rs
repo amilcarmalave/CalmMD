@@ -25,26 +25,6 @@ const FR_AFF: &str = include_str!("dictionaries/fr_FR/index.aff");
 const FR_DIC: &str = include_str!("dictionaries/fr_FR/index.dic");
 const ES_AFF: &str = include_str!("dictionaries/es_ES/index.aff");
 const ES_DIC: &str = include_str!("dictionaries/es_ES/index.dic");
-const IT_AFF: &str = include_str!("dictionaries/it_IT/index.aff");
-const IT_DIC: &str = include_str!("dictionaries/it_IT/index.dic");
-const PT_AFF: &str = include_str!("dictionaries/pt_PT/index.aff");
-const PT_DIC: &str = include_str!("dictionaries/pt_PT/index.dic");
-const NL_AFF: &str = include_str!("dictionaries/nl_NL/index.aff");
-const NL_DIC: &str = include_str!("dictionaries/nl_NL/index.dic");
-const FI_AFF: &str = include_str!("dictionaries/fi_FI/index.aff");
-const FI_DIC: &str = include_str!("dictionaries/fi_FI/index.dic");
-const NB_AFF: &str = include_str!("dictionaries/nb_NO/index.aff");
-const NB_DIC: &str = include_str!("dictionaries/nb_NO/index.dic");
-const DA_AFF: &str = include_str!("dictionaries/da_DK/index.aff");
-const DA_DIC: &str = include_str!("dictionaries/da_DK/index.dic");
-const PL_AFF: &str = include_str!("dictionaries/pl_PL/index.aff");
-const PL_DIC: &str = include_str!("dictionaries/pl_PL/index.dic");
-const ZH_AFF: &str = include_str!("dictionaries/zh_CN/index.aff");
-const ZH_DIC: &str = include_str!("dictionaries/zh_CN/index.dic");
-const JA_AFF: &str = include_str!("dictionaries/ja_JP/index.aff");
-const JA_DIC: &str = include_str!("dictionaries/ja_JP/index.dic");
-const KO_AFF: &str = include_str!("dictionaries/ko_KR/index.aff");
-const KO_DIC: &str = include_str!("dictionaries/ko_KR/index.dic");
 
 pub fn dictionaries_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -77,16 +57,6 @@ pub fn parts_for_bundled(id: &str) -> Option<(&'static str, &'static str)> {
         "de_DE" => Some((DE_AFF, DE_DIC)),
         "fr_FR" => Some((FR_AFF, FR_DIC)),
         "es_ES" => Some((ES_AFF, ES_DIC)),
-        "it_IT" => Some((IT_AFF, IT_DIC)),
-        "pt_PT" => Some((PT_AFF, PT_DIC)),
-        "nl_NL" => Some((NL_AFF, NL_DIC)),
-        "fi_FI" => Some((FI_AFF, FI_DIC)),
-        "nb_NO" => Some((NB_AFF, NB_DIC)),
-        "da_DK" => Some((DA_AFF, DA_DIC)),
-        "pl_PL" => Some((PL_AFF, PL_DIC)),
-        "zh_CN" => Some((ZH_AFF, ZH_DIC)),
-        "ja_JP" => Some((JA_AFF, JA_DIC)),
-        "ko_KR" => Some((KO_AFF, KO_DIC)),
         _ => None,
     }
 }
@@ -168,7 +138,7 @@ mod tests {
 
     #[test]
     fn builds_every_bundled_dictionary() {
-        for id in ["en_US", "en_GB", "de_DE", "fr_FR", "es_ES", "it_IT", "pt_PT", "nl_NL", "fi_FI", "nb_NO", "da_DK", "pl_PL", "zh_CN", "ja_JP", "ko_KR"] {
+        for id in ["en_US", "en_GB", "de_DE", "fr_FR", "es_ES"] {
             let (aff, dic) = parts_for_bundled(id).expect("bundled dictionary");
             let dict = build(aff, dic, "").unwrap_or_else(|e| panic!("{id}: {e}"));
             assert!(!dict.check_word("qzxqzx"), "{id} accepted a nonsense word");

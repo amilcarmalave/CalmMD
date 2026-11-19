@@ -65,8 +65,8 @@ License: **MIT**. Status: pre-1.0, built in milestones (see bottom).
     preview block, and clicking a preview block places the caret at its source line.
 - **Spellcheck** on by default, using the local zspell service where a dictionary is available and
   the OS/webview checker otherwise ("Toggle Spellcheck" and "Spelling Language: …" in the palette).
-  English (US/UK), German, French, Spanish, Italian, Portuguese, Dutch/Flemish, Finnish, Norwegian,
-  Danish, Polish, Chinese, Japanese and Korean are bundled; optional dictionaries are downloaded on
+  English (US/UK), German, French and Spanish are bundled. Italian, Portuguese, Dutch/Flemish,
+  Finnish, Norwegian, Danish, Polish, Chinese, Japanese, Korean and Russian are downloaded on
   explicit request from Tools → Spelling Language (↓ marker) and then join the available group (✓).
   The language sets the editor's `lang` attribute. "Automatic" uses the system languages. Spelling
   suggestions are in the native menu: **Shift+right-click** (our menu says so).

@@ -5,7 +5,9 @@
 
 use serde::Serialize;
 
-pub const UPSTREAM: &str = "https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries";
+pub const WOOORM: &str = "https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries";
+/// Generated dictionaries are downloaded from the repository assets, never compiled into the app.
+pub const GENERATED: &str = "https://raw.githubusercontent.com/opticsWolf/CalmMD/dev_rust/src-tauri/src/core/spell/dictionaries";
 
 #[derive(Debug, Clone, Copy)]
 pub struct DictionaryEntry {
@@ -14,7 +16,9 @@ pub struct DictionaryEntry {
     /// BCP 47 tags this dictionary answers, first tag is the canonical one.
     pub languages: &'static [&'static str],
     pub license: &'static str,
-    /// Upstream directory for downloadable dictionaries; empty for generated built-ins.
+    /// Base URL used only for downloadable dictionaries.
+    pub base: &'static str,
+    /// Upstream directory; empty for generated dictionaries stored under `id`.
     pub upstream: &'static str,
     pub bundled: bool,
 }
@@ -25,6 +29,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "English (US)",
         languages: &["en-US", "en"],
         license: "MIT AND BSD",
+        base: WOOORM,
         upstream: "en",
         bundled: true,
     },
@@ -33,6 +38,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "English (UK)",
         languages: &["en-GB"],
         license: "MIT AND BSD",
+        base: WOOORM,
         upstream: "en-GB",
         bundled: true,
     },
@@ -41,6 +47,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "German",
         languages: &["de-DE", "de"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
         bundled: true,
     },
@@ -49,6 +56,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "French",
         languages: &["fr-FR", "fr-BE", "fr"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
         bundled: true,
     },
@@ -57,6 +65,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "Spanish",
         languages: &["es-ES", "es"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
         bundled: true,
     },
@@ -65,86 +74,97 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "Italian",
         languages: &["it-IT", "it"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "pt_PT",
         label: "Portuguese",
         languages: &["pt-PT", "pt-BR", "pt"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "nl_NL",
         label: "Dutch / Flemish",
         languages: &["nl-NL", "nl-BE", "nl"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "fi_FI",
         label: "Finnish",
         languages: &["fi-FI", "fi"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "nb_NO",
         label: "Norwegian (Bokmål)",
         languages: &["nb-NO", "nb", "no"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "da_DK",
         label: "Danish",
         languages: &["da-DK", "da"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "pl_PL",
         label: "Polish",
         languages: &["pl-PL", "pl"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "zh_CN",
         label: "Chinese",
         languages: &["zh-CN", "zh"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "ja_JP",
         label: "Japanese",
         languages: &["ja-JP", "ja"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "ko_KR",
         label: "Korean",
         languages: &["ko-KR", "ko"],
         license: "Apache-2.0",
+        base: GENERATED,
         upstream: "",
-        bundled: true,
+        bundled: false,
     },
     DictionaryEntry {
         id: "ru_RU",
         label: "Russian",
         languages: &["ru-RU", "ru"],
         license: "BSD-3-Clause",
+        base: WOOORM,
         upstream: "ru",
         bundled: false,
     },
@@ -153,6 +173,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "English (Canada)",
         languages: &["en-CA"],
         license: "MIT AND BSD",
+        base: WOOORM,
         upstream: "en-CA",
         bundled: false,
     },
@@ -161,6 +182,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "English (Australia)",
         languages: &["en-AU"],
         license: "MIT AND BSD",
+        base: WOOORM,
         upstream: "en-AU",
         bundled: false,
     },
@@ -169,6 +191,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         label: "Turkish",
         languages: &["tr-TR", "tr"],
         license: "MIT",
+        base: WOOORM,
         upstream: "tr",
         bundled: false,
     },
@@ -188,6 +211,11 @@ pub struct DictionaryInfo {
 
 pub fn by_id(id: &str) -> Option<&'static DictionaryEntry> {
     DICTIONARIES.iter().find(|entry| entry.id == id)
+}
+
+/// Directory path under `base` for a downloadable dictionary.
+pub fn remote_dir(entry: &DictionaryEntry) -> &str {
+    if entry.upstream.is_empty() { entry.id } else { entry.upstream }
 }
 
 pub fn normalize_lang(lang: Option<&str>) -> String {
@@ -229,6 +257,17 @@ mod tests {
         assert_eq!(entry_for_lang(Some("ja-JP")).unwrap().id, "ja_JP");
         assert_eq!(entry_for_lang(Some("ko-KR")).unwrap().id, "ko_KR");
         assert_eq!(entry_for_lang(Some("ru-RU")).unwrap().id, "ru_RU");
+    }
+
+    #[test]
+    fn generated_languages_are_optional_not_bundled() {
+        for id in [
+            "it_IT", "pt_PT", "nl_NL", "fi_FI", "nb_NO", "da_DK", "pl_PL", "zh_CN", "ja_JP", "ko_KR",
+        ] {
+            let entry = by_id(id).expect("catalogue entry");
+            assert!(!entry.bundled, "{id} must not be bundled");
+            assert_eq!(entry.base, GENERATED);
+        }
     }
 
     #[test]

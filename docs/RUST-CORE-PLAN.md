@@ -44,9 +44,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   image/embed handling, Mermaid and page breaks in the webview. Set
   `VITE_CALMMD_RUST_MARKDOWN=0` or `localStorage['calmmd.rust.markdown'] = '0'` to use the old path.
 - **Phase 3 — bundled languages accepted:** zspell provides misspelling ranges, suggestions and a
-  local personal word list. English (US/UK), German, French, Spanish, Italian, Portuguese,
-  Dutch/Flemish, Finnish, Norwegian, Danish, Polish, Chinese, Japanese and Korean are bundled and
-  work offline; Russian, Turkish and the other English variants appear under a separator in the same
+  local personal word list. English (US/UK), German, French and Spanish are bundled and work offline.
+  Italian, Portuguese, Dutch/Flemish, Finnish, Norwegian, Danish, Polish, Chinese, Japanese, Korean,
+  Russian, Turkish and the other English variants appear under a separator in the same
   Spelling Language menu with a ↓ marker and download on request. A downloaded dictionary moves
   into the available (✓) group. The OS checker remains the fallback for other languages and when
   `useRustSpell()` is disabled explicitly.

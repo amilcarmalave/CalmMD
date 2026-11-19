@@ -162,7 +162,7 @@ pub fn core_spell_dictionaries(app: AppHandle) -> Result<Vec<catalog::Dictionary
             license: entry.license.to_string(),
             installed: entry.bundled || is_installed(&app, entry.id),
             bundled: entry.bundled,
-            source: format!("{}/{}", catalog::UPSTREAM, entry.upstream),
+            source: format!("{}/{}", entry.base, catalog::remote_dir(entry)),
         })
         .collect())
 }
@@ -204,8 +204,14 @@ pub async fn core_spell_dictionary_install(app: AppHandle, id: String) -> Result
         .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| e.to_string())?;
-    for (target, upstream) in [("index.aff", "index.aff"), ("index.dic", "index.dic"), ("LICENSE", "license")] {
-        let url = format!("{}/{}/{}", catalog::UPSTREAM, entry.upstream, upstream);
+    // wooorm ships `license`; the generated repository assets ship `LICENSE`.
+    let licence_file = if entry.base == catalog::GENERATED { "LICENSE" } else { "license" };
+    for (target, upstream) in [
+        ("index.aff", "index.aff"),
+        ("index.dic", "index.dic"),
+        ("LICENSE", licence_file),
+    ] {
+        let url = format!("{}/{}/{}", entry.base, catalog::remote_dir(entry), upstream);
         let text = download(&client, &url).await?;
         if target != "LICENSE" && text.trim().len() < 20 {
             return Err(format!("downloaded {target} is empty"));
@@ -258,22 +264,6 @@ mod tests {
         assert!(!check_with_parts("bonjour", "fr_FR", aff, dic, "").unwrap().unwrap().misspelled);
         let (aff, dic) = dictionary::parts_for_bundled("es_ES").unwrap();
         assert!(!check_with_parts("información", "es_ES", aff, dic, "").unwrap().unwrap().misspelled);
-
-        for (id, word) in [
-            ("it_IT", "grazie"),
-            ("pt_PT", "obrigado"),
-            ("nl_NL", "informatie"),
-            ("fi_FI", "kiitos"),
-            ("nb_NO", "informasjon"),
-            ("da_DK", "information"),
-            ("pl_PL", "informacje"),
-            ("zh_CN", "你好"),
-            ("ja_JP", "こんにちは"),
-            ("ko_KR", "한국"),
-        ] {
-            let (aff, dic) = dictionary::parts_for_bundled(id).unwrap();
-            assert!(!check_with_parts(word, id, aff, dic, "").unwrap().unwrap().misspelled, "{id}: {word}");
-        }
     }
 
     #[test]
