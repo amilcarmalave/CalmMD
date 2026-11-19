@@ -76,11 +76,12 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 
 ### PDF export
 
-PDFs are laid out with [Paged.js](https://pagedjs.org) and printed by a Chromium engine. On
-**Windows** that's Microsoft Edge, which comes with Windows, so there's nothing to install. On macOS
-and Linux, any installed Chrome, Edge, Chromium or Brave is used. Without one, CalmMD opens the
-system print dialog ("Save as PDF") instead. Put `---pagebreak---` on its own line for a manual page
-break. See [`docs/samples`](docs/samples) for example output.
+PDFs are laid out by the local [Takumi](https://takumi.kane.tw) engine: native Rust in the desktop
+app and a local WASM build in the browser demo. No browser print process, TeX installation or network
+service is needed. The older [Paged.js](https://pagedjs.org)/Chromium path remains available by
+setting `localStorage['calmmd.pdf.engine'] = 'browser'` (or `VITE_CALMMD_PDF_ENGINE=browser`). Put
+`---pagebreak---` on its own line for a manual page break. See [`docs/samples`](docs/samples) for
+example output.
 
 ### Your own themes
 

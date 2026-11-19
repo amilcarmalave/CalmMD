@@ -1,6 +1,7 @@
 //! Rust core services: Markdown parsing/rendering, syntax themes and native spellchecking.
 
 pub mod dto;
+pub mod export;
 pub mod highlight;
 pub mod markdown;
 pub mod spell;

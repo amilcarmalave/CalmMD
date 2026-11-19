@@ -136,7 +136,10 @@ mod tests {
     use super::*;
 
     const CORPUS: &str = include_str!("tests/fixtures/extension-corpus.md");
+    const SCROLL_FIXTURE: &str = include_str!("tests/fixtures/scroll-sync-500.md");
     const TS_SNAPSHOT: &str = include_str!("../../../../src/render/__snapshots__/markdown.test.ts.snap");
+    const SCROLL_ANCHORS: &str =
+        include_str!("../../../../src/render/__snapshots__/scroll-sync-500.anchors.json");
 
     /// Only serializer differences: DOMPurify decodes code-block quotes, and KaTeX 0.16/0.19
     /// emit the same declaration in a different order.
@@ -169,33 +172,40 @@ mod tests {
         assert_eq!(result.source_map.len(), parse_document(CORPUS).unwrap().blocks.len());
     }
 
+    fn anchors(html: &str) -> Vec<(usize, usize)> {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while let Some(rel) = html[i..].find("data-line-start=\"") {
+            let start = i + rel + "data-line-start=\"".len();
+            let end_attr = html[start..].find('"').expect("quoted line");
+            let start_line = html[start..start + end_attr].parse().unwrap();
+            let after = start + end_attr + 1;
+            let rest = &html[after..];
+            if let Some(rel2) = rest.find("data-line-end=\"") {
+                let p = after + rel2 + "data-line-end=\"".len();
+                let n = html[p..].find('"').expect("quoted line");
+                let end_line = html[p..p + n].parse().unwrap();
+                out.push((start_line, end_line));
+                i = p + n + 1;
+            } else {
+                break;
+            }
+        }
+        out
+    }
+
     #[test]
     fn source_line_anchors_match_the_typescript_snapshot() {
-        fn anchors(html: &str) -> Vec<(usize, usize)> {
-            let mut out = Vec::new();
-            let bytes = html.as_bytes();
-            let mut i = 0;
-            while let Some(rel) = html[i..].find("data-line-start=\"") {
-                let start = i + rel + "data-line-start=\"".len();
-                let end_attr = html[start..].find('"').expect("quoted line");
-                let start_line = html[start..start + end_attr].parse().unwrap();
-                let after = start + end_attr + 1;
-                let rest = &html[after..];
-                if let Some(rel2) = rest.find("data-line-end=\"") {
-                    let p = after + rel2 + "data-line-end=\"".len();
-                    let n = html[p..].find('"').expect("quoted line");
-                    let end_line = html[p..p + n].parse().unwrap();
-                    out.push((start_line, end_line));
-                    i = p + n + 1;
-                } else {
-                    break;
-                }
-            }
-            let _ = bytes;
-            out
-        }
         let rust = render_html(CORPUS, &MarkdownRenderOptions::default()).unwrap().html;
         assert_eq!(anchors(&rust), anchors(&typescript_baseline()));
+    }
+
+    #[test]
+    fn source_line_anchors_match_the_typescript_500_line_fixture() {
+        assert_eq!(SCROLL_FIXTURE.lines().count(), 500);
+        let baseline: Vec<(usize, usize)> = serde_json::from_str(SCROLL_ANCHORS).unwrap();
+        let rust = render_html(SCROLL_FIXTURE, &MarkdownRenderOptions::default()).unwrap().html;
+        assert_eq!(anchors(&rust), baseline);
     }
 
     #[test]

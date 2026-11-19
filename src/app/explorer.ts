@@ -289,14 +289,17 @@ export function createExplorer(deps: ExplorerDeps) {
     for (const p of Object.keys(unwrap(state.expanded))) if (state.expanded[p] && isWithin(p, to)) void load(p);
   }
 
-  async function trash(path: string, isDir: boolean): Promise<boolean> {
-    const choice = await deps.confirm({
-      title: `Move “${basename(path)}” to the trash?`,
-      message: isDir ? 'The folder and everything in it will be moved to the trash.' : 'You can restore it from the trash.',
-      primary: 'Move to Trash',
-      destructive: 'primary',
-    });
-    if (choice !== 'primary') return false;
+  /** MCP callers pass `confirmed` themselves; UI callers still show the confirmation dialog. */
+  async function trash(path: string, isDir: boolean, confirmed = false): Promise<boolean> {
+    if (!confirmed) {
+      const choice = await deps.confirm({
+        title: `Move “${basename(path)}” to the trash?`,
+        message: isDir ? 'The folder and everything in it will be moved to the trash.' : 'You can restore it from the trash.',
+        primary: 'Move to Trash',
+        destructive: 'primary',
+      });
+      if (choice !== 'primary') return false;
+    }
     try {
       await platform.trashPath(path);
     } catch (e) {

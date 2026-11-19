@@ -3,6 +3,7 @@
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
 import type { SearchHit, SearchOptions } from '../core/search';
+import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
 import type {
   HighlightCodeResult,
@@ -89,6 +90,8 @@ export interface Platform {
   findBrowser(): Promise<string | null>;
   /** Prints self-contained HTML to a PDF file. Rejects with "NO_BROWSER" if there's no engine. */
   printPdf(html: string, outPath: string): Promise<void>;
+  /** Writes a PDF with the native Rust Takumi engine (desktop only). */
+  takumiPdf(html: string, outPath: string, options: TakumiPdfOptions): Promise<void>;
   readImageDataUrl(path: string): Promise<string>;
   /** Writes binary data (a pasted image), creating missing folders. */
   writeBinaryFile(path: string, data: Uint8Array): Promise<void>;

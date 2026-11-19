@@ -1768,8 +1768,14 @@ export default function App(props: { platform: Platform }) {
         const started = await platform.mcpStart().catch(() => null);
         if (started?.url) {
           setMcpInfo(started);
-          notify(`MCP server: ${started.url}`);
+          await platform.writeClipboard(`${started.url} · token: ${started.token ?? ''}`).catch(() => undefined);
+          notify(`MCP server: ${started.url} (connection copied)`);
         }
+      } else if (current?.enabled) {
+        // `--mcp` starts the server before the webview mounts. Make its one-time token available.
+        await platform
+          .writeClipboard(`${current.url} · token: ${current.token ?? ''}`)
+          .catch(() => undefined);
       }
     }
 

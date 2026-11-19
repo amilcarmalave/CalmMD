@@ -166,11 +166,16 @@ Options considered:
 | **Paged.js + platform webview print-to-PDF** | Very good, matches preview exactly | **Zero** | Chosen. |
 | System Chrome/Edge `--headless --print-to-pdf` | Excellent | Only if a browser is installed | Used as a fallback and on Linux. |
 
-**Choice (implemented in M7):** build one self-contained HTML page (theme CSS, embedded fonts and
-images), paginate it with **Paged.js** (MIT) for running headers, `counter(page)`/`counter(pages)`,
+**Original M7 choice:** build one self-contained HTML page (theme CSS, embedded fonts and images),
+paginate it with **Paged.js** (MIT) for running headers, `counter(page)`/`counter(pages)`,
 `target-counter` TOC page numbers and break control, and print it with a headless
 **Chromium-family browser driven over the DevTools protocol** (`Page.printToPDF`, after the page
 signals that pagination and fonts are done).
+
+**Current choice:** the same self-contained HTML is rendered by **Takumi** (MIT OR Apache-2.0),
+natively in the desktop app and from a local WASM build in the browser demo. A visual review of all
+PDF templates accepted it as the default. Set `calmmd.pdf.engine = 'browser'` to use the original
+Paged.js path; details and comparison images are in `docs/visual-reviews/takumi/`.
 - **Windows:** Microsoft Edge, which ships with Windows 10/11, so **zero install**.
 - **macOS / Linux:** any installed Chrome, Edge, Chromium or Brave. If none is found, the
   system print dialog opens ("Save as PDF"). Same layout and styles, but no running headers or

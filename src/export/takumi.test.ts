@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PDF } from './build';
-import { takumiOptions } from './takumi';
+import { adaptHtmlForTakumi, takumiOptions } from './takumi';
 
 describe('takumiOptions', () => {
   it('maps page size, margins and metadata', () => {
@@ -28,6 +28,18 @@ describe('takumiOptions', () => {
     const none = takumiOptions({ title: 'Notes', pdf: { ...DEFAULT_PDF, header: false, pageNumbers: false } });
     expect(none.header).toBe(false);
     expect(none.footer).toBe(false);
+  });
+
+  it('adapts control glyphs and applies the adjustable body weight', () => {
+    const options = takumiOptions({ title: 'Notes', pdf: DEFAULT_PDF, cover: true });
+    const html = adaptHtmlForTakumi(
+      '<html><head></head><body><a href="#x"><span class="toc-dots"></span></a>' +
+        '<input type="checkbox" class="task-checkbox" checked="" disabled="">Check</body></html>',
+      options,
+    );
+    expect(html).toContain('targetPageNumber');
+    expect(html).toContain('task-checkbox" style=');
+    expect(html).toContain('<style>.md-body { font-weight: 350; }</style>');
   });
 
   it('suppresses the footer on a cover page', () => {

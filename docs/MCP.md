@@ -114,7 +114,7 @@ token is sufficient and matches CalmMD's no-account privacy model.
 Tools return errors as `CallToolResult::error` with a text message. Prompts map bridge failures to
 `ErrorData::internal_error`.
 
-Timeout: 120 seconds, long enough for a tool that waits on a native confirmation dialog (trash).
+Timeout: 120 seconds, long enough for slow exports and large folder scans.
 
 ---
 
@@ -174,8 +174,8 @@ snapshots on both sides.
 
 `src/app/exporter.ts` gained `exportPdfData()` and `exportHtmlData()`. They take an explicit
 source document and output path, so MCP does not need the native save dialog. The existing
-`buildBody()` / `buildDocument()` / `platform.printPdf()` pipeline is unchanged; PDFs still use
-Paged.js and the platform's Chromium/Edge print engine.
+`buildBody()` / `buildDocument()` pipeline is unchanged; headless PDF exports now use the local Takumi
+engine by default. Setting `calmmd.pdf.engine` to `browser` selects the older Paged.js/Chromium path.
 
 ---
 
@@ -203,7 +203,7 @@ With neither, the call goes to `main`.
 | `calmmd_rename_document` | `path`, `name` | Retargets tabs, favorites, history, links |
 | `calmmd_move_document` | `path`, `folder`, `name?` | Moves, optionally renames, retargets links |
 | `calmmd_write_document` | `path`, `content` or `text`, `mode?`, `flush?` | Undoable, autosaved, snapshotted |
-| `calmmd_trash_document` | `path`, `confirm` | `confirm: true` required; CalmMD may show a native confirm |
+| `calmmd_trash_document` | `path`, `confirm` | `confirm: true` is the caller's confirmation; no webview modal |
 | `calmmd_triage_folder` | `folder?`, `limit?`, `excerptChars?` | Live excerpts, headings, front matter, subfolders |
 | `calmmd_apply_organization` | `folder?`, `plan`, `apply?` | Validates and applies a move/rename plan via CalmMD |
 | `calmmd_export_pdf` | `path`, `out`, `prefs?`, `cover?` | Headless; returns the output path |

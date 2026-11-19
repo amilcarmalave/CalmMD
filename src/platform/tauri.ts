@@ -7,6 +7,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useRustSpell } from '../core/rustFlags';
 import type { SearchHit } from '../core/search';
+import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
 import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
@@ -150,6 +151,7 @@ export function createTauriPlatform(): Platform {
 
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),
+    takumiPdf: (html, out, options: TakumiPdfOptions) => invoke<void>('takumi_pdf', { html, out, options }),
     readImageDataUrl: (path) => invoke<string>('read_image_data_url', { path }),
     // Raw IPC body (fast for large images); the path travels in a header.
     writeBinaryFile: (path, data) => invoke<void>('write_binary_file', data, { headers: { path: encodeURIComponent(path) } }),

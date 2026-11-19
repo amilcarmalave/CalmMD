@@ -40,7 +40,7 @@ src/
   app/preview.ts      preview controller: debounced render, DOM patch, links, task toggles
   render/markdown.ts  markdown-it + footnotes + task lists + heading ids + source-line attrs,
                       sanitised with DOMPurify. render/highlight.ts reuses the editor's Lezer grammars
-  render/rustMarkdown.ts  opt-in Mordant-backed preview renderer; keeps webview-only images,
+  render/rustMarkdown.ts  default Mordant-backed preview renderer; keeps webview-only images,
                       Mermaid, embeds and page breaks, then sanitises with DOMPurify
   render/patch.ts     reuses unchanged top-level blocks between renders (keeps images and embeds stable)
   editor/live/        live (hybrid) mode
@@ -187,7 +187,10 @@ src-tauri/
   CSS and fonts only when the body has math). `export/assets.ts` lazy-loads fonts (woff2 `?inline`), CSS
   (`?raw`), KaTeX fonts (`import.meta.glob`) and Paged.js. Paged.js is a *relative* file import, because
   an alias gets caught by Vite's dev dependency optimiser. `export/takumi.ts` maps the same HTML and
-  PDF preferences to the opt-in local WASM engine (no browser, no TeX, no network).
+  PDF preferences to Takumi. Desktop exports use `core/export/takumi.rs` (native Rust); the browser
+  build and tests keep the local WASM fallback (neither engine uses a browser print process, TeX or
+  the network). Takumi is the default PDF engine; `calmmd.pdf.engine = 'browser'` selects the older
+  Paged.js/Chromium path.
 - **Paged.js drops custom-property declarations** when it re-parses CSS. Theme CSS therefore goes in
   `<style data-pagedjs-ignore>`, and only `@page`, break and target-counter rules go through Paged.js.
 - The page sets `window.__calmmdDone` when ready. `src-tauri/src/cdp.rs` waits for it over the DevTools
@@ -322,7 +325,8 @@ Takumi PDF crates require 1.91. CI and release builds use stable Rust, which is 
   (pixel offsets are only reused within one run).
 
 ### Scroll sync (key differentiator, so don't regress it)
-- Every rendered block has `data-line-start`/`data-line-end` (0-based, end exclusive) from markdown-it maps.
+- Every rendered block has `data-line-start`/`data-line-end` (0-based, end exclusive). The Rust
+  source-map pass reproduces the markdown-it maps, checked against a 500-line mixed fixture.
 - Anchors pair editor Y (CodeMirror `lineBlockAt`) with preview Y (block rects): block top ↔ first-line
   top, and block bottom ↔ last-line bottom, *including one-line blocks* (tall images). The ends of the two
   scroll ranges are aligned. Flat segments are allowed (a table's `|---|` line has no rendered height).
@@ -332,7 +336,9 @@ Takumi PDF crates require 1.91. CI and release builds use stable Rust, which is 
   scroll event is ignored as an echo. `.pane-preview` has `overflow-anchor: none`.
 - Images are loaded eagerly on purpose. Lazy images pop in and shift the layout.
 - Measured in the browser dev build with a 500-line mixed document (tall images, tables, code):
-  the top-of-viewport source line matches to within 0.03 lines in both directions.
+  the top-of-viewport source line matches to within 0.03 lines in both directions. The fixture and
+  its frozen anchor baseline are in `scroll-sync-500.test.ts`; the Rust renderer must emit the same
+  anchors.
 
 ### Git workflow
 `main` is always releasable. Work happens on short-lived feature branches merged by pull request.

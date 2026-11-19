@@ -146,13 +146,12 @@ export function createExporter(deps: ExporterDeps) {
     }
   }
 
-  /** Sends the prepared HTML to the selected PDF engine. Takumi runs locally in the webview. */
+  /** Sends the prepared HTML to the selected PDF engine. Takumi runs natively on desktop. */
   async function writePdf(html: string, out: string, title: string, pdf: PdfOptions, cover: boolean) {
     const engine = pdfEngine();
     if (engine === 'takumi') {
-      const { renderPdf } = await import('../export/takumi');
-      const bytes = await renderPdf(html, { title, pdf, cover });
-      await platform.writeBinaryFile(out, bytes);
+      const { takumiOptions } = await import('../export/takumi');
+      await platform.takumiPdf(html, out, takumiOptions({ title, pdf, cover }));
       return;
     }
     if (engine === 'ikat') throw new Error('The ikat PDF engine is not implemented yet.');

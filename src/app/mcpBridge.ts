@@ -217,7 +217,8 @@ export async function dispatchMcpRequest(req: McpRequest, deps: McpBridgeDeps): 
     case 'calmmd_trash_document': {
       const path = resolvePath(deps, p);
       if (!bool(p.confirm)) throw new Error('Move to trash requires confirm: true');
-      const ok = await deps.explorer.trash(path, false);
+      // The MCP `confirm` argument is the caller's confirmation; the webview cannot show a modal.
+      const ok = await deps.explorer.trash(path, false, true);
       return { path, trashed: ok };
     }
 

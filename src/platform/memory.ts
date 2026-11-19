@@ -297,6 +297,12 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async printPdf() {
       throw new Error('NO_BROWSER');
     },
+    async takumiPdf(html, out, options) {
+      // The browser build has no Tauri commands, so it keeps Takumi's local WASM engine.
+      const { renderPdf } = await import('../export/takumi');
+      const bytes = await renderPdf(html, options);
+      await platform.writeBinaryFile(out, bytes);
+    },
     async openPath() {},
     async readImageDataUrl(path) {
       const text = store.getItem('fs:' + path);

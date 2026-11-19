@@ -7,8 +7,8 @@ import type {
 } from '../markdown/types';
 
 /**
- * Typed client for the Rust Markdown core. The flag is still off by default, so this module is
- * currently used by tests and by the opt-in rollout path rather than by the preview itself.
+ * Typed client for the Rust Markdown core, now used by the preview and HTML export by default.
+ * The TypeScript renderer remains available through the feature flag as a reversible fallback.
  */
 export function createMarkdownService(platform: Platform) {
   return {

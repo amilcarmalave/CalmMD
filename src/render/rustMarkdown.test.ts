@@ -58,7 +58,7 @@ describe('Rust-backed preview renderer', () => {
     expect(html).toContain('<svg>');
   });
 
-  it('is opt-in with the TypeScript renderer still authoritative by default', () => {
-    expect(useRustMarkdown()).toBe(false);
+  it('is the default renderer with the TypeScript path still available as a fallback', () => {
+    expect(useRustMarkdown()).toBe(true);
   });
 });

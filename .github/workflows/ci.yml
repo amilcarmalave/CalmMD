@@ -52,7 +52,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.0
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -61,8 +63,10 @@ jobs:
       - run: npm run build
       - name: Rust unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
-      # Real PDF pipeline (Paged.js + headless Chromium over CDP). GitHub runners ship Chrome or Edge.
-      - name: PDF pagination test
+      - name: Native Takumi PDF test
+        run: cargo test --manifest-path src-tauri/Cargo.toml renders_a_simple_pdf
+      # Paged.js fallback: real pagination via headless Chromium over CDP. GitHub runners ship Chrome or Edge.
+      - name: PDF pagination fallback test
         run: cargo test --manifest-path src-tauri/Cargo.toml prints_paginated_pdf -- --include-ignored
       - name: Build the app (no installers)
         run: npx tauri build --no-bundle

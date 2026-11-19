@@ -37,19 +37,34 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 - **Phase 2 — first slice landed:** all 15 CalmMD syntax palettes are registered as custom Mordant
   themes in `core/highlight`. Rust highlighting resolves CalmMD colour/preview theme ids to those
   themes; export and preview pass the active colour theme through `MarkdownRenderOptions.theme`.
-- The preview can use `createRustRenderer()` behind `useRustMarkdown()`. It keeps DOMPurify, the
-  patcher, relative image/embed handling, Mermaid and page breaks in the webview. The flag still
-  defaults to false until the extension corpus and scroll-sync snapshots are accepted.
+- **Phase 1/4 accepted:** Mordant's HTML matches the frozen extension corpus snapshot, and a
+  500-line mixed fixture produces exactly the same `data-line-start`/`data-line-end` anchors as the
+  TypeScript renderer. The scroll-map round trip stays within 0.03 lines on that fixture.
+  `createRustRenderer()` is now the default; it keeps DOMPurify, the patcher, relative
+  image/embed handling, Mermaid and page breaks in the webview. Set
+  `VITE_CALMMD_RUST_MARKDOWN=0` or `localStorage['calmmd.rust.markdown'] = '0'` to use the old path.
 - **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
   misspelling ranges, suggestions and a local personal word list behind `useRustSpell()`. The OS
   checker remains the fallback for other languages and when the flag is off.
 - **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
   `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in
   TypeScript, so parity is checked against the new baseline snapshots before switching defaults.
-- **Phase 5a — first slice landed:** an opt-in browser/WASM `takumi-pdf` engine renders the existing
-  self-contained export HTML without Chromium. `pdfEngine()` selects `browser` (default), `takumi`
-  or `ikat` (not implemented). The desktop MSRV is now Rust 1.91, so direct Rust bindings are no
-  longer blocked by the toolchain.
+- **Phase 5a — shipped as the default PDF engine:** desktop PDF exports call
+  `core/export/takumi.rs`, which parses the existing self-contained HTML, loads its embedded fonts
+  and writes a paged vector PDF. The browser build uses the equivalent local WASM engine.
+  `pdfEngine()` selects `takumi` (default), `browser` (explicit fallback) or `ikat` (not implemented).
+- **Phase 5a visual review — passed:** the realistic smoke document was rendered by
+  both engines in standard, report, academic, minimal and cover variants. Page counts match, TOC
+  page numbers resolve, headers/footers and running bands align, embedded SVG text renders, task
+  checkboxes and section numbering survive, and selected text/link annotations work. Residual
+  differences are font rasterisation and small colour/placement variations. The review accepted those
+  differences and made Takumi the default; side-by-side screenshots remain in
+  [`docs/visual-reviews/takumi`](visual-reviews/takumi/README.md).
+- **Font weight control:** Takumi reads CSS `font-weight` and `font-variation-settings: "wght" ...`,
+  plus `@font-face` weight descriptors and `font-synthesis`. CalmMD exposes a reversible body-text
+  weight through `VITE_CALMMD_TAKUMI_FONT_WEIGHT` or `localStorage['calmmd.takumi.fontWeight']`
+  (default `350`); headings keep their explicit CSS weights. Native and WASM PDF exports inject the
+  same CSS, and native form controls are replaced with flow-positioned SVG checkbox marks.
 - **Phases 5b–7:** not started.
 
 ---
@@ -64,9 +79,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 | CSS-based PDF export | `takumi` / `takumi-pdf` | Rust HTML/CSS layout → paged PDF without a browser; closest LaTeX-free replacement for Paged.js | MIT OR Apache-2.0 |
 | Typeset PDF export | `ikat` 0.13.6 | Rust Markdown → LaTeX → PDF pipeline; Mermaid→TikZ, pgfplots, templates; no browser/Paged.js | MIT OR Apache-2.0 |
 
-`takumi` crate 2.20.0 requires Rust 1.91. CalmMD's MSRV was raised to 1.91, so direct Rust bindings
-are available; the first slice still uses the browser/WASM package to keep PDF rendering off the Rust
-main thread while its visual parity is reviewed.
+`takumi` crate 2.20.0 requires Rust 1.91, so CalmMD's MSRV was raised to 1.91. Desktop exports use
+the native `takumi-core`/`takumi-pdf` crates; the browser/WASM package is the equivalent engine for
+the non-Tauri app and tests. The visual review accepted Takumi as the default PDF engine.
 
 Not chosen yet:
 
@@ -117,11 +132,12 @@ designs, but is attractive as a separate high-end typesetting engine.
 
 Plan: add `prefs.pdf.engine` with these values:
 
-- `browser` — current Paged.js/Chromium default;
-- `takumi` — CSS-compatible, LaTeX-free, browser-free;
+- `takumi` — default CSS-compatible, LaTeX-free, browser-free engine;
+- `browser` — explicit Paged.js/Chromium fallback;
 - `ikat` — optional LaTeX/TikZ engine.
 
-Keep the browser engine as default until Takumi visual parity is explicitly accepted.
+The visual review accepted Takumi as the default; the browser engine remains available for exact CSS
+comparisons and as an escape hatch.
 
 ### 3.4 zspell needs dictionaries and UTF-16 conversion
 
@@ -273,12 +289,11 @@ behave as before when `useRustSpell()` is enabled and only en_US is bundled so f
 
 This is the LaTeX-free, CSS-compatible path and should be prototyped first.
 
-- Spike integration: `takumi-pdf`/`takumi-cli` tool call vs direct Rust binding. Direct `takumi`
-  2.20.0 requires Rust 1.91; CalmMD's MSRV has been raised to 1.91, so both options are available.
-  The first slice uses the official browser/WASM npm package; it renders HTML with inline CSS,
-  ignores the Paged.js scripts, and takes page geometry/headers/footers as Takumi options. A real
-  CalmMD export fixture renders to a valid local PDF with this path. Enable it with
-  `VITE_CALMMD_PDF_ENGINE=takumi` or `localStorage['calmmd.pdf.engine'] = 'takumi'`.
+- Integration: the native Rust binding was chosen after the MSRV was raised to 1.91. It renders the
+  self-contained HTML with inline CSS, ignores Paged.js scripts, loads embedded fonts, and takes page
+  geometry/headers/footers as Takumi options. The official browser/WASM npm package is the equivalent
+  engine for the non-Tauri app. Select the Paged.js fallback with `VITE_CALMMD_PDF_ENGINE=browser` or
+  `localStorage['calmmd.pdf.engine'] = 'browser'`.
 - Feed the same standalone HTML used by current export into Takumi.
 - Map `ExportPrefs` to Takumi options:
   - `pdf.pageSize` → page size;
@@ -289,14 +304,19 @@ This is the LaTeX-free, CSS-compatible path and should be prototyped first.
   - `cover`, `coverAuthor` → cover page;
   - `breakBeforeH1` → top-level heading page breaks.
 - Add engine selection:
-  - `browser` — current Paged.js/Chromium default;
-  - `takumi` — CSS-based, LaTeX-free, browser-free;
+  - `takumi` — default CSS-based, LaTeX-free, browser-free engine;
+  - `browser` — Paged.js/Chromium fallback;
   - `ikat` — later, optional typeset engine.
 - Compare sample exports against Paged.js: headings, TOC, headers/footers, tables, code blocks,
   images, link annotations and text selectability.
 
-**Exit:** a representative note exports to a paged PDF via Takumi with selectable text and no TeX
-or browser dependency; visual differences are reviewed and accepted or fixed.
+**Exit reached:** a representative note exports to a paged PDF via Takumi with selectable text and
+no TeX or browser dependency. A side-by-side review of five variants accepted Takumi as the default;
+small typographic differences remain and the Paged.js engine stays available as an explicit fallback.
+
+**Phase 1/4 exit reached:** the preview and HTML export use Rust Markdown by default; the extension
+corpus HTML snapshot and the new 500-line scroll-sync anchor baseline pass on both renderers. The
+TypeScript renderer remains a reversible fallback for debugging.
 
 ### Phase 5b — ikat PDF engine (1–2 weeks, plus TeX packaging decision)
 
@@ -372,16 +392,16 @@ Until Phase 6, keep the existing bridge. Do not make MCP depend on half-migrated
 
 | Layer | Tests |
 |---|---|
-| Markdown | golden HTML files, heading/source-map fixtures, extension corpus |
+| Markdown | golden HTML files, heading/source-map fixtures, extension corpus, 500-line scroll fixture |
 | Highlighting | code-block snapshots in light/dark themes |
 | Spell | bundled dictionary tests, Unicode/UTF-16 ranges, personal words |
 | Export | HTML snapshots; PDF metadata/text extraction where possible |
 | Tauri boundary | command DTO round-trips, error mapping |
-| MCP | existing 3 Rust tests + full client smoke script |
+| MCP | existing 3 Rust tests + full client smoke script (49 checks, re-run after the Takumi default) |
 | UI | existing Vitest suite + manual split-view scroll check |
 
-Run all of these in CI on Windows/macOS/Linux. PDF tests need either TeX or the browser engine; keep
-them marked/conditional appropriately.
+Run all of these in CI on Windows/macOS/Linux with Rust 1.91. Native Takumi PDF rendering runs in
+the normal suite; the Paged.js fallback pagination test stays ignored locally and is enabled in CI.
 
 ---
 
@@ -394,17 +414,17 @@ them marked/conditional appropriately.
 | Mordant highlighter themes differ | keep CodeMirror highlighting until visual review; snapshot themes |
 | zspell suggestions unstable | use bundled ranges first; OS/other suggestions as fallback |
 | Dictionary licensing | choose allowed-licence dictionaries and list them explicitly |
-| Takumi visual difference from Paged.js | opt-in engine, golden PDFs, keep browser default until accepted |
-| Takumi Rust MSRV 1.91 | MSRV raised to 1.91; direct Rust binding can replace WASM after visual review |
+| Takumi visual difference from Paged.js | accepted minor differences; browser engine available as explicit fallback |
+| Takumi Rust MSRV 1.91 | MSRV raised to 1.91; native desktop binding compiled and tested on 1.91 |
 | ikat visual difference from Paged.js | separate engine, opt-in, no default change until accepted |
-| TeX unavailable on user machine | clear engine error; keep browser/Takumi engines default; document `texres`/`tectonic` options |
+| TeX unavailable on user machine | clear engine error; Takumi is the default and needs no TeX; document `texres`/`tectonic` for ikat |
 | Large migration stalls | ship Phases 1–5 independently; each has user-visible value without Phase 6 |
 
 ---
 
 ## 10. Definition of done for the first useful milestone
 
-Phases 0–4 are considered a successful first milestone when:
+Phases 0–4 are a successful first milestone:
 
 - Mordant renders preview and HTML export behind a flag with matching snapshots;
 - fenced code blocks use Mordant highlighting;
@@ -413,5 +433,5 @@ Phases 0–4 are considered a successful first milestone when:
 - MCP tests and the full MCP client smoke test still pass;
 - no Tauri capabilities or privacy guarantees were widened.
 
-Phase 5a (Takumi) is the preferred next PDF engine; Phase 5b (ikat) can ship later as a separately
+Phase 5a (Takumi) is now the default PDF engine; Phase 5b (ikat) can ship later as a separately
 reviewed typeset engine option.

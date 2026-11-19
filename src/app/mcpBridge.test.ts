@@ -65,6 +65,15 @@ describe('MCP bridge', () => {
     );
   });
 
+  it('trashes with the MCP confirmation instead of a webview modal', async () => {
+    const d = deps();
+    expect(await dispatchMcpRequest(req('calmmd_trash_document', { path: 'open.md', confirm: true }), d.asDeps)).toEqual({
+      path: '/root/open.md',
+      trashed: true,
+    });
+    expect(d.explorer.trash).toHaveBeenCalledWith('/root/open.md', false, true);
+  });
+
   it('routes writes through the document manager', async () => {
     const d = deps();
     const result = await dispatchMcpRequest(

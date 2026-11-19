@@ -61,6 +61,15 @@ pub(crate) fn block_line_range(
     }
     let byte = arena[node].pos()?;
     let start = line_at(source, byte);
+    // GFM table rows are one source line. Mordant leaves a trailing row without an explicit end
+    // position, so deriving it from the next sibling can shorten it to `(start, start)`.
+    if kind == "TableRow" {
+        let row_end = source[byte.min(source.len())..]
+            .find('\n')
+            .map(|offset| byte + offset + 1)
+            .unwrap_or(source.len());
+        return Some((start, line_at(source, row_end).max(start + 1)));
+    }
     let boundary = next_line_boundary(arena, node, source.len());
     let end = if boundary >= source.len() {
         last_line(source)

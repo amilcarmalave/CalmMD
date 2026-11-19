@@ -16,7 +16,7 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | serde, serde_json | MIT / Apache-2.0 | Rust serialisation |
 | Mordant (`mordant`) and its highlighting dependencies (syntect, syntect-assets, jsonc-parser) | MIT / MIT / Apache-2.0 | Rust Markdown parsing, rendering, math and fenced-code highlighting (feature-flagged) |
 | `katex-rs` | MIT | Rust-side KaTeX math rendering in Mordant (feature-flagged) |
-| Takumi (`takumi-pdf`, `@takumi-rs/helpers`) | MIT OR Apache-2.0 | Opt-in local WASM PDF engine (`VITE_CALMMD_PDF_ENGINE=takumi`) |
+| Takumi (`takumi-core`, `takumi-pdf`, `@takumi-rs/helpers`) | MIT OR Apache-2.0 | Default native Rust PDF engine on desktop and local WASM fallback in the browser; `VITE_CALMMD_PDF_ENGINE=browser` selects the older engine |
 | zspell (`zspell`) | Apache-2.0 | Native Rust spellchecking (feature-flagged) |
 | en_US Hunspell dictionary (`dictionary-en` from wooorm/dictionaries) | MIT AND BSD | Bundled spellcheck dictionary and personal words; full text in `src-tauri/src/core/spell/dictionaries/en_us/LICENSE` |
 | `rmcp` | Apache-2.0 | Embedded local MCP server (`2026-07-28` spec) |

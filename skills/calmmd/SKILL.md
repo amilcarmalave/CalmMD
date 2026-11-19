@@ -174,7 +174,7 @@ today's date, exactly like the export dialog. PDF always embeds images.
 ## Destructive actions
 
 - `calmmd_trash_document` requires `confirm: true`. Only pass it after the user explicitly agrees.
-- Trashing may trigger a native confirmation dialog in CalmMD. Wait for the tool result.
+- The `confirm: true` argument is the confirmation; CalmMD does not show a second dialog for MCP calls.
 - There is no folder-trash tool yet; do not emulate it by deleting files directly.
 
 ## Common mistakes to avoid
