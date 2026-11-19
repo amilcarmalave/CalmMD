@@ -110,6 +110,9 @@ pub fn run() {
             core::spell::core_spell_check,
             core::spell::core_spell_check_text,
             core::spell::core_spell_learn,
+            core::spell::core_spell_dictionaries,
+            core::spell::core_spell_dictionary_install,
+            core::spell::core_spell_dictionary_remove,
             launch_paths,
         ])
         .run(tauri::generate_context!())

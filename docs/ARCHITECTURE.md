@@ -79,8 +79,8 @@ src-tauri/
   src/fsops.rs        read/stat/atomic write (temp + fsync + rename, Windows retry)
   src/kv.rs           durable key/value files in <appData>/state (drafts, session, settings)
   src/core/           feature-flagged Rust services: Mordant Markdown parsing/rendering,
-                      CalmMD-derived syntax themes for Mordant, and zspell spellchecking with a
-                      bundled en_US dictionary
+                      CalmMD-derived syntax themes for Mordant, and zspell spellchecking with
+                      bundled English, German, French and Spanish dictionaries plus on-demand downloads
   src/tree.rs         list_dir (folders first, natural order, skips .git/node_modules), create,
                       rename (never overwrites), trash (OS trash via the `trash` crate)
   src/windows.rs      SpaceClaims (window label → space id, released on window destroy), open_window
@@ -226,7 +226,9 @@ src-tauri/
   batch, cached by line text, code/links/math skipped, the word being typed left alone) and turns the
   webview's checker off, because its underlines vanish whenever Live mode redraws a line. The right-click
   menu lists `spell_check` suggestions and Add to Dictionary (`wordAt`, `spellingItems` in
-  `app/editorMenu.ts`). On Linux there's no checker to ask: the webview underlines, and its native menu
+  `app/editorMenu.ts`). Tools → Spelling Language combines locally available dictionaries (✓) and
+  downloadable ones (↓) in one menu; installing one refreshes the list and moves it into the first
+  group. On Linux there's no OS checker to ask: the webview underlines, and its native menu
   (Shift+right-click) has the suggestions.
 - Debugging real exports: run the `web-debug` launch config (sets `CALMMD_DEBUG_DIR`), build the HTML in the page
   (`buildBody`/`buildDocument` via dynamic import), `POST /__calmmd/save?name=x.html`, then print it with

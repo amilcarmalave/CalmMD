@@ -63,10 +63,12 @@ License: **MIT**. Status: pre-1.0, built in milestones (see bottom).
   - The pane the user is scrolling leads; the other follows on the next animation frame. Feedback loops are suppressed.
   - Cursor sync: moving the caret in source highlights and reveals the matching
     preview block, and clicking a preview block places the caret at its source line.
-- **Spellcheck** on by default, using the OS/webview spellchecker ("Toggle Spellcheck" and
-  "Spelling Language: …" in the palette). The language sets the editor's `lang` attribute, which picks
-  the dictionary on Chromium/WebView2 (the dictionary must be installed in the OS). "Automatic" uses the
-  system languages. Spelling suggestions are in the native menu: **Shift+right-click** (our menu says so).
+- **Spellcheck** on by default, using the local zspell service where a dictionary is available and
+  the OS/webview checker otherwise ("Toggle Spellcheck" and "Spelling Language: …" in the palette).
+  English (US/UK), German, French and Spanish are bundled; optional dictionaries are downloaded on
+  explicit request from Tools → Spelling Language (↓ marker) and then join the available group (✓).
+  The language sets the editor's `lang` attribute. "Automatic" uses the system languages. Spelling
+  suggestions are in the native menu: **Shift+right-click** (our menu says so).
 - **Math**: `$…$` inline and `$$…$$` blocks with KaTeX, using Pandoc rules, so "$5 and $10" stays text.
   The editor grammar and renderer share one scanner. In Live mode math renders in place, and while
   editing a block a live preview sits under the source.

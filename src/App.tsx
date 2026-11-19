@@ -10,6 +10,7 @@ import { recheckSpelling, spelling } from './editor/spelling';
 import { createExplorer } from './app/explorer';
 import { createMcpBridge } from './app/mcpBridge';
 import type { McpConnectionInfo } from './mcp/types';
+import type { SpellDictionary } from './core/spellDictionaries';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
 import { parseSession, type Session, type SidebarView } from './app/session';
@@ -473,6 +474,55 @@ export default function App(props: { platform: Platform }) {
   const spellCompartment = new Compartment();
   const spellCache = new Map<string, Extension>();
   const [osSpelling, setOsSpelling] = createSignal(false);
+  const [dictionaries, setDictionaries] = createSignal<SpellDictionary[]>([]);
+  const registeredDictionaryCommands = new Set<string>();
+  const registerDictionaryCommands = (list: SpellDictionary[]) => {
+    const commands = list.flatMap((dictionary) => {
+      const tag = dictionary.languages[0];
+      const result = [{
+        id: `spell.${tag}`,
+        title: `Spelling Language: ${dictionary.label}`,
+        category: 'Spelling',
+        when: () => !!dictionaries().find((d) => d.id === dictionary.id)?.installed,
+        run: () => {
+          update({ spellLang: tag, spellcheck: true });
+          notify(`Spellcheck: ${dictionary.label}`);
+        },
+      }];
+      if (!dictionary.installed) result.push({
+        id: `spell.install.${dictionary.id}`,
+        title: `Download ${dictionary.label} Dictionary`,
+        category: 'Spelling',
+        when: () => !dictionaries().find((d) => d.id === dictionary.id)?.installed,
+        run: async () => {
+          notify(`Downloading ${dictionary.label} dictionary…`);
+          try {
+            await platform.spellInstallDictionary(dictionary.id);
+            await refreshDictionaries();
+            spellCache.clear();
+            update({ spellLang: tag, spellcheck: true });
+            view?.dispatch({ effects: recheckSpelling.of(null) });
+            notify(`${dictionary.label} dictionary installed`);
+          } catch (e) {
+            notify(`Couldn't install ${dictionary.label}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        },
+      });
+      return result;
+    });
+    // Static language commands already cover some canonical tags (en-US, en-GB, ru, …).
+    const fresh = commands.filter((c) => !registry.get(c.id) && !registeredDictionaryCommands.has(c.id));
+    for (const c of fresh) registeredDictionaryCommands.add(c.id);
+    if (fresh.length) registry.register(fresh);
+  };
+  const refreshDictionaries = async () => {
+    try {
+      const list = await platform.spellDictionaries();
+      setDictionaries(list);
+      registerDictionaryCommands(list);
+    } catch { setDictionaries([]); }
+  };
+  void refreshDictionaries();
   const spellLangArg = () => (settings.spellLang === 'auto' ? undefined : settings.spellLang);
   const spellFor = () => {
     const ours = settings.spellcheck && osSpelling();
@@ -706,7 +756,7 @@ export default function App(props: { platform: Platform }) {
       category: 'Spelling',
       run: () => {
         update({ spellLang: code, spellcheck: true });
-        if (code !== 'auto') notify(`Spellcheck: ${label}. The dictionary must be installed in your system's language settings.`);
+        if (code !== 'auto') notify(`Spellcheck: ${label}. Built-in dictionaries work offline; optional ones can be downloaded from this menu.`);
       },
     })),
     { id: 'window.new', title: 'New Window', category: 'Window', keys: 'Mod+Shift+N', run: () => platform.openWindow(null) },
@@ -1163,6 +1213,7 @@ export default function App(props: { platform: Platform }) {
     clearRecentFolders: () => void explorer.forgetRecent(),
     userThemes: () => userThemes().map((t) => ({ id: t.id, name: t.name })),
     pickColorTheme,
+    dictionaries,
     isMac,
   });
   const resolveTop = (m: TopMenu) => resolveMenu(m.items(), registry, hint);

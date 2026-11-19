@@ -6,6 +6,7 @@ import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-man
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useRustSpell } from '../core/rustFlags';
+import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
 import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
@@ -46,6 +47,10 @@ async function spellLearn(word: string, lang: string | undefined): Promise<void>
   }
   await invoke<void>('spell_learn', { word, lang: lang ?? null });
 }
+
+const spellDictionaries = () => invoke<SpellDictionary[]>('core_spell_dictionaries');
+const spellInstallDictionary = (id: string) => invoke<void>('core_spell_dictionary_install', { id });
+const spellRemoveDictionary = (id: string) => invoke<void>('core_spell_dictionary_remove', { id });
 
 const SAVE_FILTERS: Record<Exclude<SaveKind, 'markdown'>, { name: string; extensions: string[] }> = {
   html: { name: 'Web page', extensions: ['html'] },
@@ -161,6 +166,9 @@ export function createTauriPlatform(): Platform {
     spellCheck,
     spellCheckText,
     spellLearn,
+    spellDictionaries,
+    spellInstallDictionary,
+    spellRemoveDictionary,
     pandocConvert: (markdown, out, resourceDir) => invoke<void>('pandoc_convert', { markdown, out, resourceDir }),
     themesDir: () => invoke<string>('themes_dir'),
     writeClipboardHtml: (html, plain) => writeHtml(html, plain),

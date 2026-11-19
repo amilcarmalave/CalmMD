@@ -3,6 +3,7 @@
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
 import type { SearchHit, SearchOptions } from '../core/search';
+import type { SpellDictionary } from '../core/spellDictionaries';
 import type { TakumiPdfOptions } from '../export/takumi';
 import type { McpConnectionInfo, McpRequest, McpResponse } from '../mcp/types';
 import type {
@@ -110,6 +111,12 @@ export interface Platform {
   spellCheckText(text: string, lang?: string): Promise<[number, number][] | null>;
   /** Adds a word to the active checker's user dictionary. */
   spellLearn(word: string, lang?: string): Promise<void>;
+  /** Available and downloadable Hunspell dictionaries (desktop Rust service). */
+  spellDictionaries(): Promise<SpellDictionary[]>;
+  /** Downloads one curated dictionary into app data. Explicit user action only. */
+  spellInstallDictionary(id: string): Promise<void>;
+  /** Removes a previously downloaded dictionary. Built-ins cannot be removed. */
+  spellRemoveDictionary(id: string): Promise<void>;
   pandocConvert(markdown: string, outPath: string, resourceDir: string | null): Promise<void>;
   /** User themes folder (created with an example on first use). */
   themesDir(): Promise<string>;

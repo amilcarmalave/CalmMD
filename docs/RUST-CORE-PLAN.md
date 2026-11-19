@@ -43,9 +43,12 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   `createRustRenderer()` is now the default; it keeps DOMPurify, the patcher, relative
   image/embed handling, Mermaid and page breaks in the webview. Set
   `VITE_CALMMD_RUST_MARKDOWN=0` or `localStorage['calmmd.rust.markdown'] = '0'` to use the old path.
-- **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
-  misspelling ranges, suggestions and a local personal word list behind `useRustSpell()`. The OS
-  checker remains the fallback for other languages and when the flag is off.
+- **Phase 3 — bundled languages accepted:** zspell provides misspelling ranges, suggestions and a
+  local personal word list. English (US/UK), German, French and Spanish are bundled and work
+  offline; Russian, Turkish and the other English variants appear under a separator in the same
+  Spelling Language menu with a ↓ marker and download on request. A downloaded dictionary moves
+  into the available (✓) group. The OS checker remains the fallback for other languages and when
+  `useRustSpell()` is disabled explicitly.
 - **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
   `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in
   TypeScript, so parity is checked against the new baseline snapshots before switching defaults.

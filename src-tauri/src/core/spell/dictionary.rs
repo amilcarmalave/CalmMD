@@ -1,46 +1,97 @@
-//! Bundled Hunspell dictionary and a small cache of built zspell dictionaries.
+//! Hunspell dictionaries for zspell: compiled-in defaults and locally installed additions.
 //!
-//! The en_US files come from wooorm/dictionaries (dictionary-en 4.0.0, `(MIT AND BSD)`); the full
-//! licence text is shipped beside them. They are compiled into the binary so spellchecking works
-//! offline on every platform without locating an OS dictionary.
+//! The bundled files come from `wooorm/dictionaries` under permissive licences; each licence is
+//! shipped beside its dictionary. Installed dictionaries live in `<app data>/dictionaries/<id>`
+//! and are only fetched after an explicit user request.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+
+use tauri::{AppHandle, Manager};
 use zspell::{DictBuilder, Dictionary};
 
-const EN_AFF: &str = include_str!("dictionaries/en_us/index.aff");
-const EN_DIC: &str = include_str!("dictionaries/en_us/index.dic");
+use super::catalog;
 
-/// Canonical id of the bundled dictionary that backs a BCP 47 language tag.
-/// `None` means "no bundled dictionary" and the caller falls back to the OS checker.
-pub fn bundled_for(lang: Option<&str>) -> Option<&'static str> {
-    let tag = lang.unwrap_or("en-US").to_ascii_lowercase().replace('_', "-");
-    if tag == "en" || tag.starts_with("en-") {
-        Some("en_US")
-    } else {
-        None
+const EN_US_AFF: &str = include_str!("dictionaries/en_us/index.aff");
+const EN_US_DIC: &str = include_str!("dictionaries/en_us/index.dic");
+const EN_GB_AFF: &str = include_str!("dictionaries/en_GB/index.aff");
+const EN_GB_DIC: &str = include_str!("dictionaries/en_GB/index.dic");
+const DE_AFF: &str = include_str!("dictionaries/de_DE/index.aff");
+const DE_DIC: &str = include_str!("dictionaries/de_DE/index.dic");
+const FR_AFF: &str = include_str!("dictionaries/fr_FR/index.aff");
+const FR_DIC: &str = include_str!("dictionaries/fr_FR/index.dic");
+const ES_AFF: &str = include_str!("dictionaries/es_ES/index.aff");
+const ES_DIC: &str = include_str!("dictionaries/es_ES/index.dic");
+
+pub fn dictionaries_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("dictionaries");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+pub fn installed_dir(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
+    let entry = catalog::by_id(id).ok_or_else(|| format!("unknown dictionary: {id}"))?;
+    if entry.bundled || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(format!("dictionary {id} cannot be installed locally"));
+    }
+    Ok(dictionaries_dir(app)?.join(id))
+}
+
+pub fn is_installed(app: &AppHandle, id: &str) -> bool {
+    installed_dir(app, id)
+        .map(|dir| dir.join("index.aff").is_file() && dir.join("index.dic").is_file())
+        .unwrap_or(false)
+}
+
+pub fn parts_for_bundled(id: &str) -> Option<(&'static str, &'static str)> {
+    match id {
+        "en_US" => Some((EN_US_AFF, EN_US_DIC)),
+        "en_GB" => Some((EN_GB_AFF, EN_GB_DIC)),
+        "de_DE" => Some((DE_AFF, DE_DIC)),
+        "fr_FR" => Some((FR_AFF, FR_DIC)),
+        "es_ES" => Some((ES_AFF, ES_DIC)),
+        _ => None,
     }
 }
 
-/// Cache key including the personal word list, since zspell bakes it into the dictionary.
-fn cache_key(lang: &str, personal_words: &str) -> String {
-    format!("{lang}\0{personal_words}")
+fn read_parts(path: &Path, name: &str) -> Result<String, String> {
+    let p = path.join(name);
+    fs::read_to_string(&p).map_err(|e| format!("could not read {}: {e}", p.display()))
 }
 
-fn build(lang: &str, personal_words: &str) -> Result<Dictionary, String> {
-    let (aff, dic) = match lang {
-        "en_US" => (EN_AFF, EN_DIC),
-        other => return Err(format!("no bundled dictionary for {other}")),
-    };
+/// Source files for a dictionary: bundled first, then the locally installed copy.
+pub fn parts_for(app: &AppHandle, id: &str) -> Result<Option<(Cow<'static, str>, Cow<'static, str>)>, String> {
+    if let Some((aff, dic)) = parts_for_bundled(id) {
+        return Ok(Some((Cow::Borrowed(aff), Cow::Borrowed(dic))));
+    }
+    let dir = installed_dir(app, id)?;
+    if !is_installed(app, id) {
+        return Ok(None);
+    }
+    Ok(Some((Cow::Owned(read_parts(&dir, "index.aff")?), Cow::Owned(read_parts(&dir, "index.dic")?))))
+}
+
+fn cache_key(id: &str, personal_words: &str) -> String {
+    format!("{id}\0{personal_words}")
+}
+
+fn build(aff: &str, dic: &str, personal_words: &str) -> Result<Dictionary, String> {
     DictBuilder::new()
         .config_str(aff)
         .dict_str(dic)
         .personal_str(personal_words)
         .build()
-        .map_err(|e| format!("failed to build {lang} dictionary: {e}"))
+        .map_err(|e| format!("failed to build dictionary: {e}"))
 }
 
-/// Lazily builds dictionaries once per language + personal word list.
+/// Lazily builds dictionaries once per id + personal word list.
 pub struct DictionaryCache {
     entries: RwLock<HashMap<String, Arc<Dictionary>>>,
 }
@@ -52,12 +103,18 @@ impl Default for DictionaryCache {
 }
 
 impl DictionaryCache {
-    pub fn get(&self, lang: &str, personal_words: &str) -> Result<Arc<Dictionary>, String> {
-        let key = cache_key(lang, personal_words);
+    pub fn get(
+        &self,
+        id: &str,
+        aff: &str,
+        dic: &str,
+        personal_words: &str,
+    ) -> Result<Arc<Dictionary>, String> {
+        let key = cache_key(id, personal_words);
         if let Some(found) = self.entries.read().expect("spell dictionary cache poisoned").get(&key) {
             return Ok(found.clone());
         }
-        let built = Arc::new(build(lang, personal_words)?);
+        let built = Arc::new(build(aff, dic, personal_words)?);
         let mut entries = self.entries.write().expect("spell dictionary cache poisoned");
         Ok(entries.entry(key).or_insert(built).clone())
     }
@@ -72,26 +129,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn maps_english_tags_to_the_bundled_dictionary() {
-        assert_eq!(bundled_for(None), Some("en_US"));
-        assert_eq!(bundled_for(Some("en")), Some("en_US"));
-        assert_eq!(bundled_for(Some("en-GB")), Some("en_US"));
-        assert_eq!(bundled_for(Some("de-DE")), None);
+    fn maps_english_tags_to_a_bundled_dictionary() {
+        assert_eq!(catalog::entry_for_lang(None).unwrap().id, "en_US");
+        assert_eq!(catalog::entry_for_lang(Some("en")).unwrap().id, "en_US");
+        assert_eq!(catalog::entry_for_lang(Some("en-GB")).unwrap().id, "en_GB");
+        assert_eq!(catalog::entry_for_lang(Some("de-DE")).unwrap().id, "de_DE");
     }
 
     #[test]
-    fn builds_the_bundled_dictionary() {
-        let cache = DictionaryCache::default();
-        let dict = cache.get("en_US", "").expect("en_US dictionary should build");
-        assert!(dict.check_word("receive"));
-        assert!(!dict.check_word("mispelled"));
+    fn builds_every_bundled_dictionary() {
+        for id in ["en_US", "en_GB", "de_DE", "fr_FR", "es_ES"] {
+            let (aff, dic) = parts_for_bundled(id).expect("bundled dictionary");
+            let dict = build(aff, dic, "").unwrap_or_else(|e| panic!("{id}: {e}"));
+            assert!(!dict.check_word("qzxqzx"), "{id} accepted a nonsense word");
+        }
     }
 
     #[test]
     fn personal_words_are_accepted() {
         let cache = DictionaryCache::default();
-        let dict = cache.get("en_US", "calmmd\n").expect("en_US dictionary should build");
+        let dict = cache.get("en_US", EN_US_AFF, EN_US_DIC, "calmmd\n").unwrap();
         assert!(dict.check_word("calmmd"));
-        assert!(!cache.get("en_US", "").unwrap().check_word("calmmd"));
+        assert!(!cache.get("en_US", EN_US_AFF, EN_US_DIC, "").unwrap().check_word("calmmd"));
     }
 }

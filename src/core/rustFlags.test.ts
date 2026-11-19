@@ -9,9 +9,9 @@ afterEach(() => {
 });
 
 describe('Rust migration flags', () => {
-  it('uses Rust Markdown and Takumi by default; spellchecking stays opt-in', () => {
+  it('uses Rust Markdown, Rust spellchecking and Takumi by default', () => {
     expect(useRustMarkdown()).toBe(true);
-    expect(useRustSpell()).toBe(false);
+    expect(useRustSpell()).toBe(true);
     expect(pdfEngine()).toBe('takumi');
     expect(takumiFontWeight()).toBe(350);
   });
@@ -19,6 +19,11 @@ describe('Rust migration flags', () => {
   it('allows the TypeScript renderer as an explicit fallback', () => {
     localStorage.setItem('calmmd.rust.markdown', '0');
     expect(useRustMarkdown()).toBe(false);
+  });
+
+  it('allows the OS spellchecker as an explicit fallback', () => {
+    localStorage.setItem('calmmd.rust.spell', '0');
+    expect(useRustSpell()).toBe(false);
   });
 
   it('allows the browser PDF engine as an explicit fallback', () => {

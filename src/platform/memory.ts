@@ -1,6 +1,7 @@
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
 import type { McpConnectionInfo } from '../mcp/types';
+import type { SpellDictionary } from '../core/spellDictionaries';
 import type {
   HeadingDto,
   HighlightCodeResult,
@@ -124,6 +125,18 @@ function browserMarkdownParse(text: string): MarkdownParseResult {
     blocks,
   };
 }
+
+const SPELL_DICTIONARIES: SpellDictionary[] = [
+  { id: 'en_US', label: 'English (US)', languages: ['en-US', 'en'], license: 'MIT AND BSD', installed: true, bundled: true, source: '' },
+  { id: 'en_GB', label: 'English (UK)', languages: ['en-GB'], license: 'MIT AND BSD', installed: true, bundled: true, source: '' },
+  { id: 'de_DE', label: 'German', languages: ['de-DE', 'de'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'fr_FR', label: 'French', languages: ['fr-FR', 'fr'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'es_ES', label: 'Spanish', languages: ['es-ES', 'es'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'ru_RU', label: 'Russian', languages: ['ru-RU', 'ru'], license: 'BSD-3-Clause', installed: false, bundled: false, source: '' },
+  { id: 'en_CA', label: 'English (Canada)', languages: ['en-CA'], license: 'MIT AND BSD', installed: false, bundled: false, source: '' },
+  { id: 'en_AU', label: 'English (Australia)', languages: ['en-AU'], license: 'MIT AND BSD', installed: false, bundled: false, source: '' },
+  { id: 'tr_TR', label: 'Turkish', languages: ['tr-TR', 'tr'], license: 'MIT', installed: false, bundled: false, source: '' },
+];
 
 export interface MemoryPlatformOptions {
   files?: Record<string, string>;
@@ -349,6 +362,20 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     async spellLearn(word) {
       learned.add(word.toLowerCase());
+    },
+    async spellDictionaries() {
+      return SPELL_DICTIONARIES.map((d) => ({
+        ...d,
+        installed: d.bundled || store.getItem('spell:installed:' + d.id) === '1',
+      }));
+    },
+    async spellInstallDictionary(id) {
+      if (!SPELL_DICTIONARIES.some((d) => d.id === id && !d.bundled)) throw new Error(`Unknown optional dictionary: ${id}`);
+      store.setItem('spell:installed:' + id, '1');
+    },
+    async spellRemoveDictionary(id) {
+      if (!SPELL_DICTIONARIES.some((d) => d.id === id && !d.bundled)) throw new Error(`Built-in dictionary cannot be removed: ${id}`);
+      store.removeItem('spell:installed:' + id);
     },
     async pandocConvert() {
       throw new Error("Pandoc isn't available here");

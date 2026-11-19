@@ -3,7 +3,8 @@
  *
  * Build-time values come from `VITE_CALMMD_*`; a local override in `localStorage` wins so a
  * developer or a smoke test can flip one service without rebuilding. Rust Markdown is authoritative
- * after the Phase 1/4 parity review; spellchecking stays opt-in until all dictionaries ship.
+ * after the Phase 1/4 parity review. Spellchecking defaults to the bundled zspell dictionaries;
+ * other languages fall back to the OS checker.
  */
 
 export type PdfEngine = 'browser' | 'takumi' | 'ikat';
@@ -34,7 +35,7 @@ export function useRustMarkdown(): boolean {
 }
 
 export function useRustSpell(): boolean {
-  return flag('VITE_CALMMD_RUST_SPELL', 'calmmd.rust.spell');
+  return flag('VITE_CALMMD_RUST_SPELL', 'calmmd.rust.spell', true);
 }
 
 export function pdfEngine(): PdfEngine {

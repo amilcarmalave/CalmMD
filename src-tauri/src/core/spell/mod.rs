@@ -1,19 +1,23 @@
-//! Native spellchecking service backed by zspell and a bundled Hunspell dictionary.
+//! Native spellchecking service backed by zspell and permissive Hunspell dictionaries.
 //!
-//! The OS checker in `spell.rs` stays as a fallback for languages we do not bundle. This module is
-//! feature-flagged from the webview (`VITE_CALMMD_RUST_SPELL` / `calmmd.rust.spell`), so the OS path
-//! remains available while dictionaries and suggestion quality are being compared.
+//! The OS checker in `spell.rs` stays as a fallback for languages without a bundled or locally
+//! installed dictionary. Dictionaries are opt-in: bundled ones work offline, and extra ones are
+//! downloaded only when the user asks for them.
 
+mod catalog;
 mod dictionary;
 mod utf16;
 
+use std::fs;
+use std::io::ErrorKind;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::AppHandle;
 
-pub use dictionary::bundled_for;
-use dictionary::DictionaryCache;
+pub use catalog::entry_for_lang;
+use dictionary::{is_installed, parts_for};
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct SpellCheckDto {
@@ -22,19 +26,22 @@ pub struct SpellCheckDto {
 }
 
 const MAX_SUGGESTIONS: usize = 6;
+const MAX_DICTIONARY_BYTES: usize = 24 * 1024 * 1024;
 
 static CACHE: OnceLock<DictionaryCache> = OnceLock::new();
+
+use dictionary::DictionaryCache;
 
 fn cache() -> &'static DictionaryCache {
     CACHE.get_or_init(DictionaryCache::default)
 }
 
-fn personal_key(lang: &str) -> String {
-    format!("spell/personal/{lang}")
+fn personal_key(id: &str) -> String {
+    format!("spell/personal/{id}")
 }
 
-fn read_personal(app: &AppHandle, lang: &str) -> Result<String, String> {
-    Ok(crate::kv::read(app, &personal_key(lang))?.unwrap_or_default())
+fn read_personal(app: &AppHandle, id: &str) -> Result<String, String> {
+    Ok(crate::kv::read(app, &personal_key(id))?.unwrap_or_default())
 }
 
 /// Adds a word to a Hunspell personal dictionary, keeping the file stable and duplicate-free.
@@ -60,15 +67,22 @@ fn add_personal_word(current: &str, word: &str) -> String {
     words.join("\n")
 }
 
-/// Checks a single word against the bundled dictionary for `lang`.
-/// `Ok(None)` means no bundled dictionary is available for that language.
-pub fn check(word: &str, lang: Option<&str>, personal_words: &str) -> Result<Option<SpellCheckDto>, String> {
+/// Resolves a language to a dictionary that is actually available on this machine.
+fn available_id(app: &AppHandle, lang: Option<&str>) -> Option<&'static str> {
+    let entry = entry_for_lang(lang)?;
+    if entry.bundled || is_installed(app, entry.id) {
+        Some(entry.id)
+    } else {
+        None
+    }
+}
+
+fn check_with_parts(word: &str, id: &str, aff: &str, dic: &str, personal_words: &str) -> Result<Option<SpellCheckDto>, String> {
     let word = word.trim();
     if word.is_empty() {
         return Ok(None);
     }
-    let Some(lang) = bundled_for(lang) else { return Ok(None) };
-    let dict = cache().get(lang, personal_words)?;
+    let dict = cache().get(id, aff, dic, personal_words)?;
     let misspelled = !dict.check_word(word);
     let suggestions = if misspelled {
         dict.entry(word)
@@ -85,10 +99,8 @@ pub fn check(word: &str, lang: Option<&str>, personal_words: &str) -> Result<Opt
     Ok(Some(SpellCheckDto { misspelled, suggestions }))
 }
 
-/// Misspelled ranges as UTF-16 code units, matching CodeMirror's string offsets.
-pub fn check_text(text: &str, lang: Option<&str>, personal_words: &str) -> Result<Option<Vec<(u32, u32)>>, String> {
-    let Some(lang) = bundled_for(lang) else { return Ok(None) };
-    let dict = cache().get(lang, personal_words)?;
+fn check_text_with_parts(text: &str, id: &str, aff: &str, dic: &str, personal_words: &str) -> Result<Option<Vec<(u32, u32)>>, String> {
+    let dict = cache().get(id, aff, dic, personal_words)?;
     let mut ranges = Vec::new();
     for (start, word) in dict.check_indices(text) {
         let end = start + word.len();
@@ -97,34 +109,126 @@ pub fn check_text(text: &str, lang: Option<&str>, personal_words: &str) -> Resul
     Ok(Some(ranges))
 }
 
+fn check_with_app(app: &AppHandle, word: &str, lang: Option<&str>) -> Result<Option<SpellCheckDto>, String> {
+    let Some(id) = available_id(app, lang) else { return Ok(None) };
+    let (aff, dic) = parts_for(app, id)?.expect("available dictionary has files");
+    let personal = read_personal(app, id)?;
+    check_with_parts(word, id, &aff, &dic, &personal)
+}
+
+fn check_text_with_app(app: &AppHandle, text: &str, lang: Option<&str>) -> Result<Option<Vec<(u32, u32)>>, String> {
+    let Some(id) = available_id(app, lang) else { return Ok(None) };
+    let (aff, dic) = parts_for(app, id)?.expect("available dictionary has files");
+    let personal = read_personal(app, id)?;
+    check_text_with_parts(text, id, &aff, &dic, &personal)
+}
+
 #[tauri::command]
 pub fn core_spell_check(app: AppHandle, word: String, lang: Option<String>) -> Result<Option<SpellCheckDto>, String> {
-    let Some(lang) = bundled_for(lang.as_deref()) else { return Ok(None) };
-    check(&word, Some(lang), &read_personal(&app, lang)?)
+    check_with_app(&app, &word, lang.as_deref())
 }
 
 #[tauri::command]
 pub fn core_spell_check_text(app: AppHandle, text: String, lang: Option<String>) -> Result<Option<Vec<(u32, u32)>>, String> {
-    let Some(lang) = bundled_for(lang.as_deref()) else { return Ok(None) };
-    check_text(&text, Some(lang), &read_personal(&app, lang)?)
+    check_text_with_app(&app, &text, lang.as_deref())
 }
 
 /// Returns `true` when the Rust service handled the word; `false` asks the webview to fall back
 /// to the OS user dictionary (unknown language).
 #[tauri::command]
 pub fn core_spell_learn(app: AppHandle, word: String, lang: Option<String>) -> Result<bool, String> {
-    let Some(lang) = bundled_for(lang.as_deref()) else { return Ok(false) };
+    let Some(id) = available_id(&app, lang.as_deref()) else { return Ok(false) };
     let word = word.trim();
     if word.is_empty() || !word.chars().all(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '\'' | '’')) {
         return Ok(true);
     }
-    let current = read_personal(&app, lang)?;
+    let current = read_personal(&app, id)?;
     let updated = add_personal_word(&current, word);
     if updated != current {
-        crate::kv::write(&app, &personal_key(lang), &updated)?;
+        crate::kv::write(&app, &personal_key(id), &updated)?;
         cache().clear();
     }
     Ok(true)
+}
+
+#[tauri::command]
+pub fn core_spell_dictionaries(app: AppHandle) -> Result<Vec<catalog::DictionaryInfo>, String> {
+    Ok(catalog::DICTIONARIES
+        .iter()
+        .map(|entry| catalog::DictionaryInfo {
+            id: entry.id.to_string(),
+            label: entry.label.to_string(),
+            languages: entry.languages.iter().map(|tag| tag.to_string()).collect(),
+            license: entry.license.to_string(),
+            installed: entry.bundled || is_installed(&app, entry.id),
+            bundled: entry.bundled,
+            source: format!("{}/{}", catalog::UPSTREAM, entry.upstream),
+        })
+        .collect())
+}
+
+async fn download(client: &reqwest::Client, url: &str) -> Result<String, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    if parsed.scheme() != "https" || parsed.host_str() != Some("raw.githubusercontent.com") {
+        return Err(format!("refusing to download from {url}"));
+    }
+    let response = client
+        .get(parsed)
+        .send()
+        .await
+        .map_err(|e| format!("dictionary download failed: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("dictionary download failed: {e}"))?;
+    if let Some(length) = response.content_length() {
+        if length as usize > MAX_DICTIONARY_BYTES {
+            return Err("dictionary file is too large".into());
+        }
+    }
+    let bytes = response.bytes().await.map_err(|e| format!("dictionary download failed: {e}"))?;
+    if bytes.is_empty() || bytes.len() > MAX_DICTIONARY_BYTES {
+        return Err("dictionary file has an unexpected size".into());
+    }
+    String::from_utf8(bytes.to_vec()).map_err(|_| "dictionary file is not UTF-8 text".into())
+}
+
+/// Installs one curated dictionary. No network access happens unless this command is called.
+#[tauri::command]
+pub async fn core_spell_dictionary_install(app: AppHandle, id: String) -> Result<(), String> {
+    let entry = catalog::by_id(&id).ok_or_else(|| format!("unknown dictionary: {id}"))?;
+    if entry.bundled {
+        return Ok(());
+    }
+    let dir = dictionary::installed_dir(&app, &id)?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| e.to_string())?;
+    for (target, upstream) in [("index.aff", "index.aff"), ("index.dic", "index.dic"), ("LICENSE", "license")] {
+        let url = format!("{}/{}/{}", catalog::UPSTREAM, entry.upstream, upstream);
+        let text = download(&client, &url).await?;
+        if target != "LICENSE" && text.trim().len() < 20 {
+            return Err(format!("downloaded {target} is empty"));
+        }
+        crate::fsops::write_atomic(&dir.join(target), text.as_bytes()).map_err(|e| e.to_string())?;
+    }
+    cache().clear();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn core_spell_dictionary_remove(app: AppHandle, id: String) -> Result<(), String> {
+    let dir = dictionary::installed_dir(&app, &id)?;
+    for name in ["index.aff", "index.dic", "LICENSE"] {
+        match fs::remove_file(dir.join(name)) {
+            Ok(()) => {}
+            Err(e) if e.kind() == ErrorKind::NotFound => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    let _ = fs::remove_dir(&dir);
+    cache().clear();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -133,12 +237,27 @@ mod tests {
 
     #[test]
     fn finds_misspellings_and_offers_suggestions() {
-        let result = check("mispelled", Some("en-US"), "").unwrap().unwrap();
+        let (aff, dic) = dictionary::parts_for_bundled("en_US").unwrap();
+        let result = check_with_parts("mispelled", "en_US", aff, dic, "").unwrap().unwrap();
         assert!(result.misspelled);
         assert!(result.suggestions.iter().any(|s| s == "misspelled"), "{:?}", result.suggestions);
 
-        let good = check("receive", Some("en-US"), "").unwrap().unwrap();
+        let good = check_with_parts("receive", "en_US", aff, dic, "").unwrap().unwrap();
         assert_eq!(good, SpellCheckDto { misspelled: false, suggestions: Vec::new() });
+    }
+
+    #[test]
+    fn uses_the_selected_bundled_language() {
+        for id in ["en_GB", "de_DE", "fr_FR", "es_ES"] {
+            let (aff, dic) = dictionary::parts_for_bundled(id).unwrap();
+            assert!(check_with_parts("qzxqzx", id, aff, dic, "").unwrap().unwrap().misspelled);
+        }
+        let (aff, dic) = dictionary::parts_for_bundled("de_DE").unwrap();
+        assert!(!check_with_parts("Informationen", "de_DE", aff, dic, "").unwrap().unwrap().misspelled);
+        let (aff, dic) = dictionary::parts_for_bundled("fr_FR").unwrap();
+        assert!(!check_with_parts("bonjour", "fr_FR", aff, dic, "").unwrap().unwrap().misspelled);
+        let (aff, dic) = dictionary::parts_for_bundled("es_ES").unwrap();
+        assert!(!check_with_parts("información", "es_ES", aff, dic, "").unwrap().unwrap().misspelled);
     }
 
     #[test]
@@ -146,7 +265,8 @@ mod tests {
         let text = "Café 😀 I mispelled teh mail.";
         // "Café" is a proper noun absent from the bundled dictionary; teach it to keep the test
         // focused on UTF-16 offset conversion.
-        let found = check_text(text, Some("en-US"), "Café\n").unwrap().unwrap();
+        let (aff, dic) = dictionary::parts_for_bundled("en_US").unwrap();
+        let found = check_text_with_parts(text, "en_US", aff, dic, "Café\n").unwrap().unwrap();
         let utf16: Vec<u16> = text.encode_utf16().collect();
         let words: Vec<String> = found
             .iter()
@@ -162,14 +282,14 @@ mod tests {
         let stored = add_personal_word(&stored, "calmmd");
         assert_eq!(stored, "calmmd\nzettel");
 
-        let dict = cache().get("en_US", &stored).unwrap();
+        let (aff, dic) = dictionary::parts_for_bundled("en_US").unwrap();
+        let dict = cache().get("en_US", aff, dic, &stored).unwrap();
         assert!(dict.check_word("calmmd"));
         assert!(dict.check_word("zettel"));
     }
 
     #[test]
-    fn unknown_languages_fall_back_to_the_os_checker() {
-        assert!(check("mispelled", Some("de-DE"), "").unwrap().is_none());
-        assert!(check_text("mispelled", Some("de-DE"), "").unwrap().is_none());
+    fn unknown_languages_have_no_bundled_dictionary() {
+        assert!(entry_for_lang(Some("pt-BR")).is_none());
     }
 }
