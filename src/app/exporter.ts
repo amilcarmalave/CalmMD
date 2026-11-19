@@ -2,7 +2,7 @@ import { createMarkdownService } from '../core/markdownService';
 import { basename, dirname, joinPath, stem } from '../core/paths';
 import { pdfEngine, useRustMarkdown } from '../core/rustFlags';
 import type { CoverInfo } from '../core/cover';
-import { buildBody, buildDocument, DEFAULT_PDF, hasMath, type BaseTheme, type ExportOptions, type PdfOptions } from '../export/build';
+import { buildBody, DEFAULT_PDF, hasMath, type BaseTheme, type ExportAssets, type ExportOptions, type PdfOptions } from '../export/build';
 import type { Platform, SaveKind } from '../platform/types';
 
 export interface ExportSource {
@@ -104,6 +104,22 @@ export function createExporter(deps: ExporterDeps) {
     return { opts, body, assets };
   }
 
+  /** Rust owns the final self-contained document shell; the view only prepares the body. */
+  async function assembleHtml(body: string, opts: ExportOptions, assets: ExportAssets, pdf?: PdfOptions) {
+    const { html } = await platform.exportAssemble({
+      body,
+      title: opts.title,
+      theme: opts.theme,
+      userCss: opts.userCss,
+      baseCss: assets.baseCss,
+      fontCss: assets.fontCss,
+      katexCss: assets.katexCss,
+      pagedJs: assets.pagedJs,
+      pdf,
+    });
+    return html;
+  }
+
   async function prepare(prefs: ExportPrefs, withPaged: boolean, cover: CoverInfo | null) {
     const d = deps.current();
     if (!d) throw new Error('Nothing to export');
@@ -119,7 +135,7 @@ export function createExporter(deps: ExporterDeps) {
     try {
       deps.notify('Exporting HTML…');
       const { opts, body, assets } = await prepare(prefs, false, cover);
-      await platform.writeTextFile(out, buildDocument(body, opts, assets));
+      await platform.writeTextFile(out, await assembleHtml(body, opts, assets));
       deps.notify(`Exported ${basename(out)}`, reveal(out));
     } catch (e) {
       fail('HTML export', e);
@@ -132,7 +148,7 @@ export function createExporter(deps: ExporterDeps) {
     try {
       deps.notify('Exporting PDF…');
       const { opts, body, assets } = await prepare(prefs, true, cover);
-      await writePdf(buildDocument(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
+      await writePdf(await assembleHtml(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
       deps.notify(`Exported ${basename(out)}`, reveal(out));
     } catch (e) {
       if (String(e).includes('NO_BROWSER') && pdfEngine() === 'browser') {
@@ -140,7 +156,7 @@ export function createExporter(deps: ExporterDeps) {
         // It has no running headers or page numbers, but the layout and styles are the same.
         const { opts, body, assets } = await prepare(prefs, false, cover);
         opts.print = true;
-        printWithDialog(buildDocument(body, opts, { ...assets, pagedJs: undefined }, prefs.pdf));
+        printWithDialog(await assembleHtml(body, opts, { ...assets, pagedJs: undefined }, prefs.pdf));
         deps.notify('Choose “Save as PDF” in the print dialog');
       } else fail('PDF export', e);
     }
@@ -176,13 +192,13 @@ export function createExporter(deps: ExporterDeps) {
   /** Headless exports for MCP: the caller supplies the source and the exact output path. */
   async function exportPdfData(doc: ExportSource, out: string, prefs: ExportPrefs = DEFAULT_EXPORT_PREFS, cover: CoverInfo | null = null) {
     const { opts, body, assets } = await prepareFor(doc, prefs, true, cover);
-    await writePdf(buildDocument(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
+    await writePdf(await assembleHtml(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
     return out;
   }
 
   async function exportHtmlData(doc: ExportSource, out: string, prefs: ExportPrefs = DEFAULT_EXPORT_PREFS, cover: CoverInfo | null = null) {
     const { opts, body, assets } = await prepareFor(doc, prefs, false, cover);
-    await platform.writeTextFile(out, buildDocument(body, opts, assets));
+    await platform.writeTextFile(out, await assembleHtml(body, opts, assets));
     return out;
   }
 

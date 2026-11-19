@@ -136,6 +136,7 @@ pub fn run() {
             core::session::core_space_remove,
             core::session::core_spaces,
             core::export::takumi::takumi_pdf,
+            core::export::assemble::core_export_assemble,
             core::spell::core_spell_check,
             core::spell::core_spell_check_text,
             core::spell::core_spell_learn,

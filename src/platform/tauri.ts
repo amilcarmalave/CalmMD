@@ -23,6 +23,7 @@ import type { HistoryUsage, HistoryVersion } from '../history/types';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
 import type { TakumiPdfOptions } from '../export/takumi';
+import type { ExportAssembleRequest } from './types';
 import type { McpConnectionInfo, McpRequest } from '../mcp/types';
 import type { WorkspaceEvent } from '../workspace/types';
 import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
@@ -213,6 +214,7 @@ export function createTauriPlatform(): Platform {
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),
     takumiPdf: (html, out, options: TakumiPdfOptions) => invoke<void>('takumi_pdf', { html, out, options }),
+    exportAssemble: (request: ExportAssembleRequest) => invoke<{ html: string }>('core_export_assemble', { payload: request }),
     readImageDataUrl: (path) => invoke<string>('read_image_data_url', { path }),
     // Raw IPC body (fast for large images); the path travels in a header.
     writeBinaryFile: (path, data) => invoke<void>('write_binary_file', data, { headers: { path: encodeURIComponent(path) } }),

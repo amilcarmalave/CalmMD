@@ -1,3 +1,4 @@
+import type { BaseTheme, Margins, PageSize, PdfTemplate } from '../export/build';
 import { createKvHistory } from '../app/history';
 import type { Session } from '../app/session';
 import { parseSession } from '../app/session';
@@ -536,6 +537,33 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       const { renderPdf } = await import('../export/takumi');
       const bytes = await renderPdf(html, options);
       await platform.writeBinaryFile(out, bytes);
+    },
+    async exportAssemble(request) {
+      // The browser build has no Rust command; keep the original TypeScript shell as fallback.
+      const { buildDocument } = await import('../export/build');
+      const { baseCss, fontCss, katexCss, pagedJs, pdf, ...rest } = request;
+      const html = buildDocument(
+        rest.body,
+        {
+          title: rest.title,
+          theme: rest.theme as BaseTheme,
+          userCss: rest.userCss,
+          toc: false,
+          embedImages: false,
+        },
+        { baseCss, fontCss, katexCss, pagedJs },
+        pdf
+          ? {
+              pageSize: pdf.pageSize as PageSize,
+              margins: pdf.margins as Margins,
+              header: pdf.header,
+              pageNumbers: pdf.pageNumbers,
+              breakBeforeH1: pdf.breakBeforeH1,
+              template: pdf.template as PdfTemplate,
+            }
+          : undefined,
+      );
+      return { html };
     },
     async openPath() {},
     async readImageDataUrl(path) {

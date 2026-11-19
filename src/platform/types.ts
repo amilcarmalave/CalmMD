@@ -59,6 +59,28 @@ export interface NativeMenu {
   items: NativeMenuItem[];
 }
 
+export interface ExportAssemblePdf {
+  pageSize: string;
+  margins: string;
+  header: boolean;
+  pageNumbers: boolean;
+  breakBeforeH1: boolean;
+  template: string;
+}
+
+/** Inputs for Rust's deterministic standalone-document assembler. */
+export interface ExportAssembleRequest {
+  body: string;
+  title: string;
+  theme: string;
+  userCss: string | null;
+  baseCss: string;
+  fontCss: string;
+  katexCss?: string;
+  pagedJs?: string;
+  pdf?: ExportAssemblePdf;
+}
+
 export interface Platform {
   readonly kind: 'tauri' | 'web' | 'memory';
   readonly isMac: boolean;
@@ -154,6 +176,8 @@ export interface Platform {
   printPdf(html: string, outPath: string): Promise<void>;
   /** Writes a PDF with the native Rust Takumi engine (desktop only). */
   takumiPdf(html: string, outPath: string, options: TakumiPdfOptions): Promise<void>;
+  /** Builds the self-contained HTML shell in Rust; the view still prepares the body. */
+  exportAssemble(request: ExportAssembleRequest): Promise<{ html: string }>;
   readImageDataUrl(path: string): Promise<string>;
   /** Writes binary data (a pasted image), creating missing folders. */
   writeBinaryFile(path: string, data: Uint8Array): Promise<void>;

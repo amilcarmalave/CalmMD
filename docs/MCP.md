@@ -14,7 +14,9 @@ user-facing summary see [`README.md`](../README.md), for client setup see
 CalmMD can host a **local MCP server** so an external AI client can work on the documents that are
 currently open in the app. The server works on the *live app state*, not a second filesystem implementation. Most tools now
 call Rust workspace services directly; the webview mirrors its buffers into those services and
-applies their state-change events. PDF/HTML export still uses the webview bridge because the
+applies their state-change events. PDF/HTML export still uses a narrow webview bridge for body
+preparation because the Mermaid patch, image readback and CSS/font assets live there; Rust
+resolves inputs, normalises preferences and assembles the standalone document shell.
 headless exporter lives there.
 
 - reads prefer the mirrored open buffer, so unsaved edits are visible;
@@ -384,7 +386,7 @@ because no `en-US` OS dictionary is installed; they are unrelated to MCP.
 
 ### 9.2 Security and permissions
 
-- **Path scoping lives in the Rust workspace.** PDF/HTML export still validates paths through the
+- **Path scoping lives in the Rust workspace.** PDF/HTML export resolves paths in Rust before the
   webview bridge; move that to Rust with the exporter in a later phase.
 - **Broad filesystem capability.** The app's Tauri asset scope is `**`; MCP did not narrow it.
 - **No per-root or per-tool permissions.** Today, starting the server grants all 12 tools for the

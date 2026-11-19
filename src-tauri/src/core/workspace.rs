@@ -432,8 +432,8 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
             stack.pop().ok_or_else(|| if redo { "Nothing to redo" } else { "Nothing to undo" })?
         };
         let target = if redo { change.after.clone() } else { change.before.clone() };
-        let (value, events) = self.apply_text(window, &path, &target, "replace", false)?;
-        let mut stacks = if redo { self.undo.write() } else { self.redo.write() };
+        let (_value, events) = self.apply_text(window, &path, &target, "replace", false)?;
+        let stacks = if redo { self.undo.write() } else { self.redo.write() };
         let mut stacks = stacks.map_err(|e| e.to_string())?;
         // Both stacks keep the original direction: undo jumps to `before`, redo to `after`.
         stacks.entry(key).or_default().push(change);

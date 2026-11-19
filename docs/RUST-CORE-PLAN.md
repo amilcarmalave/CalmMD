@@ -79,7 +79,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   `core/autosave.rs`: the webview reports edits, and Rust owns debounce/max-wait, retries and status
   events. The webview still owns the immediate EditorState runtime; tool-driven undo/redo is
   journaled in the Rust workspace.
-  PDF/HTML export still uses the webview bridge because the renderer is there.
+  PDF/HTML export is narrowed: Rust resolves inputs, normalises preferences and cover defaults,
+  and assembles the standalone document shell. The webview only prepares the body because its
+  Mermaid patch, image readback and CSS/font assets live there.
 - **Phases 5b and 7:** not started.
 
 ---
@@ -407,7 +409,8 @@ Benefits:
 - no duplicate path sandbox logic;
 - MCP tools become callable even before the webview finishes loading.
 
-Phase 6's first slice keeps this bridge only for PDF/HTML export. The remaining user-edit state
+Phase 6 keeps this bridge only for body preparation (Mermaid, image readback and CSS/font assets).
+The remaining user-edit state
 machine (drafts, conflicts, autosave targets and explorer UI state) still lives in the webview and
 is mirrored into Rust rather than fully owned there.
 
