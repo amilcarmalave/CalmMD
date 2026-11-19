@@ -27,7 +27,7 @@ Optionally enable **File → Auto-start MCP Server** so this happens on future l
 
 | Capability | Count | Examples |
 |---|---|---|
-| Tools | 16 | `calmmd_status`, `calmmd_triage_folder`, `calmmd_write_document`, `calmmd_export_pdf` |
+| Tools | 18 | `calmmd_status`, `calmmd_triage_folder`, `calmmd_write_document`, `calmmd_export_pdf` |
 | Prompts | 3 | `calmmd_summarize`, `calmmd_follow_up_guide`, `calmmd_organize_folder` |
 | Static resources | 2 | `calmmd://status`, `calmmd://windows` |
 | Resource templates | 2 | `calmmd://document/{path}`, `calmmd://folder/{path}` |
@@ -167,7 +167,7 @@ configuration, or wait for the CalmMD stdio shim (see [open topics](MCP.md#91-tr
 Ask the client to list MCP servers, or use its MCP panel. You should see:
 
 - server name `calmmd`
-- 16 tools, including `calmmd_status`, `calmmd_windows` and `calmmd_triage_folder`
+- 18 tools, including `calmmd_status`, `calmmd_windows`, `calmmd_undo_document` and `calmmd_triage_folder`
 - 3 prompts: `calmmd_summarize`, `calmmd_follow_up_guide`, `calmmd_organize_folder`
 - 2 resources and 2 resource templates
 

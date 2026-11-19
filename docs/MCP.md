@@ -44,7 +44,7 @@ Implemented and building as of this document:
 | Tauri event bridge for headless exports | ✅ |
 | Rust-owned workspace state for read/write/list/search/outline/status | ✅ |
 | Rust file history and link-safe rename/move | ✅ |
-| 16 live-state tools | ✅ |
+| 18 live-state tools | ✅ |
 | 3 prompt templates (summary, follow-up guide, folder organisation) | ✅ |
 | 2 static resources + 2 resource templates | ✅ |
 | Client setup guide and agent skill | ✅ |
@@ -215,6 +215,8 @@ With neither, the call goes to `main`.
 | `calmmd_rename_document` | `path`, `name` | Retargets tabs, favorites, history, links |
 | `calmmd_move_document` | `path`, `folder`, `name?` | Moves, optionally renames, retargets links |
 | `calmmd_write_document` | `path`, `content` or `text`, `mode?`, `flush?` | Undoable, autosaved, snapshotted |
+| `calmmd_undo_document` | `path`, routing fields | Restores the last Rust-owned change; updates the open view |
+| `calmmd_redo_document` | `path`, routing fields | Reapplies the last undone change |
 | `calmmd_trash_document` | `path`, `confirm` | `confirm: true` is the caller's confirmation; no webview modal |
 | `calmmd_triage_folder` | `folder?`, `limit?`, `excerptChars?` | Live excerpts, headings, front matter, subfolders |
 | `calmmd_apply_organization` | `folder?`, `plan`, `apply?` | Validates and applies a move/rename plan via CalmMD |

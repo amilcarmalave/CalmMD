@@ -462,6 +462,30 @@ impl CalmMdTools {
         }
     }
 
+    #[tool(description = "Undo the last Rust-owned change to a document. The view is updated and the change can be redone.")]
+    async fn calmmd_undo_document(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.undo_document(&window, &args.path),
+            Err(e) => Err(e),
+        };
+        match result {
+            Ok(v) => ok(v),
+            Err(e) => fail(e),
+        }
+    }
+
+    #[tool(description = "Redo the last undone Rust-owned change to a document.")]
+    async fn calmmd_redo_document(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
+        let result = match self.window(&args.target) {
+            Ok(window) => self.workspace.redo_document(&window, &args.path),
+            Err(e) => Err(e),
+        };
+        match result {
+            Ok(v) => ok(v),
+            Err(e) => fail(e),
+        }
+    }
+
     #[tool(description = "Move a document to the OS trash. Requires confirm: true.")]
     async fn calmmd_trash_document(&self, Parameters(args): Parameters<TrashArgs>) -> Result<CallToolResult, McpError> {
         let result = match self.window(&args.target) {

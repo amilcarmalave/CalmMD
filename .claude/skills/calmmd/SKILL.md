@@ -38,6 +38,7 @@ files while CalmMD has them open.
 | Create notes/folders | `calmmd_create_document`, `calmmd_create_folder` |
 | Rename or move notes | `calmmd_rename_document`, `calmmd_move_document` |
 | Edit a note | `calmmd_write_document` |
+| Undo / redo a Rust-backed edit | `calmmd_undo_document`, `calmmd_redo_document` |
 | Remove a note | `calmmd_trash_document` — only with explicit user confirmation |
 | Organise a large folder | `calmmd_triage_folder` + `calmmd_apply_organization` — plan first, apply second |
 | Export | `calmmd_export_pdf`, `calmmd_export_html` |

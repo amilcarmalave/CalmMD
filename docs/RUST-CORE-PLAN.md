@@ -77,7 +77,8 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   changed underneath CalmMD. Rust also owns validated session and Space records (`core/session.rs`),
   including tabs, cursors, scroll lines, roots and sidebar layout. Autosave scheduling now lives in
   `core/autosave.rs`: the webview reports edits, and Rust owns debounce/max-wait, retries and status
-  events. The webview still owns EditorState and undo history.
+  events. The webview still owns the immediate EditorState runtime; tool-driven undo/redo is
+  journaled in the Rust workspace.
   PDF/HTML export still uses the webview bridge because the renderer is there.
 - **Phases 5b and 7:** not started.
 
@@ -357,7 +358,8 @@ not.
 
 This is where MCP gets simpler.
 
-- Port `documents.ts` state machine into Rust: undo and the remaining editor runtime concerns.
+- Port `documents.ts` state machine into Rust: the remaining editor runtime concerns. Tool-driven
+  undo/redo is in the Rust workspace.
   Draft
   records, disk writes and conflict detection are in `core/buffers.rs`; autosave timing and retries
   are in `core/autosave.rs`; `set_content_by_path` for MCP is in `core/workspace.rs`;

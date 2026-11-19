@@ -296,7 +296,9 @@ marker appears in the status bar while it is running.
 
 Tools: `calmmd_status`, `calmmd_windows`, `calmmd_list_documents`, `calmmd_read_document`,
 `calmmd_search`, `calmmd_outline`, `calmmd_create_document`, `calmmd_create_folder`,
-`calmmd_rename_document`, `calmmd_move_document`, `calmmd_write_document`, `calmmd_trash_document`,
+`calmmd_rename_document`, `calmmd_move_document`, `calmmd_write_document`,
+`calmmd_undo_document` / `calmmd_redo_document`, `calmmd_trash_document`,
+
 `calmmd_triage_folder`, `calmmd_apply_organization`, `calmmd_export_pdf`, `calmmd_export_html`.
 Prompts: `calmmd_summarize`, `calmmd_follow_up_guide` (live note → client-side LLM instruction,
 written back with `calmmd_write_document`) and `calmmd_organize_folder` (live folder inventory →

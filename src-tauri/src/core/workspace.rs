@@ -64,9 +64,17 @@ impl Workspace {
 }
 
 /// Pure workspace operations. Generic over the history store so file/history rules are testable.
+#[derive(Debug, Clone)]
+struct TextChange {
+    before: String,
+    after: String,
+}
+
 pub struct WorkspaceStore<S: crate::core::history::HistoryStore> {
     window: RwLock<HashMap<String, Workspace>>,
     history: History<S>,
+    undo: RwLock<HashMap<String, Vec<TextChange>>>,
+    redo: RwLock<HashMap<String, Vec<TextChange>>>,
 }
 
 impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
@@ -74,6 +82,8 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
         Arc::new(Self {
             window: RwLock::new(HashMap::new()),
             history,
+            undo: RwLock::new(HashMap::new()),
+            redo: RwLock::new(HashMap::new()),
         })
     }
 
@@ -335,8 +345,21 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
         flush: bool,
     ) -> Result<(Value, Vec<WorkspaceEventDto>), String> {
         let _ = flush; // Rust writes synchronously; the flag is kept for tool compatibility.
+        self.apply_text(window, raw_path, content, mode, true)
+    }
+
+    /// Applies one text change. `journal` is false for undo/redo so replaying a change doesn't
+    /// push a new undo entry while that step is already moving between stacks.
+    fn apply_text(
+        &self,
+        window: &str,
+        raw_path: &str,
+        content: &str,
+        mode: &str,
+        journal: bool,
+    ) -> Result<(Value, Vec<WorkspaceEventDto>), String> {
         let path = self.resolve(window, raw_path)?;
-        let (current, eol, bom, old_mtime) = self.live_or_disk(window, &path)?;
+        let (current, eol, bom, _old_mtime) = self.live_or_disk(window, &path)?;
         {
             let all = self.workspace(window)?;
             if let Some(doc) = all.get(window).and_then(|state| state.document(&path)) {
@@ -384,16 +407,62 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
                 doc.bom = bom;
             }
         }
-        let _ = old_mtime;
+        if journal {
+            let mut undo = self.undo.write().map_err(|e| e.to_string())?;
+            undo.entry(path_key(&path)).or_default().push(TextChange {
+                before: current,
+                after: next.clone(),
+            });
+            let mut redo = self.redo.write().map_err(|e| e.to_string())?;
+            redo.remove(&path_key(&path));
+        }
         Ok((
             json!({ "path": path, "changed": true }),
             vec![WorkspaceEventDto::content(path, next, new_mtime)],
         ))
     }
 
+    fn jump_history(&self, window: &str, raw_path: &str, redo: bool) -> Result<(Value, Vec<WorkspaceEventDto>), String> {
+        let path = self.resolve(window, raw_path)?;
+        let key = path_key(&path);
+        let change = {
+            let mut stacks = if redo { self.redo.write() } else { self.undo.write() };
+            let mut stacks = stacks.map_err(|e| e.to_string())?;
+            let stack = stacks.get_mut(&key).ok_or_else(|| if redo { "Nothing to redo" } else { "Nothing to undo" })?;
+            stack.pop().ok_or_else(|| if redo { "Nothing to redo" } else { "Nothing to undo" })?
+        };
+        let target = if redo { change.after.clone() } else { change.before.clone() };
+        let (value, events) = self.apply_text(window, &path, &target, "replace", false)?;
+        let mut stacks = if redo { self.undo.write() } else { self.redo.write() };
+        let mut stacks = stacks.map_err(|e| e.to_string())?;
+        // Both stacks keep the original direction: undo jumps to `before`, redo to `after`.
+        stacks.entry(key).or_default().push(change);
+        Ok((json!({ "path": path, "changed": true, "text": target, "redo": redo }), events))
+    }
+
+    pub fn undo_document(&self, window: &str, raw_path: &str) -> Result<(Value, Vec<WorkspaceEventDto>), String> {
+        self.jump_history(window, raw_path, false)
+    }
+
+    pub fn redo_document(&self, window: &str, raw_path: &str) -> Result<(Value, Vec<WorkspaceEventDto>), String> {
+        self.jump_history(window, raw_path, true)
+    }
+
+    fn retarget_journal(&self, from: &str, to: &str) {
+        for journal in [&self.undo, &self.redo] {
+            let Ok(mut all) = journal.write() else { continue };
+            let old = std::mem::take(&mut *all);
+            for (path, changes) in old {
+                let key = if is_within(&path, from) { rebase(&path, from, to) } else { path };
+                all.entry(key).or_default().extend(changes);
+            }
+        }
+    }
+
     fn move_path(&self, window: &str, from: &str, to: &str) -> Result<Vec<WorkspaceEventDto>, String> {
         tree::rename(Path::new(from), Path::new(to)).map_err(|e| e.to_string())?;
         self.history.rename(from, to)?;
+        self.retarget_journal(from, to);
         let mut all = self.write_lock()?;
         if let Some(state) = all.get_mut(window) {
             state.retarget(from, to);
@@ -681,6 +750,18 @@ impl WorkspaceRegistry {
         self.store.resolve(window, path)
     }
 
+    pub fn undo_document(&self, window: &str, path: &str) -> Result<Value, String> {
+        let result = self.store.undo_document(window, path)?;
+        self.emit(window, result.1);
+        Ok(result.0)
+    }
+
+    pub fn redo_document(&self, window: &str, path: &str) -> Result<Value, String> {
+        let result = self.store.redo_document(window, path)?;
+        self.emit(window, result.1);
+        Ok(result.0)
+    }
+
     pub fn outline(&self, window: &str, path: &str) -> Result<Value, String> {
         self.store.outline(window, path)
     }
@@ -830,6 +911,41 @@ mod tests {
 
     fn store() -> Arc<WorkspaceStore<MemoryStore>> {
         WorkspaceStore::with_history(History::with_store(MemoryStore::default()))
+    }
+
+    #[test]
+    fn undo_and_redo_restore_tool_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+        let path = join_path(&root, "note.md");
+        fs::write(&path, "one").unwrap();
+        let store = store();
+        store
+            .sync(
+                "main",
+                WorkspaceSnapshotDto {
+                    root: Some(root),
+                    documents: vec![WorkspaceDocumentDto {
+                        path: path.clone(),
+                        text: "one".into(),
+                        eol: "\n".into(),
+                        bom: false,
+                        mtime_ms: None,
+                        dirty: false,
+                        conflict: false,
+                    }],
+                    active_document: Some(path.clone()),
+                },
+            )
+            .unwrap();
+
+        store.write_document("main", &path, "two", "replace", true).unwrap();
+        let (undone, _) = store.undo_document("main", &path).unwrap();
+        assert_eq!(undone["text"], "one");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "one");
+        let (redone, _) = store.redo_document("main", &path).unwrap();
+        assert_eq!(redone["text"], "two");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "two");
     }
 
     #[test]
