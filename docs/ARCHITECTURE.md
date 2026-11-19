@@ -226,7 +226,7 @@ src-tauri/
   batch, cached by line text, code/links/math skipped, the word being typed left alone) and turns the
   webview's checker off, because its underlines vanish whenever Live mode redraws a line. The right-click
   menu lists `spell_check` suggestions and Add to Dictionary (`wordAt`, `spellingItems` in
-  `app/editorMenu.ts`). Tools → Spelling Language combines locally available dictionaries (✓) and
+  `app/editorMenu.ts`). Tools → Spelling Language combines locally available dictionaries (●) and
   downloadable ones (↓) in one menu; installing one refreshes the list and moves it into the first
   group. On Linux there's no OS checker to ask: the webview underlines, and its native menu
   (Shift+right-click) has the suggestions.

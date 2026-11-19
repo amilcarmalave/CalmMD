@@ -13,11 +13,11 @@ describe('spellingLanguageMenu', () => {
   it('combines available and downloadable dictionaries with one separator', () => {
     const entries = spellingLanguageMenu(DEFAULT_SETTINGS, dictionaries);
     const labels = entries.map((e) => ('label' in e ? e.label : '---'));
-    expect(labels).toContain('✓  English (US)');
-    expect(labels).toContain('✓  German');
+    expect(labels).toContain('●  English (US)');
+    expect(labels).toContain('●  German');
     expect(labels).toContain('↓  Russian — download');
     expect(labels.filter((l) => l === '---')).toHaveLength(1);
-    expect(labels.indexOf('---')).toBeGreaterThan(labels.indexOf('✓  German'));
+    expect(labels.indexOf('---')).toBeGreaterThan(labels.indexOf('●  German'));
     expect(labels.indexOf('---')).toBeLessThan(labels.indexOf('↓  Russian — download'));
   });
 
@@ -25,7 +25,7 @@ describe('spellingLanguageMenu', () => {
     const installed = dictionaries.map((d) => (d.id === 'ru_RU' ? { ...d, installed: true } : d));
     const entries = spellingLanguageMenu(DEFAULT_SETTINGS, installed);
     const labels = entries.map((e) => ('label' in e ? e.label : '---'));
-    expect(labels).toContain('✓  Russian');
+    expect(labels).toContain('●  Russian');
     expect(labels).not.toContain('↓  Russian — download');
     expect(labels).not.toContain('---');
   });

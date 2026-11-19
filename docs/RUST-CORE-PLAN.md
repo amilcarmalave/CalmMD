@@ -48,7 +48,7 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   Italian, Portuguese, Dutch/Flemish, Finnish, Norwegian, Danish, Polish, Chinese, Japanese, Korean,
   Russian, Turkish and the other English variants appear under a separator in the same
   Spelling Language menu with a ↓ marker and download on request. A downloaded dictionary moves
-  into the available (✓) group. The OS checker remains the fallback for other languages and when
+  into the available (●) group. The OS checker remains the fallback for other languages and when
   `useRustSpell()` is disabled explicitly.
 - **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
   `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in

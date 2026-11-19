@@ -15,4 +15,4 @@ export interface SpellDictionary {
 /** Marks a Spelling Language menu entry that downloads a dictionary before selecting it. */
 export const DOWNLOAD_MARK = '↓';
 /** Marks a Spelling Language menu entry that can be used immediately. */
-export const AVAILABLE_MARK = '✓';
+export const AVAILABLE_MARK = '●';
