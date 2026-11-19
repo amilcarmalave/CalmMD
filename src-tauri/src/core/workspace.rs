@@ -124,7 +124,7 @@ impl<S: crate::core::history::HistoryStore> WorkspaceStore<S> {
             .ok_or_else(|| "Open a folder in CalmMD first".into())
     }
 
-    fn resolve(&self, window: &str, raw: &str) -> Result<String, String> {
+    pub(crate) fn resolve(&self, window: &str, raw: &str) -> Result<String, String> {
         let root = self.root_of(window)?;
         let trimmed = raw.trim();
         if trimmed.is_empty() {
@@ -675,6 +675,10 @@ impl WorkspaceRegistry {
 
     pub fn read_document(&self, window: &str, path: &str) -> Result<Value, String> {
         self.store.read_document(window, path)
+    }
+
+    pub fn resolve(&self, window: &str, path: &str) -> Result<String, String> {
+        self.store.resolve(window, path)
     }
 
     pub fn outline(&self, window: &str, path: &str) -> Result<Value, String> {

@@ -200,12 +200,14 @@ impl<S: HistoryStore + 'static> AutosaveService<S> {
 
     /// Applies the user's conflict choice using the pending Rust buffer, not a view snapshot.
     pub fn resolve(&self, id: &str, choice: ResolveChoice) -> Result<ResolveResult, String> {
-        let (request, path) = {
+        let path = {
             let all = self.pending.read().map_err(|e| e.to_string())?;
             let pending = all.get(id).ok_or_else(|| "No pending autosave for this document".to_owned())?;
-            let request = pending.request.clone();
-            let path = request.path.clone().ok_or_else(|| "This draft has no file path".to_owned())?;
-            (request, path)
+            pending
+                .request
+                .path
+                .clone()
+                .ok_or_else(|| "This draft has no file path".to_owned())?
         };
         let file = self.store.load(&path)?;
         match choice {

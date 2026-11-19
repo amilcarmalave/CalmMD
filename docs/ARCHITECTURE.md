@@ -283,7 +283,9 @@ are in `src-tauri/src/core/buffers.rs`. Session and Space
 records are validated and stored by `src-tauri/src/core/session.rs`; the webview still builds the
 snapshot from CodeMirror cursors and the sidebar, but reads and writes it through `Platform`.
 The webview keeps its immediate CodeMirror undo stack and the explorer view. File history is
-stored and queried through `core/history.rs`. PDF/HTML export still emits a
+stored and queried through `core/history.rs`. PDF/HTML export resolves paths, live text, options
+and cover defaults in Rust; the remaining webview bridge only renders DOM/Mermaid and assembles
+the final document. It still emits a
 request (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the
 exporter and answers with the `mcp_respond` command. Paths are resolved against the open Space root and
 `..`/outside-root paths are rejected in the bridge. Every tool accepts an optional `windowLabel`

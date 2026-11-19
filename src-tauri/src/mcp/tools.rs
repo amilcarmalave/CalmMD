@@ -1,5 +1,5 @@
 use super::bridge::{McpBridge, TargetArgs};
-use crate::core::workspace::WorkspaceRegistry;
+use crate::core::{paths::basename, workspace::WorkspaceRegistry};
 use rmcp::{
     handler::server::{
         router::{prompt::PromptRouter, tool::ToolRouter},
@@ -512,9 +512,34 @@ impl CalmMdTools {
         }
     }
 
+    /// Resolves paths, live text and export options in Rust; only final rendering stays in the view.
+    fn export_params(&self, args: &ExportArgs) -> Result<Value, String> {
+        let window = self.window(&args.target)?;
+        let path = self.workspace.resolve(&window, &args.path)?;
+        let out = self.workspace.resolve(&window, &args.out)?;
+        let doc = self.workspace.read_document(&window, &path)?;
+        let text = doc
+            .get("text")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "The document has no readable text".to_owned())?;
+        let raw_prefs = serde_json::to_value(&args.prefs).map_err(|e| e.to_string())?;
+        let prefs = crate::core::export::prefs::resolve_prefs(Some(&raw_prefs));
+        let raw_cover = serde_json::to_value(&args.cover).map_err(|e| e.to_string())?;
+        let cover = crate::core::export::prefs::resolve_cover(
+            text,
+            &basename(&path),
+            Some(&raw_cover),
+            &prefs,
+        );
+        Ok(json!({ "path": path, "out": out, "text": text, "prefs": prefs, "cover": cover }))
+    }
+
     #[tool(description = "Export a document to PDF using CalmMD's renderer and print engine. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
     async fn calmmd_export_pdf(&self, Parameters(args): Parameters<ExportArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path, "out": args.out, "prefs": args.prefs, "cover": args.cover });
+        let params = match self.export_params(&args) {
+            Ok(params) => params,
+            Err(e) => return fail(e),
+        };
         match self.call_for(&args.target, "calmmd_export_pdf", params).await {
             Ok(v) => ok(v),
             Err(e) => fail(e),
@@ -523,7 +548,10 @@ impl CalmMdTools {
 
     #[tool(description = "Export a document to standalone HTML using CalmMD's renderer. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
     async fn calmmd_export_html(&self, Parameters(args): Parameters<ExportArgs>) -> Result<CallToolResult, McpError> {
-        let params = json!({ "path": args.path, "out": args.out, "prefs": args.prefs, "cover": args.cover });
+        let params = match self.export_params(&args) {
+            Ok(params) => params,
+            Err(e) => return fail(e),
+        };
         match self.call_for(&args.target, "calmmd_export_html", params).await {
             Ok(v) => ok(v),
             Err(e) => fail(e),

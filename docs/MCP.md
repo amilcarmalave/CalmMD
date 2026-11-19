@@ -120,9 +120,10 @@ token is sufficient and matches CalmMD's no-account privacy model.
    atomic writes, history snapshots and link rewrites all run in Rust.
 4. Mutations emit `calmmd://workspace` events; the webview applies them to its controllers. User
    edits flow back with `core_workspace_upsert_document`.
-5. PDF/HTML tools still use `McpBridge::call()`: an id is stored with a `oneshot` sender, a
-   `calmmd://mcp/request` event is emitted, `createMcpBridge()` dispatches it to the exporter, and
-   `mcp_respond` completes the call.
+5. PDF/HTML tools resolve paths, read the live buffer, normalize preferences and build the cover in
+   Rust (`core/export/prefs.rs`), then use a narrow `McpBridge::call()` for DOM/Mermaid rendering
+   and final document assembly. The event carries the resolved source text so the webview does not
+   read files or choose a buffer again.
 
 Tools return errors as `CallToolResult::error` with a text message. Prompts map failures to
 `ErrorData::internal_error`. The export bridge keeps its 120-second timeout.

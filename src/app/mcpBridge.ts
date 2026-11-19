@@ -287,7 +287,9 @@ export async function dispatchMcpRequest(req: McpRequest, deps: McpBridgeDeps): 
     case 'calmmd_export_html': {
       const path = resolvePath(deps, p);
       const out = resolvePath(deps, { path: str(p.out, 'out') }, 'path');
-      const text = await readLiveText(deps, path);
+      // Rust resolves the path, reads the live buffer and normalizes prefs/cover. The text is
+      // included in the request so the view does not read files or choose a buffer again.
+      const text = typeof p.text === 'string' ? p.text : await readLiveText(deps, path);
       const doc = { text, path, name: basename(path) };
       const prefs = exportPrefs(p.prefs);
       const cover = coverInfo(p.cover, text, path, prefs);
