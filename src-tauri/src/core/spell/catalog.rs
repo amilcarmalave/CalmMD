@@ -47,7 +47,7 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
     DictionaryEntry {
         id: "fr_FR",
         label: "French",
-        languages: &["fr-FR", "fr"],
+        languages: &["fr-FR", "fr-BE", "fr"],
         license: "Apache-2.0",
         upstream: "",
         bundled: true,
@@ -56,6 +56,86 @@ pub const DICTIONARIES: &[DictionaryEntry] = &[
         id: "es_ES",
         label: "Spanish",
         languages: &["es-ES", "es"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "it_IT",
+        label: "Italian",
+        languages: &["it-IT", "it"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "pt_PT",
+        label: "Portuguese",
+        languages: &["pt-PT", "pt-BR", "pt"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "nl_NL",
+        label: "Dutch / Flemish",
+        languages: &["nl-NL", "nl-BE", "nl"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "fi_FI",
+        label: "Finnish",
+        languages: &["fi-FI", "fi"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "nb_NO",
+        label: "Norwegian (Bokmål)",
+        languages: &["nb-NO", "nb", "no"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "da_DK",
+        label: "Danish",
+        languages: &["da-DK", "da"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "pl_PL",
+        label: "Polish",
+        languages: &["pl-PL", "pl"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "zh_CN",
+        label: "Chinese",
+        languages: &["zh-CN", "zh"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "ja_JP",
+        label: "Japanese",
+        languages: &["ja-JP", "ja"],
+        license: "Apache-2.0",
+        upstream: "",
+        bundled: true,
+    },
+    DictionaryEntry {
+        id: "ko_KR",
+        label: "Korean",
+        languages: &["ko-KR", "ko"],
         license: "Apache-2.0",
         upstream: "",
         bundled: true,
@@ -138,8 +218,17 @@ mod tests {
         assert_eq!(entry_for_lang(Some("de-DE")).unwrap().id, "de_DE");
         assert_eq!(entry_for_lang(Some("fr")).unwrap().id, "fr_FR");
         assert_eq!(entry_for_lang(Some("es-ES")).unwrap().id, "es_ES");
+        assert_eq!(entry_for_lang(Some("it-IT")).unwrap().id, "it_IT");
+        assert_eq!(entry_for_lang(Some("pt-BR")).unwrap().id, "pt_PT");
+        assert_eq!(entry_for_lang(Some("nl-BE")).unwrap().id, "nl_NL");
+        assert_eq!(entry_for_lang(Some("fi-FI")).unwrap().id, "fi_FI");
+        assert_eq!(entry_for_lang(Some("nb-NO")).unwrap().id, "nb_NO");
+        assert_eq!(entry_for_lang(Some("da-DK")).unwrap().id, "da_DK");
+        assert_eq!(entry_for_lang(Some("pl-PL")).unwrap().id, "pl_PL");
+        assert_eq!(entry_for_lang(Some("zh-CN")).unwrap().id, "zh_CN");
+        assert_eq!(entry_for_lang(Some("ja-JP")).unwrap().id, "ja_JP");
+        assert_eq!(entry_for_lang(Some("ko-KR")).unwrap().id, "ko_KR");
         assert_eq!(entry_for_lang(Some("ru-RU")).unwrap().id, "ru_RU");
-        assert!(entry_for_lang(Some("pt-BR")).is_none());
     }
 
     #[test]

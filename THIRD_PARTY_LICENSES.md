@@ -19,7 +19,7 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | Takumi (`takumi-core`, `takumi-pdf`, `@takumi-rs/helpers`) | MIT OR Apache-2.0 | Default native Rust PDF engine on desktop and local WASM fallback in the browser; `VITE_CALMMD_PDF_ENGINE=browser` selects the older engine |
 | zspell (`zspell`) | Apache-2.0 | Native Rust spellchecking (feature-flagged) |
 | en_US / en_GB Hunspell dictionaries (`wooorm/dictionaries`) | MIT AND BSD | Bundled spellcheck dictionaries and personal words; full texts beside each dictionary |
-| German / French / Spanish word lists (`wordfreq` 3.1.1, Apache-2.0) | Apache-2.0 | Generated built-in Hunspell-style dictionaries from the most frequent alphabetic tokens; full text beside each dictionary |
+| Generated word lists (`wordfreq` 3.1.1, Apache-2.0) | Apache-2.0 | Built-in Hunspell-style dictionaries for German, French, Spanish, Italian, Portuguese, Dutch/Flemish, Finnish, Norwegian, Danish, Polish, Chinese, Japanese and Korean; full text beside each dictionary |
 | Optional Hunspell dictionaries (`wooorm/dictionaries`) | MIT / BSD-3-Clause | Downloaded on request into app data; licences are saved with each dictionary |
 | reqwest | MIT / Apache-2.0 | HTTPS downloads for optional spellcheck dictionaries |
 | `rmcp` | Apache-2.0 | Embedded local MCP server (`2026-07-28` spec) |

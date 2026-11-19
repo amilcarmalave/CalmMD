@@ -258,6 +258,22 @@ mod tests {
         assert!(!check_with_parts("bonjour", "fr_FR", aff, dic, "").unwrap().unwrap().misspelled);
         let (aff, dic) = dictionary::parts_for_bundled("es_ES").unwrap();
         assert!(!check_with_parts("información", "es_ES", aff, dic, "").unwrap().unwrap().misspelled);
+
+        for (id, word) in [
+            ("it_IT", "grazie"),
+            ("pt_PT", "obrigado"),
+            ("nl_NL", "informatie"),
+            ("fi_FI", "kiitos"),
+            ("nb_NO", "informasjon"),
+            ("da_DK", "information"),
+            ("pl_PL", "informacje"),
+            ("zh_CN", "你好"),
+            ("ja_JP", "こんにちは"),
+            ("ko_KR", "한국"),
+        ] {
+            let (aff, dic) = dictionary::parts_for_bundled(id).unwrap();
+            assert!(!check_with_parts(word, id, aff, dic, "").unwrap().unwrap().misspelled, "{id}: {word}");
+        }
     }
 
     #[test]
@@ -290,6 +306,6 @@ mod tests {
 
     #[test]
     fn unknown_languages_have_no_bundled_dictionary() {
-        assert!(entry_for_lang(Some("pt-BR")).is_none());
+        assert!(entry_for_lang(Some("sw-KE")).is_none());
     }
 }
