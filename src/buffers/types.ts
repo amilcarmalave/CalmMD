@@ -1,3 +1,4 @@
+import type { SaveStatus } from '../core/autosave';
 import type { Eol } from '../core/text';
 
 /** Durable draft record. The shape matches the Rust `core::buffers::DraftRecord`. */
@@ -34,6 +35,27 @@ export interface BufferPersistResult {
   conflict: boolean;
   wrote: boolean;
   draft?: BufferDraft | null;
+}
+
+/** One edit reported to the Rust autosave scheduler. */
+export interface BufferAutosaveRequest extends BufferPersistRequest {
+  idleMs?: number;
+  maxWaitMs?: number;
+  retryDelaysMs?: number[];
+}
+
+export interface BufferAutosaveState {
+  id: string;
+  status: SaveStatus;
+  dirty: boolean;
+  conflict: boolean;
+  mtimeMs: number | null;
+  lastError: string | null;
+}
+
+export interface BufferAutosaveEvent {
+  kind: 'status' | 'saved';
+  state: BufferAutosaveState;
 }
 
 /** Disk content decoded the same way as `decodeFromDisk`. */

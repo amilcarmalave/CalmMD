@@ -3,6 +3,9 @@
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
 import type {
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveState,
   BufferDraft,
   BufferDraftEntry,
   BufferFile,
@@ -122,6 +125,12 @@ export interface Platform {
   bufferPersist(request: BufferPersistRequest): Promise<BufferPersistResult>;
   /** Reads and decodes a file using the same EOL/BOM rules as the workspace. */
   bufferLoad(path: string): Promise<BufferFile>;
+  /** Reports the latest buffer text; Rust owns debounce/max-wait and retries. */
+  bufferAutosaveTouch(request: BufferAutosaveRequest): Promise<BufferAutosaveState>;
+  bufferAutosaveFlush(id: string): Promise<BufferAutosaveState>;
+  bufferAutosaveStatus(id: string): Promise<BufferAutosaveState | null>;
+  bufferAutosaveDispose(id: string): Promise<void>;
+  onBufferAutosave(handler: (event: BufferAutosaveEvent) => void): void;
 
   // ---------- Export ----------
   /** Path of a Chromium-family browser for PDF printing, or null. */

@@ -38,6 +38,7 @@ pub fn run() {
             app.manage(workspace.clone());
             let manager = mcp::McpManager::new(app.handle().clone(), workspace);
             app.manage(manager.clone());
+            app.manage(core::autosave::create_app_autosave(app.handle()));
             // `--mcp` starts the loopback server at launch for clients that expect it.
             if std::env::args().any(|a| a == "--mcp") {
                 tauri::async_runtime::spawn(async move {
@@ -115,6 +116,10 @@ pub fn run() {
             core::buffers::core_buffer_drafts,
             core::buffers::core_buffer_persist,
             core::buffers::core_buffer_load,
+            core::autosave::core_autosave_touch,
+            core::autosave::core_autosave_flush,
+            core::autosave::core_autosave_status,
+            core::autosave::core_autosave_dispose,
             core::session::core_session_get,
             core::session::core_session_set,
             core::session::core_space_get,

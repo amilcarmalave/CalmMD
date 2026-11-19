@@ -2,13 +2,13 @@ import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { Autosaver, type SaveStatus } from '../core/autosave';
+import type { SaveStatus } from '../core/autosave';
 import { basename, isWithin, rebase, samePath } from '../core/paths';
 import { scrollLineToTop, topLineOf } from '../editor/geometry';
 import type { SessionTab } from './session';
 import { decodeFromDisk, minimalChange, type Eol } from '../core/text';
 import { ExternalLoad } from '../editor/extensions';
-import type { BufferDraft } from '../buffers/types';
+import type { BufferAutosaveEvent, BufferAutosaveRequest, BufferAutosaveState, BufferDraft } from '../buffers/types';
 import type { Platform } from '../platform/types';
 
 export interface DocMeta {
@@ -68,7 +68,8 @@ export type WriteMode = 'replace' | 'append' | 'prepend';
 
 interface DocRuntime {
   state: EditorState;
-  autosaver: Autosaver;
+  status: SaveStatus;
+  dirty: boolean;
   /** Pixel offset while the app runs (null until the tab has been shown). */
   scrollTop: number | null;
   /** Line at the top of the viewport, which is what survives a restart. */
@@ -95,6 +96,7 @@ export function createDocuments(deps: DocumentsDeps) {
   });
   const runtime = new Map<string, DocRuntime>();
   let view: EditorView | null = null;
+  platform.onBufferAutosave((event: BufferAutosaveEvent) => applyAutosaveState(event.state));
 
   const find = (id: string) => store.docs.find((d) => d.id === id);
   const patch = (id: string, p: Partial<DocMeta>) => setStore('docs', (d) => d.id === id, p);
@@ -125,11 +127,10 @@ export function createDocuments(deps: DocumentsDeps) {
     await platform.bufferDraftWrite(id, record);
   }
 
-  /** The Rust service owns the autosave target and conflict-safe write decision. */
-  async function persist(id: string): Promise<void> {
+  function autosaveRequest(id: string): BufferAutosaveRequest | null {
     const meta = find(id);
-    if (!meta) return;
-    const result = await platform.bufferPersist({
+    if (!meta) return null;
+    return {
       id,
       owner: deps.draftOwner?.(),
       untitledIndex: meta.untitledIndex,
@@ -139,10 +140,38 @@ export function createDocuments(deps: DocumentsDeps) {
       bom: meta.bom,
       mtimeMs: meta.mtimeMs,
       conflict: meta.conflict,
-    });
-    if (result.conflict) patch(id, { conflict: true });
-    if (!result.wrote && result.conflict) return;
-    patch(id, { mtimeMs: result.mtimeMs, conflict: false });
+      idleMs: deps.autosaveIdleMs,
+      maxWaitMs: 10_000,
+    };
+  }
+
+  function applyAutosaveState(state: BufferAutosaveState) {
+    const r = runtime.get(state.id);
+    if (!r) return;
+    r.status = state.status;
+    r.dirty = state.dirty;
+    patch(state.id, { mtimeMs: state.mtimeMs, conflict: state.conflict, lastError: state.lastError });
+  }
+
+  async function touchAutosave(id: string) {
+    const request = autosaveRequest(id);
+    if (!request) return;
+    applyAutosaveState(await platform.bufferAutosaveTouch(request));
+  }
+
+  async function flushAutosave(id: string): Promise<boolean> {
+    if ((await platform.bufferAutosaveStatus(id)) === null) await touchAutosave(id);
+    const state = await platform.bufferAutosaveFlush(id);
+    applyAutosaveState(state);
+    return !state.dirty;
+  }
+
+  async function markAutosaveClean(id: string) {
+    await platform.bufferAutosaveDispose(id);
+    const r = runtime.get(id);
+    if (!r) return;
+    r.status = 'clean';
+    r.dirty = false;
   }
 
   function addDoc(init: {
@@ -169,14 +198,16 @@ export function createDocuments(deps: DocumentsDeps) {
       mtimeMs: init.mtimeMs ?? null,
       conflict: false,
     };
-    const autosaver = new Autosaver({
-      save: () => persist(id),
-      idleMs: deps.autosaveIdleMs,
-      onStatus: (status, error) => patch(id, { status, lastError: error ? errText(error) : null }),
-    });
     let state = deps.makeState(init.text);
     if (init.cursor) state = state.update({ selection: { anchor: Math.min(init.cursor, state.doc.length) } }).state;
-    runtime.set(id, { state, autosaver, scrollTop: null, topLine: init.topLine ?? 0, openedText: init.text });
+    runtime.set(id, {
+      state,
+      status: 'clean',
+      dirty: false,
+      scrollTop: null,
+      topLine: init.topLine ?? 0,
+      openedText: init.text,
+    });
     // Insert right after the active tab, like browsers do.
     const at = store.activeId ? store.docs.findIndex((d) => d.id === store.activeId) + 1 : store.docs.length;
     setStore('docs', (docs) => [...docs.slice(0, at), meta, ...docs.slice(at)]);
@@ -260,8 +291,7 @@ export function createDocuments(deps: DocumentsDeps) {
     if (!meta) return false;
     if (!meta.path) return saveAs(id);
     if (meta.conflict) return resolveConflict(id);
-    const r = runtime.get(id)!;
-    const ok = await r.autosaver.flush();
+    const ok = await flushAutosave(id);
     if (!ok) deps.notify(`Couldn't save ${docName(meta)}: ${find(id)?.lastError ?? 'unknown error'}`);
     return ok;
   }
@@ -279,9 +309,8 @@ export function createDocuments(deps: DocumentsDeps) {
     const moved = await deps.beforeSaveAs?.(textOf(id), meta.path, path).catch(() => null);
     if (moved != null) replaceContent(id, moved);
     patch(id, { path, mtimeMs: null, conflict: false, untitledIndex: 0 });
-    const r = runtime.get(id)!;
-    r.autosaver.touch(); // force a write even if nothing changed since the last autosave
-    const ok = await r.autosaver.flush();
+    await touchAutosave(id); // force a write even if nothing changed since the last autosave
+    const ok = await flushAutosave(id);
     if (ok && wasUntitled) await platform.bufferDraftDelete(id);
     if (!ok) deps.notify(`Couldn't save to ${basename(path)}: ${find(id)?.lastError ?? 'unknown error'}`);
     return ok;
@@ -290,7 +319,7 @@ export function createDocuments(deps: DocumentsDeps) {
   /** Remove a document without asking. */
   function discard(id: string) {
     const r = runtime.get(id);
-    r?.autosaver.dispose();
+    if (r) void platform.bufferAutosaveDispose(id);
     runtime.delete(id);
     void platform.bufferDraftDelete(id);
     const idx = store.docs.findIndex((d) => d.id === id);
@@ -325,7 +354,7 @@ export function createDocuments(deps: DocumentsDeps) {
       }
     } else if (meta.conflict) {
       if (!(await resolveConflict(id))) return false;
-    } else if (!(await r.autosaver.flush())) {
+    } else if (!(await flushAutosave(id))) {
       const choice = await deps.confirm({
         title: `Couldn't save “${docName(meta)}”`,
         message: find(id)?.lastError ?? 'The file could not be written.',
@@ -375,9 +404,8 @@ export function createDocuments(deps: DocumentsDeps) {
     if (!meta?.path) return false;
     const st = await platform.stat(meta.path);
     patch(id, { conflict: false, mtimeMs: st?.mtimeMs ?? null });
-    const r = runtime.get(id)!;
-    r.autosaver.touch();
-    const ok = await r.autosaver.flush();
+    await touchAutosave(id);
+    const ok = await flushAutosave(id);
     if (ok) await platform.bufferDraftDelete(id);
     return ok;
   }
@@ -390,7 +418,7 @@ export function createDocuments(deps: DocumentsDeps) {
       replaceContent(id, file.text);
       runtime.get(id)!.openedText = file.text;
       patch(id, { conflict: false, mtimeMs: file.mtimeMs, eol: file.eol, bom: file.bom });
-      runtime.get(id)!.autosaver.markSaved();
+      await markAutosaveClean(id);
       await platform.bufferDraftDelete(id);
       return true;
     } catch (e) {
@@ -404,10 +432,10 @@ export function createDocuments(deps: DocumentsDeps) {
     for (const meta of [...store.docs]) {
       if (!meta.path || meta.conflict || meta.mtimeMs === null) continue;
       const r = runtime.get(meta.id);
-      if (!r || r.autosaver.status === 'saving') continue;
+      if (!r || r.status === 'saving') continue;
       const st = await platform.stat(meta.path);
       if (!st || Math.abs(st.mtimeMs - meta.mtimeMs) <= 1) continue;
-      if (r.autosaver.isDirty) {
+      if (r.dirty) {
         patch(meta.id, { conflict: true });
       } else {
         await loadTheirs(meta.id);
@@ -416,7 +444,7 @@ export function createDocuments(deps: DocumentsDeps) {
   }
 
   async function flushAll(): Promise<boolean> {
-    const results = await Promise.all([...runtime.values()].map((r) => r.autosaver.flush()));
+    const results = await Promise.all([...runtime.keys()].map((id) => flushAutosave(id)));
     return results.every(Boolean);
   }
 
@@ -471,10 +499,10 @@ export function createDocuments(deps: DocumentsDeps) {
       if (view && store.activeId === d.id) view.dispatch({ changes: change, userEvent: 'input.mcp' });
       else r.state = r.state.update({ changes: change, userEvent: 'input.mcp' }).state;
     }
-    r.autosaver.touch();
+    await touchAutosave(d.id);
 
     if (opts.flush !== false) {
-      const ok = await r.autosaver.flush();
+      const ok = await flushAutosave(d.id);
       if (!ok || find(d.id)?.conflict) {
         throw new Error(find(d.id)?.lastError || 'The file changed on disk; the edit is kept as a draft.');
       }
@@ -487,7 +515,7 @@ export function createDocuments(deps: DocumentsDeps) {
     for (const d of [...store.docs]) {
       if (!d.path || !isWithin(d.path, path)) continue;
       const r = runtime.get(d.id)!;
-      if (!r.autosaver.isDirty && !d.conflict) discard(d.id);
+      if (!r.dirty && !d.conflict) discard(d.id);
       else patch(d.id, { mtimeMs: null }); // recreated on the next save
     }
   }
@@ -550,7 +578,7 @@ export function createDocuments(deps: DocumentsDeps) {
    * Spaces: the drafts belong to the Space being left and come back with it). Call flushAll first.
    */
   function reset() {
-    for (const r of runtime.values()) r.autosaver.dispose();
+    for (const id of runtime.keys()) void platform.bufferAutosaveDispose(id);
     runtime.clear();
     batch(() => {
       setStore('docs', []);
@@ -578,7 +606,12 @@ export function createDocuments(deps: DocumentsDeps) {
       if (r) r.state = state;
     },
     touch(id: string) {
-      runtime.get(id)?.autosaver.touch();
+      const r = runtime.get(id);
+      if (!r) return;
+      // Keep the view's dirty marker synchronous; the Rust scheduler owns timing and retries.
+      r.dirty = true;
+      r.status = 'dirty';
+      void touchAutosave(id);
     },
     textOf,
     activate,
@@ -604,7 +637,7 @@ export function createDocuments(deps: DocumentsDeps) {
       }
       r.openedText = text;
       patch(d.id, { mtimeMs, conflict: false, lastError: null });
-      r.autosaver.markSaved();
+      await markAutosaveClean(d.id);
     },
     save,
     saveAs,
@@ -620,7 +653,7 @@ export function createDocuments(deps: DocumentsDeps) {
     closeWithin,
     /** True while a document has edits that aren't persisted yet. */
     isDirty(id: string) {
-      return runtime.get(id)?.autosaver.isDirty ?? false;
+      return runtime.get(id)?.dirty ?? false;
     },
   };
 }

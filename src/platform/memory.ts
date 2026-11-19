@@ -2,6 +2,9 @@ import type { Session } from '../app/session';
 import { parseSession } from '../app/session';
 import { parseSpace, type SpaceRecord } from '../app/spaces';
 import type {
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveState,
   BufferDraft,
   BufferDraftEntry,
   BufferFile,
@@ -215,6 +218,50 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     return m;
   };
 
+  interface PendingAutosave {
+    request: BufferAutosaveRequest;
+    firstDirtyAt: number;
+    generation: number;
+    timer: ReturnType<typeof setTimeout>;
+    state: BufferAutosaveState;
+  }
+  const pendingAutosaves = new Map<string, PendingAutosave>();
+  const autosaveHandlers = new Set<(event: BufferAutosaveEvent) => void>();
+  const emitAutosave = (event: BufferAutosaveEvent) => {
+    for (const handler of autosaveHandlers) handler(event);
+  };
+  async function flushAutosave(id: string): Promise<BufferAutosaveState> {
+    const pending = pendingAutosaves.get(id);
+    if (!pending) {
+      return { id, status: 'clean', dirty: false, conflict: false, mtimeMs: null, lastError: null };
+    }
+    clearTimeout(pending.timer);
+    pendingAutosaves.delete(id);
+    pending.state = { ...pending.state, status: 'saving' };
+    emitAutosave({ kind: 'status', state: pending.state });
+    try {
+      const result = await platform.bufferPersist(pending.request);
+      pending.state = {
+        ...pending.state,
+        status: 'clean',
+        dirty: false,
+        conflict: result.conflict,
+        mtimeMs: result.mtimeMs,
+        lastError: null,
+      };
+      emitAutosave({ kind: 'saved', state: pending.state });
+    } catch (err) {
+      pending.state = {
+        ...pending.state,
+        status: 'error',
+        dirty: true,
+        lastError: err instanceof Error ? err.message : String(err),
+      };
+      emitAutosave({ kind: 'status', state: pending.state });
+    }
+    return pending.state;
+  }
+
   const platform: Platform & {
     /** Test helper: simulate another program editing a file. */
     externalWrite(path: string, text: string): void;
@@ -401,6 +448,45 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async bufferLoad(path): Promise<BufferFile> {
       const { text: raw, mtimeMs } = await this.readTextFile(path);
       return { ...decodeFromDisk(raw), mtimeMs };
+    },
+
+    async bufferAutosaveTouch(request): Promise<BufferAutosaveState> {
+      const previous = pendingAutosaves.get(request.id);
+      if (previous) clearTimeout(previous.timer);
+      const idle = request.idleMs ?? 1000;
+      const maxWait = request.maxWaitMs ?? 10_000;
+      const now = Date.now();
+      const firstDirtyAt = previous?.firstDirtyAt ?? now;
+      const generation = (previous?.generation ?? 0) + 1;
+      const state: BufferAutosaveState = {
+        id: request.id,
+        status: 'dirty',
+        dirty: true,
+        conflict: false,
+        mtimeMs: request.mtimeMs,
+        lastError: null,
+      };
+      const delay = Math.max(0, Math.min(idle, maxWait - (now - firstDirtyAt)));
+      const timer = setTimeout(() => {
+        const pending = pendingAutosaves.get(request.id);
+        if (pending?.generation === generation) void flushAutosave(request.id);
+      }, delay);
+      pendingAutosaves.set(request.id, { request, firstDirtyAt, generation, timer, state });
+      return state;
+    },
+    async bufferAutosaveFlush(id): Promise<BufferAutosaveState> {
+      return flushAutosave(id);
+    },
+    async bufferAutosaveStatus(id): Promise<BufferAutosaveState | null> {
+      return pendingAutosaves.get(id)?.state ?? null;
+    },
+    async bufferAutosaveDispose(id) {
+      const pending = pendingAutosaves.get(id);
+      if (pending) clearTimeout(pending.timer);
+      pendingAutosaves.delete(id);
+    },
+    onBufferAutosave(handler) {
+      autosaveHandlers.add(handler);
     },
 
     async findBrowser() {

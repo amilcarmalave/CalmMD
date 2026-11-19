@@ -5,7 +5,15 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
-import type { BufferDraftEntry, BufferFile, BufferPersistRequest, BufferPersistResult } from '../buffers/types';
+import type {
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveState,
+  BufferDraftEntry,
+  BufferFile,
+  BufferPersistRequest,
+  BufferPersistResult,
+} from '../buffers/types';
 import { useRustSpell } from '../core/rustFlags';
 import type { Session } from '../app/session';
 import type { SpaceRecord } from '../app/spaces';
@@ -178,6 +186,15 @@ export function createTauriPlatform(): Platform {
     bufferPersist: (request: BufferPersistRequest) =>
       invoke<BufferPersistResult>('core_buffer_persist', { request }),
     bufferLoad: (path) => invoke<BufferFile>('core_buffer_load', { path }),
+
+    bufferAutosaveTouch: (request: BufferAutosaveRequest) =>
+      invoke<BufferAutosaveState>('core_autosave_touch', { request }),
+    bufferAutosaveFlush: (id) => invoke<BufferAutosaveState>('core_autosave_flush', { id }),
+    bufferAutosaveStatus: (id) => invoke<BufferAutosaveState | null>('core_autosave_status', { id }),
+    bufferAutosaveDispose: (id) => invoke<void>('core_autosave_dispose', { id }),
+    onBufferAutosave(handler) {
+      void listen<BufferAutosaveEvent>('calmmd://autosave', (event) => handler(event.payload));
+    },
 
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),

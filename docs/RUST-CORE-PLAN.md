@@ -75,8 +75,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
   state-change events update the editor and explorer. A Rust buffer service now owns durable draft
   records and the autosave decision: write to disk, or keep unsaved text safe in a draft when a file
   changed underneath CalmMD. Rust also owns validated session and Space records (`core/session.rs`),
-  including tabs, cursors, scroll lines, roots and sidebar layout. The webview still owns EditorState,
-  undo and autosave timing.
+  including tabs, cursors, scroll lines, roots and sidebar layout. Autosave scheduling now lives in
+  `core/autosave.rs`: the webview reports edits, and Rust owns debounce/max-wait, retries and status
+  events. The webview still owns EditorState and undo history.
   PDF/HTML export still uses the webview bridge because the renderer is there.
 - **Phases 5b and 7:** not started.
 
@@ -356,10 +357,10 @@ not.
 
 This is where MCP gets simpler.
 
-- Port `documents.ts` state machine into Rust: buffers, autosave timing, undo and
-  `set_content_by_path`. Draft records, disk writes and conflict detection are in `core/buffers.rs`;
-  `set_content_by_path` for MCP is in `core/workspace.rs`; session/cursor/Space records are in
-  `core/session.rs`.
+- Port `documents.ts` state machine into Rust: buffers, undo and `set_content_by_path`. Draft
+  records, disk writes and conflict detection are in `core/buffers.rs`; autosave timing and retries
+  are in `core/autosave.rs`; `set_content_by_path` for MCP is in `core/workspace.rs`;
+  session/cursor/Space records are in `core/session.rs`.
 - Port the remaining `history.ts` UI into Rust. Version storage and compatibility are already in
   `core/history.rs`; restore/diff UI still lives in the webview.
 - Explorer create/rename/move/trash and link retargeting are in `core/workspace.rs` and
