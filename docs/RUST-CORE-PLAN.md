@@ -29,20 +29,28 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 - **Phase 0 — done:** frozen Markdown fixture corpus, TypeScript renderer and export-body baseline
   snapshots, and feature flags are in place.
 - **Phase 1 — first slice landed:** Mordant parses front matter, headings and a top-level source map;
-  Mordant renders HTML and highlights standalone code. Commands `markdown_parse`, `markdown_render`
-  and `markdown_highlight_code` are exposed through the TypeScript platform layer.
+  Mordant renders HTML, highlights standalone code, and supports the corpus extensions (source-line
+  attributes, wiki links, mark/sub/sup, callouts, tasks, front matter, math and preview-style
+  footnotes). A Rust test compares the normalised corpus output with the frozen TypeScript
+  snapshot, covering source-line anchors used by scroll sync. Commands `markdown_parse`,
+  `markdown_render` and `markdown_highlight_code` are exposed through the TypeScript platform layer.
 - **Phase 2 — first slice landed:** all 15 CalmMD syntax palettes are registered as custom Mordant
   themes in `core/highlight`. Rust highlighting resolves CalmMD colour/preview theme ids to those
-  themes; export passes the active preview theme through `MarkdownRenderOptions.theme`.
-- The preview still uses the TypeScript renderer. `useRustMarkdown()` defaults to false until the
-  extension corpus and scroll-sync snapshots match.
+  themes; export and preview pass the active colour theme through `MarkdownRenderOptions.theme`.
+- The preview can use `createRustRenderer()` behind `useRustMarkdown()`. It keeps DOMPurify, the
+  patcher, relative image/embed handling, Mermaid and page breaks in the webview. The flag still
+  defaults to false until the extension corpus and scroll-sync snapshots are accepted.
 - **Phase 3 — first slice landed:** zspell with a bundled en_US Hunspell dictionary provides
   misspelling ranges, suggestions and a local personal word list behind `useRustSpell()`. The OS
   checker remains the fallback for other languages and when the flag is off.
 - **Phase 4 — first slice landed:** `buildBody()` can use the Rust `markdown_render` service when
   `useRustMarkdown()` is enabled. TOC, cover, image embedding and print post-processing still run in
   TypeScript, so parity is checked against the new baseline snapshots before switching defaults.
-- **Phases 5–7:** not started.
+- **Phase 5a — first slice landed:** an opt-in browser/WASM `takumi-pdf` engine renders the existing
+  self-contained export HTML without Chromium. `pdfEngine()` selects `browser` (default), `takumi`
+  or `ikat` (not implemented). The desktop MSRV is now Rust 1.91, so direct Rust bindings are no
+  longer blocked by the toolchain.
+- **Phases 5b–7:** not started.
 
 ---
 
@@ -56,9 +64,9 @@ The first milestone is **not** a GPUI migration. Rust becomes a service layer be
 | CSS-based PDF export | `takumi` / `takumi-pdf` | Rust HTML/CSS layout → paged PDF without a browser; closest LaTeX-free replacement for Paged.js | MIT OR Apache-2.0 |
 | Typeset PDF export | `ikat` 0.13.6 | Rust Markdown → LaTeX → PDF pipeline; Mermaid→TikZ, pgfplots, templates; no browser/Paged.js | MIT OR Apache-2.0 |
 
-`takumi` crate 2.20.0 currently requires Rust 1.91, above CalmMD's 1.88 MSRV. The first spike may
-therefore call `takumi-pdf`/`takumi-cli` as a tool rather than raising the main app's MSRV. Decide
-after the spike.
+`takumi` crate 2.20.0 requires Rust 1.91. CalmMD's MSRV was raised to 1.91, so direct Rust bindings
+are available; the first slice still uses the browser/WASM package to keep PDF rendering off the Rust
+main thread while its visual parity is reviewed.
 
 Not chosen yet:
 
@@ -266,7 +274,11 @@ behave as before when `useRustSpell()` is enabled and only en_US is bundled so f
 This is the LaTeX-free, CSS-compatible path and should be prototyped first.
 
 - Spike integration: `takumi-pdf`/`takumi-cli` tool call vs direct Rust binding. Direct `takumi`
-  2.20.0 requires Rust 1.91, so prefer the CLI/npm path until an MSRV decision is made.
+  2.20.0 requires Rust 1.91; CalmMD's MSRV has been raised to 1.91, so both options are available.
+  The first slice uses the official browser/WASM npm package; it renders HTML with inline CSS,
+  ignores the Paged.js scripts, and takes page geometry/headers/footers as Takumi options. A real
+  CalmMD export fixture renders to a valid local PDF with this path. Enable it with
+  `VITE_CALMMD_PDF_ENGINE=takumi` or `localStorage['calmmd.pdf.engine'] = 'takumi'`.
 - Feed the same standalone HTML used by current export into Takumi.
 - Map `ExportPrefs` to Takumi options:
   - `pdf.pageSize` → page size;
@@ -383,7 +395,7 @@ them marked/conditional appropriately.
 | zspell suggestions unstable | use bundled ranges first; OS/other suggestions as fallback |
 | Dictionary licensing | choose allowed-licence dictionaries and list them explicitly |
 | Takumi visual difference from Paged.js | opt-in engine, golden PDFs, keep browser default until accepted |
-| Takumi Rust MSRV 1.91 | start with `takumi-pdf`/CLI; raise MSRV only if direct embedding is worth it |
+| Takumi Rust MSRV 1.91 | MSRV raised to 1.91; direct Rust binding can replace WASM after visual review |
 | ikat visual difference from Paged.js | separate engine, opt-in, no default change until accepted |
 | TeX unavailable on user machine | clear engine error; keep browser/Takumi engines default; document `texres`/`tectonic` options |
 | Large migration stalls | ship Phases 1–5 independently; each has user-visible value without Phase 6 |

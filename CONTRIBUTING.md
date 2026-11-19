@@ -36,6 +36,8 @@ npm run test:rust    # cargo test
 npm run build
 ```
 
+The Rust desktop build requires Rust 1.91 or newer (matching `src-tauri/Cargo.toml`).
+
 `cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored` also runs the real PDF test
 (it needs Chrome or Edge). CI runs all of this on Windows, macOS and Linux.
 

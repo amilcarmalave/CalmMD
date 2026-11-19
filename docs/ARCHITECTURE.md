@@ -40,6 +40,8 @@ src/
   app/preview.ts      preview controller: debounced render, DOM patch, links, task toggles
   render/markdown.ts  markdown-it + footnotes + task lists + heading ids + source-line attrs,
                       sanitised with DOMPurify. render/highlight.ts reuses the editor's Lezer grammars
+  render/rustMarkdown.ts  opt-in Mordant-backed preview renderer; keeps webview-only images,
+                      Mermaid, embeds and page breaks, then sanitises with DOMPurify
   render/patch.ts     reuses unchanged top-level blocks between renders (keeps images and embeds stable)
   editor/live/        live (hybrid) mode
     analyze.ts        PURE: syntax tree + selection → LiveItems (hide, mark, line, widgets). Tested.
@@ -184,7 +186,8 @@ src-tauri/
   embed images, embeds → players or links, TOC) and `buildDocument` (one self-contained page, with KaTeX
   CSS and fonts only when the body has math). `export/assets.ts` lazy-loads fonts (woff2 `?inline`), CSS
   (`?raw`), KaTeX fonts (`import.meta.glob`) and Paged.js. Paged.js is a *relative* file import, because
-  an alias gets caught by Vite's dev dependency optimiser.
+  an alias gets caught by Vite's dev dependency optimiser. `export/takumi.ts` maps the same HTML and
+  PDF preferences to the opt-in local WASM engine (no browser, no TeX, no network).
 - **Paged.js drops custom-property declarations** when it re-parses CSS. Theme CSS therefore goes in
   `<style data-pagedjs-ignore>`, and only `@page`, break and target-counter rules go through Paged.js.
 - The page sets `window.__calmmdDone` when ready. `src-tauri/src/cdp.rs` waits for it over the DevTools
@@ -290,7 +293,8 @@ validated, then `explorer.move()` / `explorer.rename()` create folders, move not
 tabs, favorites, history and links with `rewriteLinks()`. The AI client generates summaries
 and follow-up guides and writes them back with `calmmd_write_document`; CalmMD has no built-in LLM.
 
-Because `rmcp` 3.11 requires Rust 1.88, the desktop build's MSRV is now 1.88 (edition stays 2021).
+The desktop build's MSRV is Rust 1.91 (edition stays 2021): `rmcp` 3.11 requires 1.88 and the
+Takumi PDF crates require 1.91. CI and release builds use stable Rust, which is newer than 1.91.
 
 ### New-version notices
 

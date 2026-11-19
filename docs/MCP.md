@@ -310,7 +310,7 @@ Rust:
 
 - `src-tauri/src/mcp/mod.rs`, `bridge.rs`, `tools.rs`
 - `src-tauri/src/lib.rs` — module, setup, commands, `--mcp`
-- `src-tauri/Cargo.toml` / `Cargo.lock` — `rmcp`, `axum`, `tokio`, `uuid`, `schemars`; MSRV 1.88
+- `src-tauri/Cargo.toml` / `Cargo.lock` — `rmcp`, `axum`, `tokio`, `uuid`, `schemars`; MSRV 1.91
 
 TypeScript:
 

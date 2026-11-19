@@ -1785,6 +1785,7 @@ export default function App(props: { platform: Platform }) {
       openPath: (p) => void docs.openPaths([p]),
       openWiki: (t) => void openWiki(t),
       colorScheme: () => effectiveScheme(),
+      colorTheme: () => activeColorTheme(),
     });
     preview.sync.setEnabled(settings.scrollSync);
     if (import.meta.env.DEV) Object.assign(window, { __calmmd: { view, preview, docs, settings, explorer, sidebar, registry } });

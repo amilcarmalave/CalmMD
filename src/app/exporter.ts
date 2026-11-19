@@ -1,6 +1,6 @@
 import { createMarkdownService } from '../core/markdownService';
 import { basename, dirname, joinPath, stem } from '../core/paths';
-import { useRustMarkdown } from '../core/rustFlags';
+import { pdfEngine, useRustMarkdown } from '../core/rustFlags';
 import type { CoverInfo } from '../core/cover';
 import { buildBody, buildDocument, DEFAULT_PDF, hasMath, type BaseTheme, type ExportOptions, type PdfOptions } from '../export/build';
 import type { Platform, SaveKind } from '../platform/types';
@@ -132,10 +132,10 @@ export function createExporter(deps: ExporterDeps) {
     try {
       deps.notify('Exporting PDF…');
       const { opts, body, assets } = await prepare(prefs, true, cover);
-      await platform.printPdf(buildDocument(body, opts, assets, prefs.pdf), out);
+      await writePdf(buildDocument(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
       deps.notify(`Exported ${basename(out)}`, reveal(out));
     } catch (e) {
-      if (String(e).includes('NO_BROWSER')) {
+      if (String(e).includes('NO_BROWSER') && pdfEngine() === 'browser') {
         // Without a Chromium engine, use the system print dialog ("Save as PDF").
         // It has no running headers or page numbers, but the layout and styles are the same.
         const { opts, body, assets } = await prepare(prefs, false, cover);
@@ -144,6 +144,19 @@ export function createExporter(deps: ExporterDeps) {
         deps.notify('Choose “Save as PDF” in the print dialog');
       } else fail('PDF export', e);
     }
+  }
+
+  /** Sends the prepared HTML to the selected PDF engine. Takumi runs locally in the webview. */
+  async function writePdf(html: string, out: string, title: string, pdf: PdfOptions, cover: boolean) {
+    const engine = pdfEngine();
+    if (engine === 'takumi') {
+      const { renderPdf } = await import('../export/takumi');
+      const bytes = await renderPdf(html, { title, pdf, cover });
+      await platform.writeBinaryFile(out, bytes);
+      return;
+    }
+    if (engine === 'ikat') throw new Error('The ikat PDF engine is not implemented yet.');
+    await platform.printPdf(html, out);
   }
 
   /** Fallback: print a self-contained page with the webview's print dialog (no scripts needed). */
@@ -164,7 +177,7 @@ export function createExporter(deps: ExporterDeps) {
   /** Headless exports for MCP: the caller supplies the source and the exact output path. */
   async function exportPdfData(doc: ExportSource, out: string, prefs: ExportPrefs = DEFAULT_EXPORT_PREFS, cover: CoverInfo | null = null) {
     const { opts, body, assets } = await prepareFor(doc, prefs, true, cover);
-    await platform.printPdf(buildDocument(body, opts, assets, prefs.pdf), out);
+    await writePdf(buildDocument(body, opts, assets, prefs.pdf), out, opts.title, prefs.pdf, prefs.cover);
     return out;
   }
 

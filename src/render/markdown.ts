@@ -21,6 +21,8 @@ export interface RenderEnv {
   onAsyncUpdate?: () => void;
   /** Theme for diagrams. */
   colorScheme?: 'light' | 'dark';
+  /** Active CalmMD colour theme id, used by the Rust/Mordant highlighter. */
+  theme?: string;
 }
 
 /**
@@ -78,7 +80,7 @@ export function slugify(text: string): string {
     .replace(/\s+/g, '-');
 }
 
-const PAGE_BREAK = /^(---pagebreak---|\\pagebreak|\\newpage|<!--\s*pagebreak\s*-->)$/i;
+export const PAGE_BREAK = /^(---pagebreak---|\\pagebreak|\\newpage|<!--\s*pagebreak\s*-->)$/i;
 
 /** Page-break markers become `<div class="page-break">`: a faint line on screen, a real break in PDFs. */
 function pageBreaks(md: MarkdownIt) {
@@ -288,4 +290,9 @@ export function createRenderer(): Renderer {
       return html.replace(slot, (_, i) => trustedHtml[Number(i)] ?? '');
     },
   };
+}
+
+/** Sanitises HTML from the Rust Markdown service with the same rules as the TypeScript renderer. */
+export function sanitizeMarkdownHtml(html: string): string {
+  return purify(html);
 }

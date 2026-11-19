@@ -130,7 +130,7 @@ The installers aren't signed with a paid certificate yet, so the first launch sh
 
 ## Building from source
 
-You need [Node.js](https://nodejs.org) 20+ and [Rust](https://rustup.rs) (stable), plus the
+You need [Node.js](https://nodejs.org) 20+ and [Rust](https://rustup.rs) 1.91+ (stable), plus the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
 
 ```sh
