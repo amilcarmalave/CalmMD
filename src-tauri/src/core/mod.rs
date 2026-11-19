@@ -8,6 +8,7 @@ pub mod history;
 pub mod links;
 pub mod markdown;
 pub mod paths;
+pub mod session;
 pub mod spell;
 pub mod workspace;
 

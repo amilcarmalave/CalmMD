@@ -14,7 +14,6 @@ export interface SpaceRecord {
   session: Session;
 }
 
-const PREFIX = 'space/';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 export function parseSpace(raw: string | null): SpaceRecord | null {
@@ -39,21 +38,17 @@ export type Spaces = ReturnType<typeof createSpaces>;
 
 export function createSpaces(platform: Platform, onChange: () => void = () => {}) {
   async function get(id: string) {
-    return parseSpace(await platform.kvGet(PREFIX + id));
+    return platform.spaceGet(id);
   }
   async function save(rec: SpaceRecord, notify = true) {
-    await platform.kvSet(PREFIX + rec.id, JSON.stringify(rec));
+    await platform.spaceSave(rec);
     if (notify) onChange();
   }
   return {
     get,
     save,
     /** All Spaces, most recently opened first. */
-    async list(): Promise<SpaceRecord[]> {
-      const keys = await platform.kvList(PREFIX);
-      const recs = await Promise.all(keys.map(async (k) => parseSpace(await platform.kvGet(k))));
-      return recs.filter((r): r is SpaceRecord => !!r).sort((a, b) => b.lastOpened - a.lastOpened);
-    },
+    list: () => platform.spaces(),
     async create(name: string, session: Session): Promise<SpaceRecord> {
       const now = Date.now();
       const rec: SpaceRecord = { v: 1, id: newId(), name: name.trim() || 'Untitled Space', createdAt: now, lastOpened: now, session };
@@ -66,7 +61,7 @@ export function createSpaces(platform: Platform, onChange: () => void = () => {}
     },
     /** Forgets a Space. Files on disk are never touched. */
     async remove(id: string) {
-      await platform.kvDelete(PREFIX + id);
+      await platform.spaceRemove(id);
       onChange();
     },
     /** Saves the session of an open Space (frequent, so it doesn't notify other windows). */

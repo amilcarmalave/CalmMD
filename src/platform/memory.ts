@@ -1,3 +1,6 @@
+import type { Session } from '../app/session';
+import { parseSession } from '../app/session';
+import { parseSpace, type SpaceRecord } from '../app/spaces';
 import type {
   BufferDraft,
   BufferDraftEntry,
@@ -325,6 +328,29 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async workspaceSync(_snapshot: WorkspaceSnapshot) {},
     async workspaceUpsert(_document: WorkspaceDocument, _activeDocument?: string | null) {},
     onWorkspaceEvent(_handler: (event: WorkspaceEvent) => void) {},
+
+    async sessionGet(key): Promise<Session | null> {
+      const raw = await this.kvGet(key);
+      return raw === null ? null : parseSession(raw);
+    },
+    async sessionSet(key, session) {
+      await this.kvSet(key, JSON.stringify(session));
+    },
+    async spaceGet(id): Promise<SpaceRecord | null> {
+      const raw = await this.kvGet('space/' + id);
+      return raw === null ? null : parseSpace(raw);
+    },
+    async spaceSave(space) {
+      await this.kvSet('space/' + space.id, JSON.stringify(space));
+    },
+    async spaceRemove(id) {
+      await this.kvDelete('space/' + id);
+    },
+    async spaces(): Promise<SpaceRecord[]> {
+      const keys = await this.kvList('space/');
+      const recs = await Promise.all(keys.map((key) => this.spaceGet(key.slice('space/'.length))));
+      return recs.filter((r): r is SpaceRecord => !!r).sort((a, b) => b.lastOpened - a.lastOpened);
+    },
 
     async bufferDraftWrite(id, record) {
       store.setItem('kv:draft/' + id, JSON.stringify(record));

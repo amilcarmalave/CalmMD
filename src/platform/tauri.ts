@@ -7,6 +7,8 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type { BufferDraftEntry, BufferFile, BufferPersistRequest, BufferPersistResult } from '../buffers/types';
 import { useRustSpell } from '../core/rustFlags';
+import type { Session } from '../app/session';
+import type { SpaceRecord } from '../app/spaces';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
 import type { TakumiPdfOptions } from '../export/takumi';
@@ -162,6 +164,13 @@ export function createTauriPlatform(): Platform {
     onWorkspaceEvent(handler) {
       void listen<WorkspaceEvent>('calmmd://workspace', (event) => handler(event.payload));
     },
+
+    sessionGet: (key) => invoke<Session | null>('core_session_get', { key }),
+    sessionSet: (key, session) => invoke<void>('core_session_set', { key, session }),
+    spaceGet: (id) => invoke<SpaceRecord | null>('core_space_get', { id }),
+    spaceSave: (space) => invoke<void>('core_space_save', { space }),
+    spaceRemove: (id) => invoke<void>('core_space_remove', { id }),
+    spaces: () => invoke<SpaceRecord[]>('core_spaces'),
 
     bufferDraftWrite: (id, record) => invoke<void>('core_buffer_draft_write', { id, record }),
     bufferDraftDelete: (id) => invoke<void>('core_buffer_draft_delete', { id }),

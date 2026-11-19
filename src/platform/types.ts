@@ -9,6 +9,8 @@ import type {
   BufferPersistRequest,
   BufferPersistResult,
 } from '../buffers/types';
+import type { Session } from '../app/session';
+import type { SpaceRecord } from '../app/spaces';
 import type { SearchHit, SearchOptions } from '../core/search';
 import type { SpellDictionary } from '../core/spellDictionaries';
 import type { TakumiPdfOptions } from '../export/takumi';
@@ -101,6 +103,15 @@ export interface Platform {
   workspaceUpsert(document: WorkspaceDocument, activeDocument?: string | null): Promise<void>;
   /** Subscribes to state changes made directly by the Rust workspace services. */
   onWorkspaceEvent(handler: (event: WorkspaceEvent) => void): void;
+
+  // ---------- Rust-owned session and Spaces ----------
+  /** Reads a validated session record (`session` or `space/<id>`). */
+  sessionGet(key: string): Promise<Session | null>;
+  sessionSet(key: string, session: Session): Promise<void>;
+  spaceGet(id: string): Promise<SpaceRecord | null>;
+  spaceSave(space: SpaceRecord): Promise<void>;
+  spaceRemove(id: string): Promise<void>;
+  spaces(): Promise<SpaceRecord[]>;
 
   // ---------- Rust-owned drafts and autosave targets ----------
   /** Writes one durable draft record. */

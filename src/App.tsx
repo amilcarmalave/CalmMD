@@ -1404,7 +1404,7 @@ export default function App(props: { platform: Platform }) {
     if (!sessionReady) return;
     const s = space();
     if (s) await spaces.saveSession(s.id, buildSession());
-    else if (isMain) await platform.kvSet('session', JSON.stringify(buildSession()));
+    else if (isMain) await platform.sessionSet('session', buildSession());
   };
 
   /** Applies a session to this window: layout, folder, tabs. */
@@ -2037,7 +2037,7 @@ export default function App(props: { platform: Platform }) {
           session = rec.session;
         }
       } else if (isMain) {
-        session = parseSession(await platform.kvGet('session'));
+        session = (await platform.sessionGet('session')) ?? parseSession(null);
       }
     } catch {
       // A broken session must never stop the app from starting.

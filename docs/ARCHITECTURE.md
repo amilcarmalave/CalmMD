@@ -277,8 +277,10 @@ that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, a
 `calmmd://workspace` events for content changes, renames, creates and trashes. The remaining
 `docs`/`explorer` controllers apply those events so CodeMirror, favorites and the tree stay in step.
 Autosave now delegates to `src-tauri/src/core/buffers.rs`: Rust owns durable draft records and
-decides whether to write a buffer, keep it as a draft, or flag a disk conflict. The webview keeps
-autosave timing, undo history, tabs, cursors and the explorer view. PDF/HTML export still emits a
+decides whether to write a buffer, keep it as a draft, or flag a disk conflict. Session and Space
+records are validated and stored by `src-tauri/src/core/session.rs`; the webview still builds the
+snapshot from CodeMirror cursors and the sidebar, but reads and writes it through `Platform`.
+The webview keeps autosave timing, undo history and the explorer view. PDF/HTML export still emits a
 request (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the
 exporter and answers with the `mcp_respond` command. Paths are resolved against the open Space root and
 `..`/outside-root paths are rejected in the bridge. Every tool accepts an optional `windowLabel`
