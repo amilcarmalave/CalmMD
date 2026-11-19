@@ -3,8 +3,10 @@
  * runs unchanged in Tauri, in a plain browser (dev), and in unit tests.
  */
 import type {
+  BufferAutosaveChoice,
   BufferAutosaveEvent,
   BufferAutosaveRequest,
+  BufferAutosaveResolveResult,
   BufferAutosaveState,
   BufferDraft,
   BufferDraftEntry,
@@ -130,6 +132,8 @@ export interface Platform {
   bufferAutosaveFlush(id: string): Promise<BufferAutosaveState>;
   bufferAutosaveStatus(id: string): Promise<BufferAutosaveState | null>;
   bufferAutosaveDispose(id: string): Promise<void>;
+  /** Applies a conflict choice to the pending Rust buffer. */
+  bufferAutosaveResolve(id: string, choice: BufferAutosaveChoice): Promise<BufferAutosaveResolveResult>;
   onBufferAutosave(handler: (event: BufferAutosaveEvent) => void): void;
 
   // ---------- Export ----------

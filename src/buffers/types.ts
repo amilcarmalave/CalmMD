@@ -53,6 +53,13 @@ export interface BufferAutosaveState {
   lastError: string | null;
 }
 
+export type BufferAutosaveChoice = 'keepMine' | 'loadTheirs';
+
+export interface BufferAutosaveResolveResult {
+  state: BufferAutosaveState;
+  file: BufferFile | null;
+}
+
 export interface BufferAutosaveEvent {
   kind: 'status' | 'saved';
   state: BufferAutosaveState;

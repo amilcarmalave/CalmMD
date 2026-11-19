@@ -8,7 +8,13 @@ import { scrollLineToTop, topLineOf } from '../editor/geometry';
 import type { SessionTab } from './session';
 import { decodeFromDisk, minimalChange, type Eol } from '../core/text';
 import { ExternalLoad } from '../editor/extensions';
-import type { BufferAutosaveEvent, BufferAutosaveRequest, BufferAutosaveState, BufferDraft } from '../buffers/types';
+import type {
+  BufferAutosaveChoice,
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveState,
+  BufferDraft,
+} from '../buffers/types';
 import type { Platform } from '../platform/types';
 
 export interface DocMeta {
@@ -399,32 +405,47 @@ export function createDocuments(deps: DocumentsDeps) {
     return false;
   }
 
-  async function keepMine(id: string): Promise<boolean> {
+  async function resolveAutosave(id: string, choice: BufferAutosaveChoice): Promise<boolean> {
     const meta = find(id);
     if (!meta?.path) return false;
-    const st = await platform.stat(meta.path);
-    patch(id, { conflict: false, mtimeMs: st?.mtimeMs ?? null });
-    await touchAutosave(id);
-    const ok = await flushAutosave(id);
-    if (ok) await platform.bufferDraftDelete(id);
-    return ok;
+    try {
+      const result = await platform.bufferAutosaveResolve(id, choice);
+      applyAutosaveState(result.state);
+      if (result.file) {
+        replaceContent(id, result.file.text);
+        runtime.get(id)!.openedText = result.file.text;
+        patch(id, { eol: result.file.eol, bom: result.file.bom });
+      }
+      await platform.bufferDraftDelete(id);
+      return true;
+    } catch (e) {
+      deps.notify(`Couldn't resolve the conflict in ${docName(meta)}: ${errText(e)}`);
+      return false;
+    }
+  }
+
+  async function keepMine(id: string): Promise<boolean> {
+    return resolveAutosave(id, 'keepMine');
   }
 
   async function loadTheirs(id: string): Promise<boolean> {
     const meta = find(id);
     if (!meta?.path) return false;
-    try {
-      const file = await platform.bufferLoad(meta.path);
-      replaceContent(id, file.text);
-      runtime.get(id)!.openedText = file.text;
-      patch(id, { conflict: false, mtimeMs: file.mtimeMs, eol: file.eol, bom: file.bom });
-      await markAutosaveClean(id);
-      await platform.bufferDraftDelete(id);
-      return true;
-    } catch (e) {
-      deps.notify(`Couldn't reload ${docName(meta)}: ${errText(e)}`);
-      return false;
+    // A clean document has no pending autosave; Rust does not need to resolve anything.
+    if ((await platform.bufferAutosaveStatus(id)) === null) {
+      try {
+        const file = await platform.bufferLoad(meta.path);
+        replaceContent(id, file.text);
+        runtime.get(id)!.openedText = file.text;
+        patch(id, { conflict: false, mtimeMs: file.mtimeMs, eol: file.eol, bom: file.bom });
+        await platform.bufferDraftDelete(id);
+        return true;
+      } catch (e) {
+        deps.notify(`Couldn't reload ${docName(meta)}: ${errText(e)}`);
+        return false;
+      }
     }
+    return resolveAutosave(id, 'loadTheirs');
   }
 
   /** Called when the window regains focus: reload files that changed underneath us. */

@@ -119,6 +119,7 @@ pub fn run() {
             core::autosave::core_autosave_touch,
             core::autosave::core_autosave_flush,
             core::autosave::core_autosave_status,
+            core::autosave::core_autosave_resolve,
             core::autosave::core_autosave_dispose,
             core::session::core_session_get,
             core::session::core_session_set,

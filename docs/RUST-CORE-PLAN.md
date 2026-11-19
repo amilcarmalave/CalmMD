@@ -357,7 +357,8 @@ not.
 
 This is where MCP gets simpler.
 
-- Port `documents.ts` state machine into Rust: buffers, undo and `set_content_by_path`. Draft
+- Port `documents.ts` state machine into Rust: undo and the remaining editor runtime concerns.
+  Draft
   records, disk writes and conflict detection are in `core/buffers.rs`; autosave timing and retries
   are in `core/autosave.rs`; `set_content_by_path` for MCP is in `core/workspace.rs`;
   session/cursor/Space records are in `core/session.rs`.

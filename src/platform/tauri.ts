@@ -6,8 +6,10 @@ import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-man
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type {
+  BufferAutosaveChoice,
   BufferAutosaveEvent,
   BufferAutosaveRequest,
+  BufferAutosaveResolveResult,
   BufferAutosaveState,
   BufferDraftEntry,
   BufferFile,
@@ -192,6 +194,8 @@ export function createTauriPlatform(): Platform {
     bufferAutosaveFlush: (id) => invoke<BufferAutosaveState>('core_autosave_flush', { id }),
     bufferAutosaveStatus: (id) => invoke<BufferAutosaveState | null>('core_autosave_status', { id }),
     bufferAutosaveDispose: (id) => invoke<void>('core_autosave_dispose', { id }),
+    bufferAutosaveResolve: (id: string, choice: BufferAutosaveChoice) =>
+      invoke<BufferAutosaveResolveResult>('core_autosave_resolve', { id, choice }),
     onBufferAutosave(handler) {
       void listen<BufferAutosaveEvent>('calmmd://autosave', (event) => handler(event.payload));
     },

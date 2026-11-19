@@ -4,7 +4,7 @@
 //! for the idle/max-wait deadline, writes through `BufferStore`, retries failures, and emits status
 //! events for the view. The webview no longer owns debounce timers or retry backoff.
 
-use super::buffers::{BufferStore, PersistRequest};
+use super::buffers::{BufferStore, DecodedFile, PersistRequest};
 use super::history::HistoryStore;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -46,6 +46,21 @@ pub struct AutosaveState {
 pub struct AutosaveEvent {
     pub kind: String,
     pub state: AutosaveState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ResolveChoice {
+    KeepMine,
+    LoadTheirs,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveResult {
+    pub state: AutosaveState,
+    #[serde(default)]
+    pub file: Option<DecodedFile>,
 }
 
 fn default_idle_ms() -> u64 { 1000 }
@@ -181,6 +196,48 @@ impl<S: HistoryStore + 'static> AutosaveService<S> {
             },
         };
         self.write(id, generation)
+    }
+
+    /// Applies the user's conflict choice using the pending Rust buffer, not a view snapshot.
+    pub fn resolve(&self, id: &str, choice: ResolveChoice) -> Result<ResolveResult, String> {
+        let (request, path) = {
+            let all = self.pending.read().map_err(|e| e.to_string())?;
+            let pending = all.get(id).ok_or_else(|| "No pending autosave for this document".to_owned())?;
+            let request = pending.request.clone();
+            let path = request.path.clone().ok_or_else(|| "This draft has no file path".to_owned())?;
+            (request, path)
+        };
+        let file = self.store.load(&path)?;
+        match choice {
+            ResolveChoice::KeepMine => {
+                let generation = {
+                    let mut all = self.pending.write().map_err(|e| e.to_string())?;
+                    let pending = all.get_mut(id).ok_or_else(|| "No pending autosave for this document".to_owned())?;
+                    pending.request.conflict = false;
+                    pending.request.mtime_ms = Some(file.mtime_ms);
+                    pending.generation = pending.generation.wrapping_add(1);
+                    pending.generation
+                };
+                let state = self.write(id, generation);
+                if state.status == "error" {
+                    return Err(state.last_error.clone().unwrap_or_else(|| "Could not save this document".into()));
+                }
+                Ok(ResolveResult { state, file: None })
+            }
+            ResolveChoice::LoadTheirs => {
+                self.dispose(id);
+                let state = AutosaveState {
+                    id: id.into(),
+                    status: "clean".into(),
+                    dirty: false,
+                    conflict: false,
+                    mtime_ms: Some(file.mtime_ms),
+                    last_error: None,
+                };
+                (self.emit)(AutosaveEvent { kind: "saved".into(), state: state.clone() });
+                Ok(ResolveResult { state, file: Some(file) })
+            }
+        }
     }
 
     pub fn dispose(&self, id: &str) {
@@ -344,6 +401,15 @@ pub fn core_autosave_status(service: State<'_, AppAutosave>, id: String) -> Opti
 }
 
 #[tauri::command]
+pub fn core_autosave_resolve(
+    service: State<'_, AppAutosave>,
+    id: String,
+    choice: ResolveChoice,
+) -> Result<ResolveResult, String> {
+    service.resolve(&id, choice)
+}
+
+#[tauri::command]
 pub fn core_autosave_dispose(service: State<'_, AppAutosave>, id: String) {
     service.dispose(&id)
 }
@@ -422,6 +488,32 @@ mod tests {
         assert_eq!(state.status, "clean");
         assert!(!state.dirty);
         assert!(events.lock().unwrap().iter().any(|event| event.kind == "saved"));
+    }
+
+    #[tokio::test]
+    async fn resolves_keep_mine_and_load_theirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("c.md").to_string_lossy().into_owned();
+        std::fs::write(&path, "theirs").unwrap();
+        let store = Arc::new(BufferStore::new(MemoryStore::default()));
+        let service = AutosaveService::new(store, |_| {});
+
+        let mut mine = request(&path);
+        mine.buffer.text = "mine".into();
+        mine.buffer.mtime_ms = Some(1.0);
+        mine.buffer.conflict = true;
+        mine.idle_ms = 10_000;
+        service.touch(mine.clone());
+        let kept = service.resolve("tab1", ResolveChoice::KeepMine).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "mine");
+        assert!(!kept.state.conflict);
+        assert!(kept.file.is_none());
+
+        service.touch(mine);
+        let loaded = service.resolve("tab1", ResolveChoice::LoadTheirs).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "mine");
+        assert_eq!(loaded.file.unwrap().text, "mine");
+        assert!(service.status("tab1").is_none());
     }
 
     #[tokio::test]

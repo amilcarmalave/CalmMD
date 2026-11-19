@@ -4,6 +4,7 @@ import { parseSpace, type SpaceRecord } from '../app/spaces';
 import type {
   BufferAutosaveEvent,
   BufferAutosaveRequest,
+  BufferAutosaveResolveResult,
   BufferAutosaveState,
   BufferDraft,
   BufferDraftEntry,
@@ -236,7 +237,6 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       return { id, status: 'clean', dirty: false, conflict: false, mtimeMs: null, lastError: null };
     }
     clearTimeout(pending.timer);
-    pendingAutosaves.delete(id);
     pending.state = { ...pending.state, status: 'saving' };
     emitAutosave({ kind: 'status', state: pending.state });
     try {
@@ -479,6 +479,30 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     async bufferAutosaveStatus(id): Promise<BufferAutosaveState | null> {
       return pendingAutosaves.get(id)?.state ?? null;
+    },
+    async bufferAutosaveResolve(id, choice): Promise<BufferAutosaveResolveResult> {
+      const pending = pendingAutosaves.get(id);
+      if (!pending) throw new Error('No pending autosave for this document');
+      const path = pending.request.path;
+      if (!path) throw new Error('This draft has no file path');
+      const file = await this.bufferLoad(path);
+      if (choice === 'loadTheirs') {
+        await this.bufferAutosaveDispose(id);
+        const state: BufferAutosaveState = {
+          id,
+          status: 'clean',
+          dirty: false,
+          conflict: false,
+          mtimeMs: file.mtimeMs,
+          lastError: null,
+        };
+        emitAutosave({ kind: 'saved', state });
+        return { state, file };
+      }
+      pending.request.conflict = false;
+      pending.request.mtimeMs = file.mtimeMs;
+      const state = await flushAutosave(id);
+      return { state, file: null };
     },
     async bufferAutosaveDispose(id) {
       const pending = pendingAutosaves.get(id);

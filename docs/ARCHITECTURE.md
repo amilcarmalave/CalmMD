@@ -277,8 +277,9 @@ that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, a
 `calmmd://workspace` events for content changes, renames, creates and trashes. The remaining
 `docs`/`explorer` controllers apply those events so CodeMirror, favorites and the tree stay in step.
 Autosave now runs in `src-tauri/src/core/autosave.rs`: the webview reports edits with
-`bufferAutosaveTouch`, and Rust owns debounce/max-wait, retries and `calmmd://autosave` status
-events. Writes and conflict decisions are in `src-tauri/src/core/buffers.rs`. Session and Space
+`bufferAutosaveTouch`, and Rust owns debounce/max-wait, retries, conflict resolution
+(`keepMine` / `loadTheirs`) and `calmmd://autosave` status events. Writes and conflict-safe drafts
+are in `src-tauri/src/core/buffers.rs`. Session and Space
 records are validated and stored by `src-tauri/src/core/session.rs`; the webview still builds the
 snapshot from CodeMirror cursors and the sidebar, but reads and writes it through `Platform`.
 The webview keeps undo history and the explorer view. PDF/HTML export still emits a
