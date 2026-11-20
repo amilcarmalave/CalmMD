@@ -1,5 +1,7 @@
 mod cdp;
+mod core;
 mod export;
+mod mcp;
 mod fsops;
 mod kv;
 mod search;
@@ -31,6 +33,20 @@ fn launch_paths() -> Vec<String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let workspace = core::workspace::WorkspaceRegistry::new(app.handle().clone());
+            app.manage(workspace.clone());
+            let manager = mcp::McpManager::new(app.handle().clone(), workspace);
+            app.manage(manager.clone());
+            app.manage(core::autosave::create_app_autosave(app.handle()));
+            // `--mcp` starts the loopback server at launch for clients that expect it.
+            if std::env::args().any(|a| a == "--mcp") {
+                tauri::async_runtime::spawn(async move {
+                    let _ = manager.start().await;
+                });
+            }
+            Ok(())
+        })
         // Opening a file while CalmMD is running hands it to the running instance instead of
         // starting a second one.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -86,6 +102,47 @@ pub fn run() {
             spell::spell_check,
             spell::spell_check_text,
             spell::spell_learn,
+            mcp::mcp_status,
+            mcp::mcp_start,
+            mcp::mcp_stop,
+            mcp::mcp_respond,
+            core::markdown_parse,
+            core::markdown_render,
+            core::markdown_highlight_code,
+            core::workspace::core_workspace_sync,
+            core::workspace::core_workspace_upsert_document,
+            core::buffers::core_buffer_draft_write,
+            core::buffers::core_buffer_draft_delete,
+            core::buffers::core_buffer_drafts,
+            core::buffers::core_buffer_persist,
+            core::buffers::core_buffer_load,
+            core::autosave::core_autosave_touch,
+            core::autosave::core_autosave_flush,
+            core::autosave::core_autosave_status,
+            core::autosave::core_autosave_resolve,
+            core::history::core_history_list,
+            core::history::core_history_read,
+            core::history::core_history_save,
+            core::history::core_history_remove,
+            core::history::core_history_rename,
+            core::history::core_history_clear_file,
+            core::history::core_history_clear_all,
+            core::history::core_history_usage,
+            core::autosave::core_autosave_dispose,
+            core::session::core_session_get,
+            core::session::core_session_set,
+            core::session::core_space_get,
+            core::session::core_space_save,
+            core::session::core_space_remove,
+            core::session::core_spaces,
+            core::export::takumi::takumi_pdf,
+            core::export::assemble::core_export_assemble,
+            core::spell::core_spell_check,
+            core::spell::core_spell_check_text,
+            core::spell::core_spell_learn,
+            core::spell::core_spell_dictionaries,
+            core::spell::core_spell_dictionary_install,
+            core::spell::core_spell_dictionary_remove,
             launch_paths,
         ])
         .run(tauri::generate_context!())

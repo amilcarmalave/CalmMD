@@ -32,6 +32,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.2.5",
     "@fontsource-variable/literata": "^5.2.5",
     "@lezer/highlight": "^1.2.1",
+    "@takumi-rs/helpers": "^2.20.0",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.2.2",
@@ -48,6 +49,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "solid-js": "^1.9.7",
+    "takumi-pdf": "^0.20.0",
     "turndown": "^7.2.5",
     "turndown-plugin-gfm": "^1.0.2"
   },

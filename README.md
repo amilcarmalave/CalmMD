@@ -69,17 +69,19 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 | **Spaces** | Save a window (folder, tabs, layout) as a Space and switch with `Ctrl/⌘+Alt+O`, or open Spaces in their own windows |
 | **Finding things** | Command palette (`Ctrl/⌘+Shift+P`), go to file (`Ctrl/⌘+P`), line (`:`), heading (`@`), and `/` on an empty line to insert anything |
 | **Export and share** | PDF with templates (Standard, Report, Academic, Minimal) and cover pages, standalone HTML, Copy as HTML, a note with its images as one file or a `.zip`, and Word/ODT/EPUB when [Pandoc](https://pandoc.org) is installed |
+| **Local MCP server** | Opt-in, loopback-only MCP endpoint so an AI client can read, rename, reorganise, write and export notes through CalmMD’s live document state (no account, no cloud). See [`docs/MCP.md`](docs/MCP.md) and [client setup](docs/MCP-CLIENT-SETUP.md) |
 | **Looks** | Fifteen colour themes, from Snow and Paper to Solarized, Fjord and Nightshade, with separate light and dark choices; five document styles (Book, Studio, Clear, GitHub, Typewriter); text width from narrow to full; your own CSS themes |
 | **Paste** | Formatted text from a web page, Word or Google Docs becomes Markdown (headings, bold, links, lists, tables); Paste as Plain Text (`Ctrl/⌘+Shift+V`) keeps just the text |
 | **Safety** | Autosave with crash-safe atomic writes, drafts for untitled notes, and it never overwrites changes made by other apps |
 
 ### PDF export
 
-PDFs are laid out with [Paged.js](https://pagedjs.org) and printed by a Chromium engine. On
-**Windows** that's Microsoft Edge, which comes with Windows, so there's nothing to install. On macOS
-and Linux, any installed Chrome, Edge, Chromium or Brave is used. Without one, CalmMD opens the
-system print dialog ("Save as PDF") instead. Put `---pagebreak---` on its own line for a manual page
-break. See [`docs/samples`](docs/samples) for example output.
+PDFs are laid out by the local [Takumi](https://takumi.kane.tw) engine: native Rust in the desktop
+app and a local WASM build in the browser demo. No browser print process, TeX installation or network
+service is needed. The older [Paged.js](https://pagedjs.org)/Chromium path remains available by
+setting `localStorage['calmmd.pdf.engine'] = 'browser'` (or `VITE_CALMMD_PDF_ENGINE=browser`). Put
+`---pagebreak---` on its own line for a manual page break. See [`docs/samples`](docs/samples) for
+example output.
 
 ### Your own themes
 
@@ -129,7 +131,7 @@ The installers aren't signed with a paid certificate yet, so the first launch sh
 
 ## Building from source
 
-You need [Node.js](https://nodejs.org) 20+ and [Rust](https://rustup.rs) (stable), plus the
+You need [Node.js](https://nodejs.org) 20+ and [Rust](https://rustup.rs) 1.91+ (stable), plus the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
 
 ```sh

@@ -8,6 +8,10 @@ import { createDocuments, docName } from './app/documents';
 import { editorMenuItems, spellingItems, wordAt } from './app/editorMenu';
 import { recheckSpelling, spelling } from './editor/spelling';
 import { createExplorer } from './app/explorer';
+import { createMcpBridge } from './app/mcpBridge';
+import type { McpConnectionInfo } from './mcp/types';
+import type { WorkspaceEvent, WorkspaceSnapshot } from './workspace/types';
+import type { SpellDictionary } from './core/spellDictionaries';
 import { openLink } from './app/links';
 import { createPreview } from './app/preview';
 import { parseSession, type Session, type SidebarView } from './app/session';
@@ -31,7 +35,7 @@ import { createAssets } from './app/assets';
 import { findImageLinks, isImagePath } from './core/assets';
 import { MenuBar } from './ui/MenuBar';
 import { notePicker } from './editor/notePicker';
-import { linksTo, parseWiki, resolveWiki, type Backlink } from './core/noteLinks';
+import { linksTo, parseWiki, resolveWiki, rewriteLinks, type Backlink } from './core/noteLinks';
 import { markdownUrl } from './core/assets';
 import { SearchPanel } from './ui/SearchPanel';
 import { QuickView } from './ui/QuickView';
@@ -59,7 +63,7 @@ import { isEmbeddableUrl } from './render/embeds';
 import { BRAND } from './brand';
 import { formatBinding } from './core/keys';
 import { extractHeadings, headingIndexAt, type Heading } from './core/outline';
-import { basename, dirname, isPlainTextPath, isWithin, joinPath, pathKey, samePath, stem } from './core/paths';
+import { basename, dirname, isMarkdownPath, isPlainTextPath, isWithin, joinPath, pathKey, samePath, stem } from './core/paths';
 import { notifySavedFiles } from './platform/savedFiles';
 import { countStats, type TextStats } from './core/stats';
 import { editorExtensions, isUserEdit, markdownSupport } from './editor/extensions';
@@ -94,6 +98,7 @@ export default function App(props: { platform: Platform }) {
   const { settings, update, load: loadSettings, flush: flushSettings } = createSettings(platform);
   const [message, setMessage] = createSignal<{ text: string; action?: { label: string; run: () => void } } | null>(null);
   const [stats, setStats] = createSignal<TextStats>(EMPTY_STATS);
+  const [mcpInfo, setMcpInfo] = createSignal<McpConnectionInfo | null>(null);
   const [selection, setSelection] = createSignal<TextStats | null>(null);
   const { confirm, prompt, ConfirmDialog } = createConfirm();
 
@@ -470,6 +475,55 @@ export default function App(props: { platform: Platform }) {
   const spellCompartment = new Compartment();
   const spellCache = new Map<string, Extension>();
   const [osSpelling, setOsSpelling] = createSignal(false);
+  const [dictionaries, setDictionaries] = createSignal<SpellDictionary[]>([]);
+  const registeredDictionaryCommands = new Set<string>();
+  const registerDictionaryCommands = (list: SpellDictionary[]) => {
+    const commands = list.flatMap((dictionary) => {
+      const tag = dictionary.languages[0];
+      const result = [{
+        id: `spell.${tag}`,
+        title: `Spelling Language: ${dictionary.label}`,
+        category: 'Spelling',
+        when: () => !!dictionaries().find((d) => d.id === dictionary.id)?.installed,
+        run: () => {
+          update({ spellLang: tag, spellcheck: true });
+          notify(`Spellcheck: ${dictionary.label}`);
+        },
+      }];
+      if (!dictionary.installed) result.push({
+        id: `spell.install.${dictionary.id}`,
+        title: `Download ${dictionary.label} Dictionary`,
+        category: 'Spelling',
+        when: () => !dictionaries().find((d) => d.id === dictionary.id)?.installed,
+        run: async () => {
+          notify(`Downloading ${dictionary.label} dictionary…`);
+          try {
+            await platform.spellInstallDictionary(dictionary.id);
+            await refreshDictionaries();
+            spellCache.clear();
+            update({ spellLang: tag, spellcheck: true });
+            view?.dispatch({ effects: recheckSpelling.of(null) });
+            notify(`${dictionary.label} dictionary installed`);
+          } catch (e) {
+            notify(`Couldn't install ${dictionary.label}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        },
+      });
+      return result;
+    });
+    // Static language commands already cover some canonical tags (en-US, en-GB, ru, …).
+    const fresh = commands.filter((c) => !registry.get(c.id) && !registeredDictionaryCommands.has(c.id));
+    for (const c of fresh) registeredDictionaryCommands.add(c.id);
+    if (fresh.length) registry.register(fresh);
+  };
+  const refreshDictionaries = async () => {
+    try {
+      const list = await platform.spellDictionaries();
+      setDictionaries(list);
+      registerDictionaryCommands(list);
+    } catch { setDictionaries([]); }
+  };
+  void refreshDictionaries();
   const spellLangArg = () => (settings.spellLang === 'auto' ? undefined : settings.spellLang);
   const spellFor = () => {
     const ours = settings.spellcheck && osSpelling();
@@ -513,10 +567,37 @@ export default function App(props: { platform: Platform }) {
     draftOwner,
     beforeSaveAs: (text, from, to) => assets.relocate(text, from, to),
     onClosing: (path, opened, current) => captureOnClose(path, opened, current),
+    onExternalEdit: (path, before, after) => captureOnMcpEdit(path, before, after),
   });
   const store = docs.store;
   const activeDoc = createMemo(() => store.docs.find((d) => d.id === store.activeId));
   const menu = createContextMenu();
+
+  /** Mirrors the live webview state into Rust so MCP tools can answer without a webview round trip. */
+  function workspaceSnapshot(): WorkspaceSnapshot {
+    return {
+      root: explorer.state.root,
+      documents: store.docs
+        .filter((d) => !!d.path)
+        .map((d) => ({
+          path: d.path!,
+          text: docs.textOf(d.id),
+          eol: d.eol,
+          bom: d.bom,
+          mtimeMs: d.mtimeMs,
+          dirty: docs.isDirty(d.id),
+          conflict: d.conflict,
+        })),
+      activeDocument: activeDoc()?.path ?? null,
+    };
+  }
+  // Rust-originated events temporarily suppress full snapshots. A rename/rewrite is delivered as
+  // several events; echoing the view between them would overwrite Rust's newer mirror with stale text.
+  let workspaceEventsUntil = 0;
+  function syncWorkspace() {
+    if (Date.now() < workspaceEventsUntil) return;
+    void platform.workspaceSync(workspaceSnapshot()).catch(() => undefined);
+  }
 
   const assets = createAssets({
     platform,
@@ -529,15 +610,27 @@ export default function App(props: { platform: Platform }) {
     platform,
     confirm,
     notify,
-    onRenamed: (from, to) => {
+    onRenamed: async (from, to) => {
       docs.renamePaths(from, to);
-      void history.rename(from, to).then(() => setHistoryRev((n) => n + 1));
+      await history.rename(from, to).catch(() => undefined);
+      setHistoryRev((n) => n + 1);
+      await rewriteLinksAfterRename(from, to);
     },
     onTrashed: (path) => docs.closeWithin(path),
     openFile: (path) => void docs.openPaths([path]),
     onShowAllFiles: (on) => update({ showAllFiles: on }),
   });
 
+  // The Rust workspace is the live state MCP reads. Keep it in step with the view.
+  createEffect(
+    on(
+      // Structural changes only. Text, mtime and status changes are sent by onUpdate upserts;
+      // echoing them here can overwrite a newer Rust mirror while content events are queued.
+      () => [explorer.state.root, store.docs.map((d) => `${d.id}:${d.path}`).join('|'), store.activeId] as const,
+      () => syncWorkspace(),
+      { defer: false },
+    ),
+  );
   // ---------- Sidebar and outline ----------
   const [sidebar, setSidebar] = createStore<Session['sidebar']>({ open: true, view: 'files', width: 248 });
   const [headings, setHeadings] = createSignal<Heading[]>([]);
@@ -700,7 +793,7 @@ export default function App(props: { platform: Platform }) {
       category: 'Spelling',
       run: () => {
         update({ spellLang: code, spellcheck: true });
-        if (code !== 'auto') notify(`Spellcheck: ${label}. The dictionary must be installed in your system's language settings.`);
+        if (code !== 'auto') notify(`Spellcheck: ${label}. Built-in dictionaries work offline; optional ones can be downloaded from this menu.`);
       },
     })),
     { id: 'window.new', title: 'New Window', category: 'Window', keys: 'Mod+Shift+N', run: () => platform.openWindow(null) },
@@ -782,6 +875,9 @@ export default function App(props: { platform: Platform }) {
     setExportDialog({ kind, prefs, engine: engineName(engine) });
   }
   const [pandoc, setPandoc] = createSignal(false);
+  // The MCP bridge needs all four controllers, so it is installed after the exporter exists.
+  createMcpBridge({ platform, docs, explorer, exporter });
+
   registry.register([
     { id: 'export.pdf', title: 'Export as PDF…', category: 'File', run: () => openExport('pdf') },
     { id: 'export.html', title: 'Export as HTML…', category: 'File', run: () => openExport('html') },
@@ -789,6 +885,40 @@ export default function App(props: { platform: Platform }) {
     { id: 'export.docx', title: 'Export as Word (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('docx') },
     { id: 'export.odt', title: 'Export as OpenDocument (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('odt') },
     { id: 'export.epub', title: 'Export as EPUB (Pandoc)…', category: 'File', when: pandoc, run: () => exporter.exportPandoc('epub') },
+    {
+      id: 'mcp.start',
+      title: 'Start MCP Server',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: async () => {
+        const s = await platform.mcpStart();
+        setMcpInfo(s);
+        if (!s.url) return notify('Could not start the MCP server');
+        await platform.writeClipboard(`${s.url} · token: ${s.token ?? ''}`).catch(() => undefined);
+        notify(`MCP server: ${s.url} (connection copied)`);
+      },
+    },
+    {
+      id: 'mcp.stop',
+      title: 'Stop MCP Server',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: async () => {
+        setMcpInfo(await platform.mcpStop());
+        notify('MCP server stopped');
+      },
+    },
+    {
+      id: 'mcp.autostart',
+      title: settings.mcpAutostart ? 'MCP Server: Don’t Auto-start' : 'MCP Server: Auto-start',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: () => {
+        const on = !settings.mcpAutostart;
+        update({ mcpAutostart: on });
+        notify(on ? 'CalmMD will start the MCP server on launch' : 'MCP server won’t auto-start');
+      },
+    },
     { id: 'theme.openFolder', title: 'Open Themes Folder…', category: 'Appearance', run: openThemesFolder },
     { id: 'theme.reload', title: 'Reload Themes', category: 'Appearance', run: () => reloadThemes().then(() => notify('Themes reloaded')) },
   ]);
@@ -852,6 +982,64 @@ export default function App(props: { platform: Platform }) {
   const history = createHistory({ platform });
   const [historyRev, setHistoryRev] = createSignal(0);
   const [versionView, setVersionView] = createSignal<{ path: string; version: Version; text: string } | null>(null);
+
+  /** After a rename, retarget links in every note so folders can be reorganised safely. */
+  async function rewriteLinksAfterRename(from: string, to: string) {
+    if (!explorer.state.root) return;
+    const files = (await explorer.everyFile()).filter(isMarkdownPath);
+    let changed = 0;
+    let failed = 0;
+    for (const path of files) {
+      const open = store.docs.find((d) => d.path && samePath(d.path, path));
+      const before = open ? docs.textOf(open.id) : (await platform.readTextFile(path).catch(() => null))?.text;
+      if (before === undefined) continue;
+      const after = rewriteLinks(before, path, from, to, files);
+      if (after === before) continue;
+      try {
+        if (open) await docs.setContentByPath(path, after, { mode: 'replace', flush: true });
+        else {
+          await history.save(path, before);
+          await platform.writeTextFile(path, after);
+          await history.save(path, after);
+        }
+        changed++;
+      } catch {
+        failed++;
+      }
+    }
+    setHistoryRev((n) => n + 1);
+    if (failed) notify(`Updated links in ${changed} notes; ${failed} failed`);
+    else if (changed) notify(`Updated links in ${changed} note${changed === 1 ? '' : 's'}`);
+  }
+
+  /** An MCP edit: keep the previous text and the result, so an agent change is reversible. */
+  async function captureOnMcpEdit(path: string, before: string, after: string) {
+    if (before.trim()) await history.save(path, before);
+    await history.save(path, after);
+    setHistoryRev((n) => n + 1);
+  }
+
+  platform.onWorkspaceEvent((event: WorkspaceEvent) => {
+    workspaceEventsUntil = Date.now() + 2000;
+    if (event.kind === 'content' && event.path && event.text !== undefined && event.mtimeMs !== undefined) {
+      // Rust already persisted this text and updated its mirror. Do not echo a full snapshot
+      // back here: other content events may still be queued and would overwrite newer text.
+      void docs.applyWorkspaceContent(event.path, event.text, event.mtimeMs).then(() => {
+        setHistoryRev((n) => n + 1);
+      });
+    } else if (event.kind === 'renamed' && event.from && event.to) {
+      docs.renamePaths(event.from, event.to);
+      void explorer.externalRenamed(event.from, event.to);
+      setHistoryRev((n) => n + 1);
+    } else if (event.kind === 'created' && event.path) {
+      const parent = dirname(event.path);
+      if (parent) void explorer.refreshDir(parent);
+      // Do not open the file here: a following content event is authoritative and opens it with the final text.
+    } else if (event.kind === 'trashed' && event.path) {
+      docs.closeWithin(event.path);
+      void explorer.externalTrashed(event.path, event.isDir === true);
+    }
+  });
 
   /** A changed file closed: keep how it was when opened (if that's new) and how it is now. */
   async function captureOnClose(path: string, opened: string, current: string) {
@@ -1084,6 +1272,7 @@ export default function App(props: { platform: Platform }) {
     clearRecentFolders: () => void explorer.forgetRecent(),
     userThemes: () => userThemes().map((t) => ({ id: t.id, name: t.name })),
     pickColorTheme,
+    dictionaries,
     isMac,
   });
   const resolveTop = (m: TopMenu) => resolveMenu(m.items(), registry, hint);
@@ -1215,7 +1404,7 @@ export default function App(props: { platform: Platform }) {
     if (!sessionReady) return;
     const s = space();
     if (s) await spaces.saveSession(s.id, buildSession());
-    else if (isMain) await platform.kvSet('session', JSON.stringify(buildSession()));
+    else if (isMain) await platform.sessionSet('session', buildSession());
   };
 
   /** Applies a session to this window: layout, folder, tabs. */
@@ -1413,6 +1602,25 @@ export default function App(props: { platform: Platform }) {
     docs.syncState(id, u.state);
     if (isUserEdit(u)) docs.touch(id);
     if (u.docChanged) {
+      const meta = store.docs.find((d) => d.id === id);
+      // Rust already wrote input.mcp transactions; the event handler sends the full snapshot.
+      const fromWorkspace = u.transactions.some((tr) => tr.isUserEvent('input.mcp'));
+      if (meta?.path && !fromWorkspace) {
+        void platform
+          .workspaceUpsert(
+            {
+              path: meta.path,
+              text: u.state.doc.toString(),
+              eol: meta.eol,
+              bom: meta.bom,
+              mtimeMs: meta.mtimeMs,
+              dirty: docs.isDirty(id),
+              conflict: meta.conflict,
+            },
+            activeDoc()?.path ?? null,
+          )
+          .catch(() => undefined);
+      }
       scheduleStats(u.state);
       scheduleOutline(u.state);
       offerEmbed(u);
@@ -1682,6 +1890,23 @@ export default function App(props: { platform: Platform }) {
 
   onMount(async () => {
     const upgraded = await loadSettings().catch(() => false);
+    if (platform.kind === 'tauri') {
+      const current = await platform.mcpStatus().catch(() => null);
+      setMcpInfo(current);
+      if (settings.mcpAutostart && !current?.enabled) {
+        const started = await platform.mcpStart().catch(() => null);
+        if (started?.url) {
+          setMcpInfo(started);
+          await platform.writeClipboard(`${started.url} · token: ${started.token ?? ''}`).catch(() => undefined);
+          notify(`MCP server: ${started.url} (connection copied)`);
+        }
+      } else if (current?.enabled) {
+        // `--mcp` starts the server before the webview mounts. Make its one-time token available.
+        await platform
+          .writeClipboard(`${current.url} · token: ${current.token ?? ''}`)
+          .catch(() => undefined);
+      }
+    }
 
     view = new EditorView({ parent: host, state: EditorState.create({ doc: '', extensions: [extensions, spellCompartment.of(spellFor())] }) });
     docs.attachView(view);
@@ -1695,6 +1920,7 @@ export default function App(props: { platform: Platform }) {
       openPath: (p) => void docs.openPaths([p]),
       openWiki: (t) => void openWiki(t),
       colorScheme: () => effectiveScheme(),
+      colorTheme: () => activeColorTheme(),
     });
     preview.sync.setEnabled(settings.scrollSync);
     if (import.meta.env.DEV) Object.assign(window, { __calmmd: { view, preview, docs, settings, explorer, sidebar, registry } });
@@ -1811,7 +2037,7 @@ export default function App(props: { platform: Platform }) {
           session = rec.session;
         }
       } else if (isMain) {
-        session = parseSession(await platform.kvGet('session'));
+        session = (await platform.sessionGet('session')) ?? parseSession(null);
       }
     } catch {
       // A broken session must never stop the app from starting.
@@ -2098,6 +2324,9 @@ export default function App(props: { platform: Platform }) {
         }
         trailing={
           <>
+            <Show when={mcpInfo()?.enabled}>
+              <span class="mcp-indicator" title={mcpInfo()?.url ?? ''}>MCP</span>
+            </Show>
             <span class="zoom-control" role="group" aria-label="Zoom">
               <button class="icon-btn" title={`Zoom out  ${hint('view.zoomOut') ?? ''}`} aria-label="Zoom out" onClick={() => registry.run('view.zoomOut')}>
                 −

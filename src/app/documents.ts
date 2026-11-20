@@ -2,12 +2,19 @@ import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { Autosaver, type SaveStatus } from '../core/autosave';
+import type { SaveStatus } from '../core/autosave';
 import { basename, isWithin, rebase, samePath } from '../core/paths';
 import { scrollLineToTop, topLineOf } from '../editor/geometry';
 import type { SessionTab } from './session';
-import { decodeFromDisk, encodeForDisk, minimalChange, type Eol } from '../core/text';
+import { decodeFromDisk, minimalChange, type Eol } from '../core/text';
 import { ExternalLoad } from '../editor/extensions';
+import type {
+  BufferAutosaveChoice,
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveState,
+  BufferDraft,
+} from '../buffers/types';
 import type { Platform } from '../platform/types';
 
 export interface DocMeta {
@@ -56,22 +63,19 @@ export interface DocumentsDeps {
    * opened and now, for file history. Only called when the two differ.
    */
   onClosing?: (path: string, opened: string, current: string) => Promise<void>;
+  /**
+   * Text is being changed by a tool (MCP), not by keystrokes. Snapshot it for file history
+   * before applying the change so an agent edit is always reversible.
+   */
+  onExternalEdit?: (path: string, before: string, after: string) => Promise<void>;
 }
 
-const DRAFT_PREFIX = 'draft/';
-interface DraftRecord {
-  v: 1;
-  owner?: string;
-  text: string;
-  untitledIndex: number;
-  /** Set when the draft holds edits that conflicted with a file on disk. */
-  path?: string | null;
-  updatedAt: number;
-}
+export type WriteMode = 'replace' | 'append' | 'prepend';
 
 interface DocRuntime {
   state: EditorState;
-  autosaver: Autosaver;
+  status: SaveStatus;
+  dirty: boolean;
   /** Pixel offset while the app runs (null until the tab has been shown). */
   scrollTop: number | null;
   /** Line at the top of the viewport, which is what survives a restart. */
@@ -98,11 +102,11 @@ export function createDocuments(deps: DocumentsDeps) {
   });
   const runtime = new Map<string, DocRuntime>();
   let view: EditorView | null = null;
+  platform.onBufferAutosave((event: BufferAutosaveEvent) => applyAutosaveState(event.state));
 
   const find = (id: string) => store.docs.find((d) => d.id === id);
   const patch = (id: string, p: Partial<DocMeta>) => setStore('docs', (d) => d.id === id, p);
   const textOf = (id: string) => runtime.get(id)?.state.doc.toString() ?? '';
-  const draftKey = (id: string) => DRAFT_PREFIX + id;
 
   function nextUntitledIndex(): number {
     const used = new Set(store.docs.filter((d) => !d.path).map((d) => d.untitledIndex));
@@ -118,7 +122,7 @@ export function createDocuments(deps: DocumentsDeps) {
   async function writeDraft(id: string, path: string | null) {
     const meta = find(id);
     if (!meta) return;
-    const record: DraftRecord = {
+    const record: BufferDraft = {
       v: 1,
       owner: deps.draftOwner?.(),
       text: textOf(id),
@@ -126,33 +130,54 @@ export function createDocuments(deps: DocumentsDeps) {
       path,
       updatedAt: Date.now(),
     };
-    await platform.kvSet(draftKey(id), JSON.stringify(record));
+    await platform.bufferDraftWrite(id, record);
   }
 
-  /** The autosave target: the file on disk, or the draft store for untitled documents. */
-  async function persist(id: string): Promise<void> {
+  function autosaveRequest(id: string): BufferAutosaveRequest | null {
     const meta = find(id);
-    if (!meta) return;
-    const text = textOf(id);
+    if (!meta) return null;
+    return {
+      id,
+      owner: deps.draftOwner?.(),
+      untitledIndex: meta.untitledIndex,
+      path: meta.path,
+      text: textOf(id),
+      eol: meta.eol,
+      bom: meta.bom,
+      mtimeMs: meta.mtimeMs,
+      conflict: meta.conflict,
+      idleMs: deps.autosaveIdleMs,
+      maxWaitMs: 10_000,
+    };
+  }
 
-    if (!meta.path) {
-      if (text.length === 0) await platform.kvDelete(draftKey(id));
-      else await writeDraft(id, null);
-      return;
-    }
-    if (meta.conflict) {
-      // Never overwrite someone else's change. Keep our edits safe until the user decides.
-      await writeDraft(id, meta.path);
-      return;
-    }
-    const st = await platform.stat(meta.path);
-    if (st && meta.mtimeMs !== null && Math.abs(st.mtimeMs - meta.mtimeMs) > 1) {
-      patch(id, { conflict: true });
-      await writeDraft(id, meta.path);
-      return;
-    }
-    const { mtimeMs } = await platform.writeTextFile(meta.path, encodeForDisk(text, meta.eol, meta.bom));
-    patch(id, { mtimeMs });
+  function applyAutosaveState(state: BufferAutosaveState) {
+    const r = runtime.get(state.id);
+    if (!r) return;
+    r.status = state.status;
+    r.dirty = state.dirty;
+    patch(state.id, { mtimeMs: state.mtimeMs, conflict: state.conflict, lastError: state.lastError });
+  }
+
+  async function touchAutosave(id: string) {
+    const request = autosaveRequest(id);
+    if (!request) return;
+    applyAutosaveState(await platform.bufferAutosaveTouch(request));
+  }
+
+  async function flushAutosave(id: string): Promise<boolean> {
+    if ((await platform.bufferAutosaveStatus(id)) === null) await touchAutosave(id);
+    const state = await platform.bufferAutosaveFlush(id);
+    applyAutosaveState(state);
+    return !state.dirty;
+  }
+
+  async function markAutosaveClean(id: string) {
+    await platform.bufferAutosaveDispose(id);
+    const r = runtime.get(id);
+    if (!r) return;
+    r.status = 'clean';
+    r.dirty = false;
   }
 
   function addDoc(init: {
@@ -179,14 +204,16 @@ export function createDocuments(deps: DocumentsDeps) {
       mtimeMs: init.mtimeMs ?? null,
       conflict: false,
     };
-    const autosaver = new Autosaver({
-      save: () => persist(id),
-      idleMs: deps.autosaveIdleMs,
-      onStatus: (status, error) => patch(id, { status, lastError: error ? errText(error) : null }),
-    });
     let state = deps.makeState(init.text);
     if (init.cursor) state = state.update({ selection: { anchor: Math.min(init.cursor, state.doc.length) } }).state;
-    runtime.set(id, { state, autosaver, scrollTop: null, topLine: init.topLine ?? 0, openedText: init.text });
+    runtime.set(id, {
+      state,
+      status: 'clean',
+      dirty: false,
+      scrollTop: null,
+      topLine: init.topLine ?? 0,
+      openedText: init.text,
+    });
     // Insert right after the active tab, like browsers do.
     const at = store.activeId ? store.docs.findIndex((d) => d.id === store.activeId) + 1 : store.docs.length;
     setStore('docs', (docs) => [...docs.slice(0, at), meta, ...docs.slice(at)]);
@@ -270,8 +297,7 @@ export function createDocuments(deps: DocumentsDeps) {
     if (!meta) return false;
     if (!meta.path) return saveAs(id);
     if (meta.conflict) return resolveConflict(id);
-    const r = runtime.get(id)!;
-    const ok = await r.autosaver.flush();
+    const ok = await flushAutosave(id);
     if (!ok) deps.notify(`Couldn't save ${docName(meta)}: ${find(id)?.lastError ?? 'unknown error'}`);
     return ok;
   }
@@ -289,10 +315,9 @@ export function createDocuments(deps: DocumentsDeps) {
     const moved = await deps.beforeSaveAs?.(textOf(id), meta.path, path).catch(() => null);
     if (moved != null) replaceContent(id, moved);
     patch(id, { path, mtimeMs: null, conflict: false, untitledIndex: 0 });
-    const r = runtime.get(id)!;
-    r.autosaver.touch(); // force a write even if nothing changed since the last autosave
-    const ok = await r.autosaver.flush();
-    if (ok && wasUntitled) await platform.kvDelete(draftKey(id));
+    await touchAutosave(id); // force a write even if nothing changed since the last autosave
+    const ok = await flushAutosave(id);
+    if (ok && wasUntitled) await platform.bufferDraftDelete(id);
     if (!ok) deps.notify(`Couldn't save to ${basename(path)}: ${find(id)?.lastError ?? 'unknown error'}`);
     return ok;
   }
@@ -300,9 +325,9 @@ export function createDocuments(deps: DocumentsDeps) {
   /** Remove a document without asking. */
   function discard(id: string) {
     const r = runtime.get(id);
-    r?.autosaver.dispose();
+    if (r) void platform.bufferAutosaveDispose(id);
     runtime.delete(id);
-    void platform.kvDelete(draftKey(id));
+    void platform.bufferDraftDelete(id);
     const idx = store.docs.findIndex((d) => d.id === id);
     batch(() => {
       setStore('docs', (docs) => docs.filter((d) => d.id !== id));
@@ -335,7 +360,7 @@ export function createDocuments(deps: DocumentsDeps) {
       }
     } else if (meta.conflict) {
       if (!(await resolveConflict(id))) return false;
-    } else if (!(await r.autosaver.flush())) {
+    } else if (!(await flushAutosave(id))) {
       const choice = await deps.confirm({
         title: `Couldn't save “${docName(meta)}”`,
         message: find(id)?.lastError ?? 'The file could not be written.',
@@ -380,34 +405,47 @@ export function createDocuments(deps: DocumentsDeps) {
     return false;
   }
 
-  async function keepMine(id: string): Promise<boolean> {
+  async function resolveAutosave(id: string, choice: BufferAutosaveChoice): Promise<boolean> {
     const meta = find(id);
     if (!meta?.path) return false;
-    const st = await platform.stat(meta.path);
-    patch(id, { conflict: false, mtimeMs: st?.mtimeMs ?? null });
-    const r = runtime.get(id)!;
-    r.autosaver.touch();
-    const ok = await r.autosaver.flush();
-    if (ok) await platform.kvDelete(draftKey(id));
-    return ok;
+    try {
+      const result = await platform.bufferAutosaveResolve(id, choice);
+      applyAutosaveState(result.state);
+      if (result.file) {
+        replaceContent(id, result.file.text);
+        runtime.get(id)!.openedText = result.file.text;
+        patch(id, { eol: result.file.eol, bom: result.file.bom });
+      }
+      await platform.bufferDraftDelete(id);
+      return true;
+    } catch (e) {
+      deps.notify(`Couldn't resolve the conflict in ${docName(meta)}: ${errText(e)}`);
+      return false;
+    }
+  }
+
+  async function keepMine(id: string): Promise<boolean> {
+    return resolveAutosave(id, 'keepMine');
   }
 
   async function loadTheirs(id: string): Promise<boolean> {
     const meta = find(id);
     if (!meta?.path) return false;
-    try {
-      const { text: raw, mtimeMs } = await platform.readTextFile(meta.path);
-      const decoded = decodeFromDisk(raw);
-      replaceContent(id, decoded.text);
-      runtime.get(id)!.openedText = decoded.text;
-      patch(id, { conflict: false, mtimeMs, eol: decoded.eol, bom: decoded.bom });
-      runtime.get(id)!.autosaver.markSaved();
-      await platform.kvDelete(draftKey(id));
-      return true;
-    } catch (e) {
-      deps.notify(`Couldn't reload ${docName(meta)}: ${errText(e)}`);
-      return false;
+    // A clean document has no pending autosave; Rust does not need to resolve anything.
+    if ((await platform.bufferAutosaveStatus(id)) === null) {
+      try {
+        const file = await platform.bufferLoad(meta.path);
+        replaceContent(id, file.text);
+        runtime.get(id)!.openedText = file.text;
+        patch(id, { conflict: false, mtimeMs: file.mtimeMs, eol: file.eol, bom: file.bom });
+        await platform.bufferDraftDelete(id);
+        return true;
+      } catch (e) {
+        deps.notify(`Couldn't reload ${docName(meta)}: ${errText(e)}`);
+        return false;
+      }
     }
+    return resolveAutosave(id, 'loadTheirs');
   }
 
   /** Called when the window regains focus: reload files that changed underneath us. */
@@ -415,10 +453,10 @@ export function createDocuments(deps: DocumentsDeps) {
     for (const meta of [...store.docs]) {
       if (!meta.path || meta.conflict || meta.mtimeMs === null) continue;
       const r = runtime.get(meta.id);
-      if (!r || r.autosaver.status === 'saving') continue;
+      if (!r || r.status === 'saving') continue;
       const st = await platform.stat(meta.path);
       if (!st || Math.abs(st.mtimeMs - meta.mtimeMs) <= 1) continue;
-      if (r.autosaver.isDirty) {
+      if (r.dirty) {
         patch(meta.id, { conflict: true });
       } else {
         await loadTheirs(meta.id);
@@ -427,7 +465,7 @@ export function createDocuments(deps: DocumentsDeps) {
   }
 
   async function flushAll(): Promise<boolean> {
-    const results = await Promise.all([...runtime.values()].map((r) => r.autosaver.flush()));
+    const results = await Promise.all([...runtime.keys()].map((id) => flushAutosave(id)));
     return results.every(Boolean);
   }
 
@@ -453,12 +491,52 @@ export function createDocuments(deps: DocumentsDeps) {
     }
   }
 
+  /**
+   * Applies a tool-driven edit to the live document state (not directly to disk), so autosave,
+   * conflict detection, drafts and undo all keep working. Opens the file first if needed.
+   */
+  async function setContentByPath(
+    path: string,
+    text: string,
+    opts: { mode?: WriteMode; flush?: boolean } = {},
+  ): Promise<{ id: string; changed: boolean }> {
+    let d = store.docs.find((x) => x.path && samePath(x.path, path));
+    if (!d) {
+      await openPaths([path]);
+      d = store.docs.find((x) => x.path && samePath(x.path, path));
+    }
+    if (!d) throw new Error(`No document open at ${path}`);
+    if (d.conflict) throw new Error('This document has a conflict. Resolve it in CalmMD before editing it.');
+
+    const current = textOf(d.id);
+    const mode = opts.mode ?? 'replace';
+    const next = mode === 'append' ? current + text : mode === 'prepend' ? text + current : text;
+    if (next === current) return { id: d.id, changed: false };
+
+    await deps.onExternalEdit?.(path, current, next).catch(() => undefined);
+    const change = minimalChange(current, next);
+    const r = runtime.get(d.id)!;
+    if (change) {
+      if (view && store.activeId === d.id) view.dispatch({ changes: change, userEvent: 'input.mcp' });
+      else r.state = r.state.update({ changes: change, userEvent: 'input.mcp' }).state;
+    }
+    await touchAutosave(d.id);
+
+    if (opts.flush !== false) {
+      const ok = await flushAutosave(d.id);
+      if (!ok || find(d.id)?.conflict) {
+        throw new Error(find(d.id)?.lastError || 'The file changed on disk; the edit is kept as a draft.');
+      }
+    }
+    return { id: d.id, changed: true };
+  }
+
   /** A file or folder was moved to the trash: close clean documents inside it, keep edited ones. */
   function closeWithin(path: string) {
     for (const d of [...store.docs]) {
       if (!d.path || !isWithin(d.path, path)) continue;
       const r = runtime.get(d.id)!;
-      if (!r.autosaver.isDirty && !d.conflict) discard(d.id);
+      if (!r.dirty && !d.conflict) discard(d.id);
       else patch(d.id, { mtimeMs: null }); // recreated on the next save
     }
   }
@@ -477,20 +555,8 @@ export function createDocuments(deps: DocumentsDeps) {
   ) {
     const me = deps.draftOwner?.();
     const adopt = opts.adopt ?? ((owner: string | undefined) => owner === undefined || owner === me);
-    const keys = await platform.kvList(DRAFT_PREFIX);
-    const drafts: { id: string; rec: DraftRecord }[] = [];
-    for (const key of keys) {
-      try {
-        const raw = await platform.kvGet(key);
-        if (!raw) continue;
-        const rec = JSON.parse(raw) as DraftRecord;
-        if (rec.v === 1 && typeof rec.text === 'string') drafts.push({ id: key.slice(DRAFT_PREFIX.length), rec });
-      } catch {
-        // A corrupt draft shouldn't block startup.
-      }
-    }
-    drafts.sort((a, b) => a.rec.updatedAt - b.rec.updatedAt);
-    const draftById = new Map(drafts.map((d) => [d.id, d.rec]));
+    const drafts = await platform.bufferDrafts();
+    const draftById = new Map(drafts.map((d) => [d.id, d.record]));
 
     const ids: (string | null)[] = [];
     let missing = 0;
@@ -533,7 +599,7 @@ export function createDocuments(deps: DocumentsDeps) {
    * Spaces: the drafts belong to the Space being left and come back with it). Call flushAll first.
    */
   function reset() {
-    for (const r of runtime.values()) r.autosaver.dispose();
+    for (const id of runtime.keys()) void platform.bufferAutosaveDispose(id);
     runtime.clear();
     batch(() => {
       setStore('docs', []);
@@ -561,13 +627,39 @@ export function createDocuments(deps: DocumentsDeps) {
       if (r) r.state = state;
     },
     touch(id: string) {
-      runtime.get(id)?.autosaver.touch();
+      const r = runtime.get(id);
+      if (!r) return;
+      // Keep the view's dirty marker synchronous; the Rust scheduler owns timing and retries.
+      r.dirty = true;
+      r.status = 'dirty';
+      void touchAutosave(id);
     },
     textOf,
     activate,
     newDoc,
     openPaths,
     openWithDialog,
+    setContentByPath,
+    /** Applies a change already written by the Rust workspace, without another save or snapshot. */
+    async applyWorkspaceContent(path: string, text: string, mtimeMs: number | null) {
+      let d = store.docs.find((x) => x.path && samePath(x.path, path));
+      if (!d) {
+        await openPaths([path]);
+        d = store.docs.find((x) => x.path && samePath(x.path, path));
+      }
+      if (!d) return;
+      // Keep the edit undoable, like the old MCP write path did.
+      const r = runtime.get(d.id)!;
+      const before = r.state.doc.toString();
+      const change = minimalChange(before, text);
+      if (change) {
+        if (view && store.activeId === d.id) view.dispatch({ changes: change, userEvent: 'input.mcp' });
+        else r.state = r.state.update({ changes: change, userEvent: 'input.mcp' }).state;
+      }
+      r.openedText = text;
+      patch(d.id, { mtimeMs, conflict: false, lastError: null });
+      await markAutosaveClean(d.id);
+    },
     save,
     saveAs,
     close,
@@ -582,7 +674,7 @@ export function createDocuments(deps: DocumentsDeps) {
     closeWithin,
     /** True while a document has edits that aren't persisted yet. */
     isDirty(id: string) {
-      return runtime.get(id)?.autosaver.isDirty ?? false;
+      return runtime.get(id)?.dirty ?? false;
     },
   };
 }

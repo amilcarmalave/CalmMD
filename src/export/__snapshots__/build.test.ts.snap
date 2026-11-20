@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildBody > matches the TypeScript baseline snapshot 1`] = `
+"<pre class="front-matter"><code>title: Rust core fixture
+tags: [mordant, fixtures]
+draft: false</code></pre>
+<h1 id="project-notes">Project notes</h1>
+<p>Intro with a <span class="wikilink">wiki link</span>, ==highlighted text~, <sub>subscript</sub> and <sup>superscript</sup>.</p>
+<h2 id="section-one">Section one</h2>
+<ul class="contains-task-list contains-task-list">
+<li class="task-list-item"><input type="checkbox" class="task-checkbox" disabled="">first task</li>
+<li class="task-list-item"><input type="checkbox" class="task-checkbox" checked="" disabled="">second task</li>
+</ul>
+<blockquote class="callout callout-note">
+<p class="callout-title">Note</p>
+<p>Callout bodies stay in the preview.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rust</td>
+<td>1.88</td>
+</tr>
+</tbody>
+</table>
+<p>Inline math <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>x</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">x^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span> and a fenced block:</p>
+<pre class="code-block" data-lang="rust"><code><span class="tok-keyword">fn</span> <span class="tok-variableName tok-definition">main</span><span class="tok-punctuation">(</span><span class="tok-punctuation">)</span> <span class="tok-punctuation">{</span>
+    <span class="tok-macroName">println</span><span class="tok-macroName">!</span><span class="tok-punctuation">(</span><span class="tok-string">"hello"</span><span class="tok-punctuation">)</span><span class="tok-punctuation">;</span>
+<span class="tok-punctuation">}</span></code></pre>
+<p>A footnote reference<sup class="footnote-ref"><a href="#fn1" id="fnref1" rel="noopener noreferrer">[1]</a></sup>.</p>
+<h2 id="section-one-1">Section one</h2>
+<p>Same heading again to exercise stable ids.</p>
+<h2 id="section-two">Section two</h2>
+<p>One more section before the nested heading.</p>
+<h3 id="details">Details</h3>
+<p>Mermaid diagrams and page breaks are handled by the TypeScript layer for now.</p>
+<hr class="footnotes-sep">
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><p>Footnote body. <a href="#fnref1" class="footnote-backref" rel="noopener noreferrer">↩︎</a></p>
+</li>
+</ol>
+</section>
+"
+`;

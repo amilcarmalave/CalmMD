@@ -1,6 +1,8 @@
 import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
-import { createRenderer } from '../render/markdown';
+import { useRustMarkdown } from '../core/rustFlags';
+import { createRenderer, type RenderEnv } from '../render/markdown';
+import { createRustRenderer } from '../render/rustMarkdown';
 import { activateEmbed } from '../render/embeds';
 import { patchChildren, rememberOriginal } from '../render/patch';
 import { ScrollSync } from '../sync/scrollSync';
@@ -19,6 +21,8 @@ export interface PreviewDeps {
   /** Follows a [[wiki link]] (target as written). */
   openWiki?: (target: string) => void;
   colorScheme: () => 'light' | 'dark';
+  /** Active CalmMD colour theme id for Rust syntax highlighting. */
+  colorTheme?: () => string;
 }
 
 /**
@@ -27,32 +31,49 @@ export interface PreviewDeps {
  */
 export function createPreview(deps: PreviewDeps) {
   const { view, platform, scroller, content } = deps;
-  const renderer = createRenderer();
+  const tsRenderer = createRenderer();
+  const rustRenderer = createRustRenderer(platform);
   const sync = new ScrollSync(view, scroller, content);
   const stopResize = previewImageResize(view, scroller, content);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastRendered: string | null = null;
+  let renderGeneration = 0;
 
   function cursorLine() {
     return view.state.doc.lineAt(view.state.selection.main.head).number - 1;
   }
 
-  function renderNow() {
+  async function renderNow() {
     clearTimeout(timer);
     if (!deps.isVisible()) return;
     const text = view.state.doc.toString();
-    const key = text + '\u0000' + (deps.docPath() ?? '') + '\u0000' + deps.colorScheme();
+    const theme = deps.colorTheme?.() ?? '';
+    const useRust = useRustMarkdown();
+    const key = text + '\u0000' + (deps.docPath() ?? '') + '\u0000' + deps.colorScheme() + '\u0000' + theme + '\u0000' + useRust;
     if (key === lastRendered) return;
     lastRendered = key;
-    const html = renderer.render(text, {
+    const generation = ++renderGeneration;
+    const env: RenderEnv = {
       docPath: deps.docPath(),
       resolveAsset: platform.assetUrl,
       colorScheme: deps.colorScheme(),
+      theme,
       onAsyncUpdate: () => {
         lastRendered = null;
+        renderGeneration++;
         schedule(30);
       },
-    });
+    };
+    let html: string;
+    try {
+      html = useRust ? await rustRenderer.render(text, env) : tsRenderer.render(text, env);
+    } catch (error) {
+      // A failed Rust call must not leave the preview blank; fall back to the authoritative TS path.
+      if (generation !== renderGeneration) return;
+      console.warn('Rust Markdown render failed; using TypeScript renderer', error);
+      html = tsRenderer.render(text, env);
+    }
+    if (generation !== renderGeneration) return;
     patchChildren(content, html);
     sync.refresh();
     sync.highlightLine(cursorLine());
@@ -62,7 +83,7 @@ export function createPreview(deps: PreviewDeps) {
     if (!deps.isVisible()) return;
     clearTimeout(timer);
     const len = view.state.doc.length;
-    timer = setTimeout(renderNow, delay ?? (len < 20_000 ? 16 : len < 200_000 ? 90 : 250));
+    timer = setTimeout(() => void renderNow(), delay ?? (len < 20_000 ? 16 : len < 200_000 ? 90 : 250));
   }
 
   function onEditorUpdate(u: ViewUpdate) {
@@ -131,6 +152,7 @@ export function createPreview(deps: PreviewDeps) {
     /** Forget the cache so the next render always runs (after tab switches or theme changes). */
     invalidate() {
       lastRendered = null;
+      renderGeneration++;
     },
     dispose() {
       clearTimeout(timer);

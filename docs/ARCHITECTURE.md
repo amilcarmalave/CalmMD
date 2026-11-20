@@ -2,6 +2,8 @@
 
 How CalmMD is put together, and the rules that keep it working. Read [SPEC.md](../SPEC.md) first for the
 product decisions and design principles, and [CONTRIBUTING.md](../CONTRIBUTING.md) for how to work on it.
+The planned Rust service layer (Mordant, zspell, Takumi and ikat) is described in
+[`RUST-CORE-PLAN.md`](RUST-CORE-PLAN.md).
 
 ## Commands
 
@@ -32,9 +34,14 @@ src/
   app/spaces.ts       Spaces store: kv "space/<id>" = { name, lastOpened, session }
   app/explorer.ts     explorer state: root, lazy listings, favorites (kv "favorites"), create/rename/trash
   core/outline.ts     heading extraction (line scanner: fences, setext, front matter) for the outline
+  core/markdownService.ts  typed client for the feature-flagged Rust Markdown commands
+  core/rustFlags.ts   VITE_CALMMD_* / localStorage switches for the Rust services and PDF engine
+  markdown/types.ts   DTOs mirrored from src-tauri/src/core/dto.rs
   app/preview.ts      preview controller: debounced render, DOM patch, links, task toggles
   render/markdown.ts  markdown-it + footnotes + task lists + heading ids + source-line attrs,
                       sanitised with DOMPurify. render/highlight.ts reuses the editor's Lezer grammars
+  render/rustMarkdown.ts  default Mordant-backed preview renderer; keeps webview-only images,
+                      Mermaid, embeds and page breaks, then sanitises with DOMPurify
   render/patch.ts     reuses unchanged top-level blocks between renders (keeps images and embeds stable)
   editor/live/        live (hybrid) mode
     analyze.ts        PURE: syntax tree + selection → LiveItems (hide, mark, line, widgets). Tested.
@@ -71,13 +78,16 @@ src/
 src-tauri/
   src/fsops.rs        read/stat/atomic write (temp + fsync + rename, Windows retry)
   src/kv.rs           durable key/value files in <appData>/state (drafts, session, settings)
+  src/core/           feature-flagged Rust services: Mordant Markdown parsing/rendering,
+                      CalmMD-derived syntax themes for Mordant, and zspell spellchecking with
+                      bundled English/German/French/Spanish dictionaries plus on-demand downloads
   src/tree.rs         list_dir (folders first, natural order, skips .git/node_modules), create,
                       rename (never overwrites), trash (OS trash via the `trash` crate)
   src/windows.rs      SpaceClaims (window label → space id, released on window destroy), open_window
                       (passes the space via an initialization script), focus_window, space_window
   src/lib.rs          command registration, launch paths, single-instance handoff (emits
                       "calmmd://open-paths" to the main window)
-  capabilities/       Tauri permissions (keep them minimal)
+  capabilities/       Explicit Tauri permissions: core event/menu/window, dialog, opener, clipboard
 ```
 
 ### Key rules
@@ -176,7 +186,11 @@ src-tauri/
   embed images, embeds → players or links, TOC) and `buildDocument` (one self-contained page, with KaTeX
   CSS and fonts only when the body has math). `export/assets.ts` lazy-loads fonts (woff2 `?inline`), CSS
   (`?raw`), KaTeX fonts (`import.meta.glob`) and Paged.js. Paged.js is a *relative* file import, because
-  an alias gets caught by Vite's dev dependency optimiser.
+  an alias gets caught by Vite's dev dependency optimiser. `export/takumi.ts` maps the same HTML and
+  PDF preferences to Takumi. Desktop exports use `core/export/takumi.rs` (native Rust); the browser
+  build and tests keep the local WASM fallback (neither engine uses a browser print process, TeX or
+  the network). Takumi is the default PDF engine; `calmmd.pdf.engine = 'browser'` selects the older
+  Paged.js/Chromium path.
 - **Paged.js drops custom-property declarations** when it re-parses CSS. Theme CSS therefore goes in
   `<style data-pagedjs-ignore>`, and only `@page`, break and target-counter rules go through Paged.js.
 - The page sets `window.__calmmdDone` when ready. `src-tauri/src/cdp.rs` waits for it over the DevTools
@@ -212,7 +226,9 @@ src-tauri/
   batch, cached by line text, code/links/math skipped, the word being typed left alone) and turns the
   webview's checker off, because its underlines vanish whenever Live mode redraws a line. The right-click
   menu lists `spell_check` suggestions and Add to Dictionary (`wordAt`, `spellingItems` in
-  `app/editorMenu.ts`). On Linux there's no checker to ask: the webview underlines, and its native menu
+  `app/editorMenu.ts`). Tools → Spelling Language combines locally available dictionaries (●) and
+  downloadable ones (↓) in one menu; installing one refreshes the list and moves it into the first
+  group. On Linux there's no OS checker to ask: the webview underlines, and its native menu
   (Shift+right-click) has the suggestions.
 - Debugging real exports: run the `web-debug` launch config (sets `CALMMD_DEBUG_DIR`), build the HTML in the page
   (`buildBody`/`buildDocument` via dynamic import), `POST /__calmmd/save?name=x.html`, then print it with
@@ -246,6 +262,59 @@ src-tauri/
   save of a new drawing, the note that asked for it gets the link (`waitingForDrawing`). Space in the sidebar still
   opens a Quick view peek.
 
+### Local MCP server and Rust workspace
+
+See [`MCP.md`](MCP.md) for the full implementation record, tool reference and open topics, and
+[`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md) for client configuration and discovery.
+
+CalmMD can host a **local MCP server** (`src-tauri/src/mcp/`, official `rmcp` SDK, Streamable HTTP on
+`127.0.0.1:<random port>/mcp`). It is **off until started** from File → Start MCP Server, the command
+palette, or the `--mcp` launch flag. The connection URL and a per-launch bearer token are copied to
+the clipboard; the server validates the token and the `Origin` header and never binds beyond loopback.
+
+Most tools call `src-tauri/src/core/workspace.rs` directly. The webview mirrors live buffers into
+that Rust state with `core_workspace_sync` / `core_workspace_upsert_document`, and Rust emits
+`calmmd://workspace` events for content changes, renames, creates and trashes. The remaining
+`docs`/`explorer` controllers apply those events so CodeMirror, favorites and the tree stay in step.
+Autosave now runs in `src-tauri/src/core/autosave.rs`: the webview reports edits with
+`bufferAutosaveTouch`, and Rust owns debounce/max-wait, retries, conflict resolution
+(`keepMine` / `loadTheirs`) and `calmmd://autosave` status events. Writes and conflict-safe drafts
+are in `src-tauri/src/core/buffers.rs`. Session and Space
+records are validated and stored by `src-tauri/src/core/session.rs`; the webview still builds the
+snapshot from CodeMirror cursors and the sidebar, but reads and writes it through `Platform`.
+The webview keeps its immediate CodeMirror undo stack and the explorer view. File history is
+stored and queried through `core/history.rs`. PDF/HTML export resolves paths, live text, options
+and cover defaults in Rust; the remaining webview bridge only renders DOM/Mermaid and assembles
+the final document. It still emits a
+request (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the
+exporter and answers with the `mcp_respond` command. Paths are resolved against the open Space root and
+`..`/outside-root paths are rejected in the bridge. Every tool accepts an optional `windowLabel`
+or `spaceId`; the latter is resolved through `SpaceClaims`, so calls can be routed to the window
+that holds a Space. Without a target they go to `main`. The server can be started from File → Start
+MCP Server, the palette, `--mcp`, or the persisted **Auto-start MCP Server** setting; a small `MCP`
+marker appears in the status bar while it is running.
+
+Tools: `calmmd_status`, `calmmd_windows`, `calmmd_list_documents`, `calmmd_read_document`,
+`calmmd_search`, `calmmd_outline`, `calmmd_create_document`, `calmmd_create_folder`,
+`calmmd_rename_document`, `calmmd_move_document`, `calmmd_write_document`,
+`calmmd_undo_document` / `calmmd_redo_document`, `calmmd_trash_document`,
+
+`calmmd_triage_folder`, `calmmd_apply_organization`, `calmmd_export_pdf`, `calmmd_export_html`.
+Prompts: `calmmd_summarize`, `calmmd_follow_up_guide` (live note → client-side LLM instruction,
+written back with `calmmd_write_document`) and `calmmd_organize_folder` (live folder inventory →
+JSON move plan applied with `calmmd_apply_organization`).
+Read-only resources: `calmmd://status`, `calmmd://windows`, `calmmd://document/{path}` and
+`calmmd://folder/{path}` (percent-encoded paths; optional `windowLabel`/`spaceId` query).
+Reads use the in-memory buffer for open tabs (so unsaved edits are visible). Writes go through
+`docs.setContentByPath()` with `userEvent: 'input.mcp'`, snapshot the old and new text into file
+history, and flush the atomic save. Triage inventories live note text; organisation plans are
+validated, then `explorer.move()` / `explorer.rename()` create folders, move notes and retarget
+tabs, favorites, history and links with `rewriteLinks()`. The AI client generates summaries
+and follow-up guides and writes them back with `calmmd_write_document`; CalmMD has no built-in LLM.
+
+The desktop build's MSRV is Rust 1.91 (edition stays 2021): `rmcp` 3.11 requires 1.88 and the
+Takumi PDF crates require 1.91. CI and release builds use stable Rust, which is newer than 1.91.
+
 ### New-version notices
 
 - Asked once (`settings.updateCheck`: `'ask'` → `'on'`/`'off'`, a confirm 4 s after the first window opens;
@@ -272,7 +341,8 @@ src-tauri/
   (pixel offsets are only reused within one run).
 
 ### Scroll sync (key differentiator, so don't regress it)
-- Every rendered block has `data-line-start`/`data-line-end` (0-based, end exclusive) from markdown-it maps.
+- Every rendered block has `data-line-start`/`data-line-end` (0-based, end exclusive). The Rust
+  source-map pass reproduces the markdown-it maps, checked against a 500-line mixed fixture.
 - Anchors pair editor Y (CodeMirror `lineBlockAt`) with preview Y (block rects): block top ↔ first-line
   top, and block bottom ↔ last-line bottom, *including one-line blocks* (tall images). The ends of the two
   scroll ranges are aligned. Flat segments are allowed (a table's `|---|` line has no rendered height).
@@ -282,7 +352,9 @@ src-tauri/
   scroll event is ignored as an echo. `.pane-preview` has `overflow-anchor: none`.
 - Images are loaded eagerly on purpose. Lazy images pop in and shift the layout.
 - Measured in the browser dev build with a 500-line mixed document (tall images, tables, code):
-  the top-of-viewport source line matches to within 0.03 lines in both directions.
+  the top-of-viewport source line matches to within 0.03 lines in both directions. The fixture and
+  its frozen anchor baseline are in `scroll-sync-500.test.ts`; the Rust renderer must emit the same
+  anchors.
 
 ### Git workflow
 `main` is always releasable. Work happens on short-lived feature branches merged by pull request.

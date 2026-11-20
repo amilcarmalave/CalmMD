@@ -34,6 +34,10 @@ impl SpaceClaims {
         map.iter().find(|(_, s)| s.as_str() == space).map(|(w, _)| w.clone())
     }
 
+    pub fn space_for_window(&self, window: &str) -> Option<String> {
+        self.by_window.lock().unwrap().get(window).cloned()
+    }
+
     pub fn release(&self, window: &str) {
         self.by_window.lock().unwrap().remove(window);
     }

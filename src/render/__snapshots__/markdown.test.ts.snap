@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`frozen extension corpus > matches the TypeScript baseline snapshot 1`] = `
+"<pre class="front-matter" data-line-start="0" data-line-end="5"><code>title: Rust core fixture
+tags: [mordant, fixtures]
+draft: false</code></pre>
+<h1 id="project-notes" data-line-start="6" data-line-end="7">Project notes</h1>
+<p data-line-start="8" data-line-end="9">Intro with a <a class="wikilink" href="wiki:wiki%20link" rel="noopener noreferrer">wiki link</a>, ==highlighted text~, <sub>subscript</sub> and <sup>superscript</sup>.</p>
+<h2 id="section-one" data-line-start="10" data-line-end="11">Section one</h2>
+<ul class="contains-task-list contains-task-list" data-line-start="12" data-line-end="15">
+<li class="task-list-item" data-line-start="12" data-line-end="13"><input type="checkbox" class="task-checkbox" data-task-line="12">first task</li>
+<li class="task-list-item" data-line-start="13" data-line-end="15"><input type="checkbox" class="task-checkbox" data-task-line="13" checked="">second task</li>
+</ul>
+<blockquote class="callout callout-note" data-line-start="15" data-line-end="17">
+<p class="callout-title">Note</p>
+<p data-line-start="15" data-line-end="17">Callout bodies stay in the preview.</p>
+</blockquote>
+<table data-line-start="18" data-line-end="21">
+<thead data-line-start="18" data-line-end="19">
+<tr data-line-start="18" data-line-end="19">
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody data-line-start="20" data-line-end="21">
+<tr data-line-start="20" data-line-end="21">
+<td>rust</td>
+<td>1.88</td>
+</tr>
+</tbody>
+</table>
+<p data-line-start="22" data-line-end="23">Inline math <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>x</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">x^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span> and a fenced block:</p>
+<pre class="code-block" data-line-start="24" data-line-end="29" data-lang="rust"><code>fn main() {
+    println!("hello");
+}</code></pre>
+<p data-line-start="30" data-line-end="31">A footnote reference<sup class="footnote-ref"><a href="#fn1" id="fnref1" rel="noopener noreferrer">[1]</a></sup>.</p>
+<h2 id="section-one-1" data-line-start="32" data-line-end="33">Section one</h2>
+<p data-line-start="34" data-line-end="35">Same heading again to exercise stable ids.</p>
+<h2 id="section-two" data-line-start="36" data-line-end="37">Section two</h2>
+<p data-line-start="38" data-line-end="39">One more section before the nested heading.</p>
+<h3 id="details" data-line-start="40" data-line-end="41">Details</h3>
+<p data-line-start="42" data-line-end="43">Mermaid diagrams and page breaks are handled by the TypeScript layer for now.</p>
+<hr class="footnotes-sep">
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><p data-line-start="44" data-line-end="45">Footnote body. <a href="#fnref1" class="footnote-backref" rel="noopener noreferrer">↩︎</a></p>
+</li>
+</ol>
+</section>
+"
+`;

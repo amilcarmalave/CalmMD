@@ -5,13 +5,68 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
+import type {
+  BufferAutosaveChoice,
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveResolveResult,
+  BufferAutosaveState,
+  BufferDraftEntry,
+  BufferFile,
+  BufferPersistRequest,
+  BufferPersistResult,
+} from '../buffers/types';
+import { useRustSpell } from '../core/rustFlags';
+import type { Session } from '../app/session';
+import type { SpaceRecord } from '../app/spaces';
+import type { HistoryUsage, HistoryVersion } from '../history/types';
+import type { SpellDictionary } from '../core/spellDictionaries';
 import type { SearchHit } from '../core/search';
+import type { TakumiPdfOptions } from '../export/takumi';
+import type { ExportAssembleRequest } from './types';
+import type { McpConnectionInfo, McpRequest } from '../mcp/types';
+import type { WorkspaceEvent } from '../workspace/types';
+import type { HighlightCodeResult, MarkdownParseResult, MarkdownRenderResult } from '../markdown/types';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
 
 const MARKDOWN_FILTERS = [
   { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
   { name: 'All files', extensions: ['*'] },
 ];
+
+type SpellCheckResult = { misspelled: boolean; suggestions: string[] } | null;
+
+/**
+ * When the Rust spell flag is on, the bundled zspell service answers for bundled languages and
+ * supports learned words on every platform. Other languages still use the OS checker.
+ */
+async function spellCheck(word: string, lang: string | undefined): Promise<SpellCheckResult> {
+  if (useRustSpell()) {
+    const native = await invoke<SpellCheckResult>('core_spell_check', { word, lang: lang ?? null });
+    if (native !== null) return native;
+  }
+  return invoke<SpellCheckResult>('spell_check', { word, lang: lang ?? null });
+}
+
+async function spellCheckText(text: string, lang: string | undefined): Promise<[number, number][] | null> {
+  if (useRustSpell()) {
+    const native = await invoke<[number, number][] | null>('core_spell_check_text', { text, lang: lang ?? null });
+    if (native !== null) return native;
+  }
+  return invoke<[number, number][] | null>('spell_check_text', { text, lang: lang ?? null });
+}
+
+async function spellLearn(word: string, lang: string | undefined): Promise<void> {
+  if (useRustSpell()) {
+    const handled = await invoke<boolean>('core_spell_learn', { word, lang: lang ?? null });
+    if (handled) return;
+  }
+  await invoke<void>('spell_learn', { word, lang: lang ?? null });
+}
+
+const spellDictionaries = () => invoke<SpellDictionary[]>('core_spell_dictionaries');
+const spellInstallDictionary = (id: string) => invoke<void>('core_spell_dictionary_install', { id });
+const spellRemoveDictionary = (id: string) => invoke<void>('core_spell_dictionary_remove', { id });
 
 const SAVE_FILTERS: Record<Exclude<SaveKind, 'markdown'>, { name: string; extensions: string[] }> = {
   html: { name: 'Web page', extensions: ['html'] },
@@ -110,17 +165,68 @@ export function createTauriPlatform(): Platform {
       return (await save({ defaultPath: suggestedName, filters })) ?? null;
     },
 
+    markdownParse: (text) => invoke<MarkdownParseResult>('markdown_parse', { text }),
+    markdownRender: (text, options) => invoke<MarkdownRenderResult>('markdown_render', { text, options: options ?? null }),
+    markdownHighlightCode: (language, code, theme) =>
+      invoke<HighlightCodeResult>('markdown_highlight_code', { language, code, theme: theme ?? null }),
+
+    workspaceSync: (snapshot) => invoke<void>('core_workspace_sync', { snapshot }),
+    workspaceUpsert: (document, activeDocument) =>
+      invoke<void>('core_workspace_upsert_document', { document, activeDocument: activeDocument ?? null }),
+    onWorkspaceEvent(handler) {
+      void listen<WorkspaceEvent>('calmmd://workspace', (event) => handler(event.payload));
+    },
+
+    sessionGet: (key) => invoke<Session | null>('core_session_get', { key }),
+    sessionSet: (key, session) => invoke<void>('core_session_set', { key, session }),
+    spaceGet: (id) => invoke<SpaceRecord | null>('core_space_get', { id }),
+    spaceSave: (space) => invoke<void>('core_space_save', { space }),
+    spaceRemove: (id) => invoke<void>('core_space_remove', { id }),
+    spaces: () => invoke<SpaceRecord[]>('core_spaces'),
+
+    historyList: (path) => invoke<HistoryVersion[]>('core_history_list', { path }),
+    historyRead: (path, id) => invoke<string | null>('core_history_read', { path, id }),
+    historySave: (path, text, name) => invoke<HistoryVersion | null>('core_history_save', { path, text, name }),
+    historyRemove: (path, id) => invoke<void>('core_history_remove', { path, id }),
+    historyRename: (from, to) => invoke<void>('core_history_rename', { from, to }),
+    historyClearFile: (path) => invoke<void>('core_history_clear_file', { path }),
+    historyClearAll: () => invoke<void>('core_history_clear_all'),
+    historyUsage: () => invoke<HistoryUsage>('core_history_usage'),
+
+    bufferDraftWrite: (id, record) => invoke<void>('core_buffer_draft_write', { id, record }),
+    bufferDraftDelete: (id) => invoke<void>('core_buffer_draft_delete', { id }),
+    bufferDrafts: () => invoke<BufferDraftEntry[]>('core_buffer_drafts'),
+    bufferPersist: (request: BufferPersistRequest) =>
+      invoke<BufferPersistResult>('core_buffer_persist', { request }),
+    bufferLoad: (path) => invoke<BufferFile>('core_buffer_load', { path }),
+
+    bufferAutosaveTouch: (request: BufferAutosaveRequest) =>
+      invoke<BufferAutosaveState>('core_autosave_touch', { request }),
+    bufferAutosaveFlush: (id) => invoke<BufferAutosaveState>('core_autosave_flush', { id }),
+    bufferAutosaveStatus: (id) => invoke<BufferAutosaveState | null>('core_autosave_status', { id }),
+    bufferAutosaveDispose: (id) => invoke<void>('core_autosave_dispose', { id }),
+    bufferAutosaveResolve: (id: string, choice: BufferAutosaveChoice) =>
+      invoke<BufferAutosaveResolveResult>('core_autosave_resolve', { id, choice }),
+    onBufferAutosave(handler) {
+      void listen<BufferAutosaveEvent>('calmmd://autosave', (event) => handler(event.payload));
+    },
+
     findBrowser: () => invoke<string | null>('find_browser'),
     printPdf: (html, out) => invoke<void>('print_pdf', { html, out }),
+    takumiPdf: (html, out, options: TakumiPdfOptions) => invoke<void>('takumi_pdf', { html, out, options }),
+    exportAssemble: (request: ExportAssembleRequest) => invoke<{ html: string }>('core_export_assemble', { payload: request }),
     readImageDataUrl: (path) => invoke<string>('read_image_data_url', { path }),
     // Raw IPC body (fast for large images); the path travels in a header.
     writeBinaryFile: (path, data) => invoke<void>('write_binary_file', data, { headers: { path: encodeURIComponent(path) } }),
     copyFile: (from, to) => invoke<void>('copy_file', { from, to }),
     pendingAssetsDir: () => invoke<string>('pending_assets_dir'),
     findPandoc: () => invoke<string | null>('find_pandoc'),
-    spellCheck: (word, lang) => invoke('spell_check', { word, lang: lang ?? null }),
-    spellCheckText: (text, lang) => invoke('spell_check_text', { text, lang: lang ?? null }),
-    spellLearn: (word, lang) => invoke<void>('spell_learn', { word, lang: lang ?? null }),
+    spellCheck,
+    spellCheckText,
+    spellLearn,
+    spellDictionaries,
+    spellInstallDictionary,
+    spellRemoveDictionary,
     pandocConvert: (markdown, out, resourceDir) => invoke<void>('pandoc_convert', { markdown, out, resourceDir }),
     themesDir: () => invoke<string>('themes_dir'),
     writeClipboardHtml: (html, plain) => writeHtml(html, plain),
@@ -154,6 +260,14 @@ export function createTauriPlatform(): Platform {
     onOpenPaths(handler) {
       void getCurrentWindow().listen<string[]>('calmmd://open-paths', (e) => handler(e.payload));
     },
+
+    mcpStatus: () => invoke<McpConnectionInfo>('mcp_status'),
+    mcpStart: () => invoke<McpConnectionInfo>('mcp_start'),
+    mcpStop: () => invoke<McpConnectionInfo>('mcp_stop'),
+    onMcpRequest(handler) {
+      void listen<McpRequest>('calmmd://mcp/request', (e) => handler(e.payload));
+    },
+    mcpRespond: (response) => invoke<void>('mcp_respond', { response }),
 
     setWindowTitle: (title) => getCurrentWindow().setTitle(title),
     onCloseRequested(handler) {

@@ -3,6 +3,7 @@ import { HIGHLIGHT_COLORS, TEXT_COLORS } from '../editor/colors';
 import { COLOR_THEMES, type ColorTheme } from './colorThemes';
 import { act, cmd, sep, sub, type MenuEntry, type TopMenu } from './menuModel';
 import { SPELL_LANGUAGES, type Settings, type ViewMode } from './settings';
+import { AVAILABLE_MARK, DOWNLOAD_MARK, type SpellDictionary } from '../core/spellDictionaries';
 import { BUILTIN_THEMES } from './themes';
 import { FONT_LABELS, WIDTH_LABELS } from './appCommands';
 
@@ -19,8 +20,33 @@ export interface MenuContext {
   clearRecentFolders: () => void;
   userThemes: () => { id: string; name: string }[];
   pickColorTheme: (t: ColorTheme) => void;
+  /** Live dictionary availability; downloadable entries move into the available group when installed. */
+  dictionaries: () => SpellDictionary[];
   /** macOS: the app menu holds About and Quit, so Help and File drop theirs. */
   isMac: boolean;
+}
+
+/**
+ * One Spelling Language menu: installed languages first, then a separator and downloadable ones.
+ * A downloaded dictionary is reported as installed by the platform and moves into the first group.
+ */
+export function spellingLanguageMenu(settings: Settings, dictionaries: SpellDictionary[]): MenuEntry[] {
+  const known = new Set(dictionaries.flatMap((d) => d.languages.map((tag) => tag.toLowerCase())));
+  const available: MenuEntry[] = [
+    cmd('spell.auto', { label: `${AVAILABLE_MARK}  Automatic (system languages)`, checked: () => settings.spellLang === 'auto' }),
+  ];
+  for (const d of dictionaries.filter((x) => x.installed)) {
+    const tag = d.languages[0];
+    available.push(cmd(`spell.${tag}`, { label: `${AVAILABLE_MARK}  ${d.label}`, checked: () => settings.spellLang === tag }));
+  }
+  for (const [code, label] of SPELL_LANGUAGES) {
+    if (code === 'auto' || known.has(code.toLowerCase())) continue;
+    available.push(cmd(`spell.${code}`, { label: `${AVAILABLE_MARK}  ${label}`, checked: () => settings.spellLang === code }));
+  }
+  const optional = dictionaries
+    .filter((d) => !d.installed)
+    .map((d) => cmd(`spell.install.${d.id}`, { label: `${DOWNLOAD_MARK}  ${d.label} — download` }));
+  return optional.length ? [...available, sep, ...optional] : available;
 }
 
 /** The application menus. Entries are mostly command ids from appCommands.ts and App.tsx. */
@@ -62,6 +88,10 @@ export function appMenus(c: MenuContext): TopMenu[] {
         cmd('export.copyHtml'),
       ]),
       sep,
+      sep,
+      cmd('mcp.start', { label: 'Start MCP Server' }),
+      cmd('mcp.stop', { label: 'Stop MCP Server' }),
+      cmd('mcp.autostart', { label: 'Auto-start MCP Server', checked: () => c.settings.mcpAutostart }),
       sub('Spaces', () => [
         ...c.spaces().map((s) => act(s.name, () => c.switchSpace(s.id), { checked: () => s.current })),
         ...(c.spaces().length ? [sep] : []),
@@ -219,7 +249,7 @@ export function appMenus(c: MenuContext): TopMenu[] {
       cmd('palette.headings'),
       sep,
       cmd('edit.spellcheck', { label: 'Check Spelling', checked: () => c.settings.spellcheck }),
-      sub('Spelling Language', () => SPELL_LANGUAGES.map(([code, label]) => cmd(`spell.${code}`, { label, checked: () => c.settings.spellLang === code }))),
+      sub('Spelling Language', () => spellingLanguageMenu(c.settings, c.dictionaries())),
       cmd('view.slash', { label: 'Slash Commands', checked: () => c.settings.slashCommands }),
       sep,
       sub('Export', () => [cmd('export.pdf', { label: 'PDF…' }), cmd('export.html', { label: 'HTML…' }), cmd('export.copyHtml')]),

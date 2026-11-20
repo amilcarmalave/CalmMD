@@ -21,7 +21,7 @@ export interface ExplorerDeps {
   confirm: ConfirmFn;
   notify: (msg: string) => void;
   /** Hooks into open documents. */
-  onRenamed: (from: string, to: string) => void;
+  onRenamed: (from: string, to: string) => void | Promise<void>;
   onTrashed: (path: string) => void;
   openFile: (path: string) => void;
   /** Called when the user switches between all files and notes only (the app persists it). */
@@ -236,9 +236,32 @@ export function createExplorer(deps: ExplorerDeps) {
       return null;
     }
     fileCache = null;
-    deps.onRenamed(path, to);
+    await deps.onRenamed(path, to);
     retarget(path, to);
     await load(dirname(path));
+    return to;
+  }
+
+  async function move(path: string, dir: string, rawName?: string): Promise<string | null> {
+    const name = rawName?.trim() || basename(path);
+    const to = joinPath(dir, name);
+    if (samePath(path, to)) return path;
+    const err = validateName(name);
+    if (err) {
+      deps.notify(err);
+      return null;
+    }
+    try {
+      await platform.renamePath(path, to);
+    } catch (e) {
+      deps.notify(errText(e));
+      return null;
+    }
+    fileCache = null;
+    await deps.onRenamed(path, to);
+    retarget(path, to);
+    await load(dirname(path));
+    if (!samePath(dir, dirname(path))) await load(dir);
     return to;
   }
 
@@ -266,14 +289,17 @@ export function createExplorer(deps: ExplorerDeps) {
     for (const p of Object.keys(unwrap(state.expanded))) if (state.expanded[p] && isWithin(p, to)) void load(p);
   }
 
-  async function trash(path: string, isDir: boolean): Promise<boolean> {
-    const choice = await deps.confirm({
-      title: `Move “${basename(path)}” to the trash?`,
-      message: isDir ? 'The folder and everything in it will be moved to the trash.' : 'You can restore it from the trash.',
-      primary: 'Move to Trash',
-      destructive: 'primary',
-    });
-    if (choice !== 'primary') return false;
+  /** MCP callers pass `confirmed` themselves; UI callers still show the confirmation dialog. */
+  async function trash(path: string, isDir: boolean, confirmed = false): Promise<boolean> {
+    if (!confirmed) {
+      const choice = await deps.confirm({
+        title: `Move “${basename(path)}” to the trash?`,
+        message: isDir ? 'The folder and everything in it will be moved to the trash.' : 'You can restore it from the trash.',
+        primary: 'Move to Trash',
+        destructive: 'primary',
+      });
+      if (choice !== 'primary') return false;
+    }
     try {
       await platform.trashPath(path);
     } catch (e) {
@@ -339,7 +365,25 @@ export function createExplorer(deps: ExplorerDeps) {
     moveFavorite,
     create,
     rename,
+    move,
     trash,
+    /** Applies a rename made by the Rust workspace service. */
+    async externalRenamed(from: string, to: string) {
+      const oldParent = dirname(from);
+      const newParent = dirname(to);
+      retarget(from, to);
+      await Promise.all([
+        ...(oldParent && oldParent !== newParent ? [load(oldParent)] : []),
+        ...(newParent ? [load(newParent)] : []),
+      ]);
+    },
+    /** Applies a trash made by the Rust workspace service. */
+    async externalTrashed(path: string, isDir: boolean) {
+      if (isFavorite(path)) await toggleFavorite(path, isDir);
+      fileCache = null;
+      const parent = dirname(path);
+      if (parent) await load(parent);
+    },
     setEditing: (e: Editing) => setState('editing', e),
     setShowAllFiles: (on: boolean) => {
       setState('showAllFiles', on);

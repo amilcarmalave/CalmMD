@@ -1,6 +1,171 @@
+import type { BaseTheme, Margins, PageSize, PdfTemplate } from '../export/build';
+import { createKvHistory } from '../app/history';
+import type { Session } from '../app/session';
+import { parseSession } from '../app/session';
+import { parseSpace, type SpaceRecord } from '../app/spaces';
+import type {
+  BufferAutosaveEvent,
+  BufferAutosaveRequest,
+  BufferAutosaveResolveResult,
+  BufferAutosaveState,
+  BufferDraft,
+  BufferDraftEntry,
+  BufferFile,
+  BufferPersistRequest,
+  BufferPersistResult,
+} from '../buffers/types';
+import { decodeFromDisk, encodeForDisk } from '../core/text';
 import { naturalCompare } from '../core/paths';
 import { SEARCH_MAX_HITS, searchText, type SearchHit } from '../core/search';
+import type { McpConnectionInfo } from '../mcp/types';
+import type { WorkspaceDocument, WorkspaceEvent, WorkspaceSnapshot } from '../workspace/types';
+import type { HistoryUsage } from '../history/types';
+import type { SpellDictionary } from '../core/spellDictionaries';
+import type {
+  HeadingDto,
+  HighlightCodeResult,
+  MarkdownParseResult,
+  MarkdownRenderOptions,
+  MarkdownRenderResult,
+  SourceBlockDto,
+} from '../markdown/types';
+import { createRenderer } from '../render/markdown';
+import { escapeHtml, highlightToHtml } from '../render/highlight';
 import type { DirEntry, Platform, StatResult } from './types';
+
+/** Browser/test stand-in for the Rust Markdown service. */
+const browserRenderer = createRenderer();
+
+function slugify(text: string): string {
+  const out: string[] = [];
+  let pendingDash = false;
+  for (const ch of text.trim().toLocaleLowerCase()) {
+    if (/\s/u.test(ch)) {
+      pendingDash = out.length > 0;
+      continue;
+    }
+    if (/[\p{L}\p{N}_-]/u.test(ch)) {
+      if (pendingDash) out.push('-');
+      pendingDash = false;
+      out.push(ch);
+    }
+  }
+  return out.join('') || 'section';
+}
+
+function parseSimpleFrontMatter(lines: readonly string[]): Record<string, unknown> {
+  if (lines[0]?.trimEnd() !== '---') return {};
+  const result: Record<string, unknown> = {};
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trimEnd() === '---' || line.trimEnd() === '...') break;
+    const m = /^([\w.-]+):\s*(.*)$/.exec(line);
+    if (!m) continue;
+    const raw = m[2].trim();
+    if (raw === 'true') result[m[1]] = true;
+    else if (raw === 'false') result[m[1]] = false;
+    else if (/^-?\d+(\.\d+)?$/.test(raw)) result[m[1]] = Number(raw);
+    else if (raw.startsWith('[') && raw.endsWith(']'))
+      result[m[1]] = raw
+        .slice(1, -1)
+        .split(',')
+        .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean);
+    else result[m[1]] = raw.replace(/^['"]|['"]$/g, '');
+  }
+  return result;
+}
+
+function browserMarkdownParse(text: string): MarkdownParseResult {
+  const lines = text.split(/\r?\n/);
+  const seen = new Map<string, number>();
+  const headings: HeadingDto[] = [];
+  const blocks: SourceBlockDto[] = [];
+  let paragraphStart: number | null = null;
+  let i = 0;
+  if (lines[0]?.trimEnd() === '---') {
+    while (i < lines.length && i < 400 && lines[i].trimEnd() !== '---' && lines[i].trimEnd() !== '...') i++;
+    if (i < lines.length) i++;
+  }
+  for (; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      const start = i;
+      const marker = fence[1][0];
+      i++;
+      while (i < lines.length && !new RegExp(`^ {0,3}${marker}{3,}`).test(lines[i] ?? '')) i++;
+      blocks.push({ kind: 'CodeBlock', startLine: start, endLine: Math.min(i, lines.length - 1), byteStart: 0 });
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (heading) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      const raw = heading[2];
+      const base = slugify(raw);
+      const count = seen.get(base) ?? 0;
+      seen.set(base, count + 1);
+      headings.push({
+        level: heading[1].length,
+        text: raw,
+        id: count === 0 ? base : `${base}-${count}`,
+        line: i,
+        byteStart: 0,
+      });
+      blocks.push({ kind: 'Heading', startLine: i, endLine: i, byteStart: 0 });
+      continue;
+    }
+    if (!line.trim()) {
+      if (paragraphStart !== null) {
+        blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: i - 1, byteStart: 0 });
+        paragraphStart = null;
+      }
+      continue;
+    }
+    if (paragraphStart === null) paragraphStart = i;
+    if (line.trimStart().startsWith('|')) {
+      blocks.push({ kind: 'Table', startLine: i, endLine: i, byteStart: 0 });
+      paragraphStart = null;
+    }
+  }
+  if (paragraphStart !== null)
+    blocks.push({ kind: 'Paragraph', startLine: paragraphStart, endLine: lines.length - 1, byteStart: 0 });
+  blocks.sort((a, b) => a.startLine - b.startLine);
+  return {
+    headings,
+    frontMatter: parseSimpleFrontMatter(lines),
+    blocks,
+  };
+}
+
+const SPELL_DICTIONARIES: SpellDictionary[] = [
+  { id: 'en_US', label: 'English (US)', languages: ['en-US', 'en'], license: 'MIT AND BSD', installed: true, bundled: true, source: '' },
+  { id: 'en_GB', label: 'English (UK)', languages: ['en-GB'], license: 'MIT AND BSD', installed: true, bundled: true, source: '' },
+  { id: 'de_DE', label: 'German', languages: ['de-DE', 'de'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'fr_FR', label: 'French', languages: ['fr-FR', 'fr-BE', 'fr'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'es_ES', label: 'Spanish', languages: ['es-ES', 'es'], license: 'Apache-2.0', installed: true, bundled: true, source: '' },
+  { id: 'it_IT', label: 'Italian', languages: ['it-IT', 'it'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'pt_PT', label: 'Portuguese', languages: ['pt-PT', 'pt-BR', 'pt'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'nl_NL', label: 'Dutch / Flemish', languages: ['nl-NL', 'nl-BE', 'nl'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'fi_FI', label: 'Finnish', languages: ['fi-FI', 'fi'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'nb_NO', label: 'Norwegian (Bokmål)', languages: ['nb-NO', 'nb', 'no'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'da_DK', label: 'Danish', languages: ['da-DK', 'da'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'pl_PL', label: 'Polish', languages: ['pl-PL', 'pl'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'zh_CN', label: 'Chinese', languages: ['zh-CN', 'zh'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'ja_JP', label: 'Japanese', languages: ['ja-JP', 'ja'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'ko_KR', label: 'Korean', languages: ['ko-KR', 'ko'], license: 'Apache-2.0', installed: false, bundled: false, source: '' },
+  { id: 'ru_RU', label: 'Russian', languages: ['ru-RU', 'ru'], license: 'BSD-3-Clause', installed: false, bundled: false, source: '' },
+  { id: 'en_CA', label: 'English (Canada)', languages: ['en-CA'], license: 'MIT AND BSD', installed: false, bundled: false, source: '' },
+  { id: 'en_AU', label: 'English (Australia)', languages: ['en-AU'], license: 'MIT AND BSD', installed: false, bundled: false, source: '' },
+  { id: 'tr_TR', label: 'Turkish', languages: ['tr-TR', 'tr'], license: 'MIT', installed: false, bundled: false, source: '' },
+];
 
 export interface MemoryPlatformOptions {
   files?: Record<string, string>;
@@ -56,6 +221,50 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     if (m === undefined) mtimes.set(path, (m = tick()));
     return m;
   };
+
+  interface PendingAutosave {
+    request: BufferAutosaveRequest;
+    firstDirtyAt: number;
+    generation: number;
+    timer: ReturnType<typeof setTimeout>;
+    state: BufferAutosaveState;
+  }
+  let kvHistory: ReturnType<typeof createKvHistory>;
+  const pendingAutosaves = new Map<string, PendingAutosave>();
+  const autosaveHandlers = new Set<(event: BufferAutosaveEvent) => void>();
+  const emitAutosave = (event: BufferAutosaveEvent) => {
+    for (const handler of autosaveHandlers) handler(event);
+  };
+  async function flushAutosave(id: string): Promise<BufferAutosaveState> {
+    const pending = pendingAutosaves.get(id);
+    if (!pending) {
+      return { id, status: 'clean', dirty: false, conflict: false, mtimeMs: null, lastError: null };
+    }
+    clearTimeout(pending.timer);
+    pending.state = { ...pending.state, status: 'saving' };
+    emitAutosave({ kind: 'status', state: pending.state });
+    try {
+      const result = await platform.bufferPersist(pending.request);
+      pending.state = {
+        ...pending.state,
+        status: 'clean',
+        dirty: false,
+        conflict: result.conflict,
+        mtimeMs: result.mtimeMs,
+        lastError: null,
+      };
+      emitAutosave({ kind: 'saved', state: pending.state });
+    } catch (err) {
+      pending.state = {
+        ...pending.state,
+        status: 'error',
+        dirty: true,
+        lastError: err instanceof Error ? err.message : String(err),
+      };
+      emitAutosave({ kind: 'status', state: pending.state });
+    }
+    return pending.state;
+  }
 
   const platform: Platform & {
     /** Test helper: simulate another program editing a file. */
@@ -155,11 +364,206 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     async revealPath() {},
 
+    async markdownParse(text) {
+      return browserMarkdownParse(text);
+    },
+    async markdownRender(text, _options?: MarkdownRenderOptions): Promise<MarkdownRenderResult> {
+      return {
+        html: browserRenderer.render(text, { docPath: null }),
+        sourceMap: browserMarkdownParse(text).blocks,
+      };
+    },
+    async markdownHighlightCode(language, code): Promise<HighlightCodeResult> {
+      return { html: `<pre class="code-block" data-lang="${escapeHtml(language)}"><code>${highlightToHtml(code, language)}</code></pre>` };
+    },
+    async workspaceSync(_snapshot: WorkspaceSnapshot) {},
+    async workspaceUpsert(_document: WorkspaceDocument, _activeDocument?: string | null) {},
+    onWorkspaceEvent(_handler: (event: WorkspaceEvent) => void) {},
+
+    async sessionGet(key): Promise<Session | null> {
+      const raw = await this.kvGet(key);
+      return raw === null ? null : parseSession(raw);
+    },
+    async sessionSet(key, session) {
+      await this.kvSet(key, JSON.stringify(session));
+    },
+    async spaceGet(id): Promise<SpaceRecord | null> {
+      const raw = await this.kvGet('space/' + id);
+      return raw === null ? null : parseSpace(raw);
+    },
+    async spaceSave(space) {
+      await this.kvSet('space/' + space.id, JSON.stringify(space));
+    },
+    async spaceRemove(id) {
+      await this.kvDelete('space/' + id);
+    },
+    async spaces(): Promise<SpaceRecord[]> {
+      const keys = await this.kvList('space/');
+      const recs = await Promise.all(keys.map((key) => this.spaceGet(key.slice('space/'.length))));
+      return recs.filter((r): r is SpaceRecord => !!r).sort((a, b) => b.lastOpened - a.lastOpened);
+    },
+
+    historyList: (path) => kvHistory.list(path),
+    historyRead: (path, id) => kvHistory.read(path, id),
+    historySave: (path, text, name) => kvHistory.save(path, text, name),
+    historyRemove: (path, id) => kvHistory.remove(path, id),
+    historyRename: (from, to) => kvHistory.rename(from, to),
+    historyClearFile: (path) => kvHistory.clearFile(path),
+    historyClearAll: () => kvHistory.clearAll(),
+    historyUsage: (): Promise<HistoryUsage> => kvHistory.usage(),
+
+    async bufferDraftWrite(id, record) {
+      store.setItem('kv:draft/' + id, JSON.stringify(record));
+    },
+    async bufferDraftDelete(id) {
+      store.removeItem('kv:draft/' + id);
+    },
+    async bufferDrafts(): Promise<BufferDraftEntry[]> {
+      const out: BufferDraftEntry[] = [];
+      for (const key of keys('kv:draft/')) {
+        try {
+          const record = JSON.parse(store.getItem(key) ?? '') as BufferDraft;
+          if (record.v !== 1 || typeof record.text !== 'string' || !record.text) continue;
+          out.push({ id: key.slice('kv:draft/'.length), record });
+        } catch {
+          // A corrupt draft shouldn't block startup.
+        }
+      }
+      return out.sort((a, b) => a.record.updatedAt - b.record.updatedAt);
+    },
+    async bufferPersist(req: BufferPersistRequest): Promise<BufferPersistResult> {
+      const draft: BufferDraft = {
+        v: 1,
+        owner: req.owner,
+        text: req.text,
+        untitledIndex: req.untitledIndex,
+        path: req.path,
+        updatedAt: Date.now(),
+      };
+      if (!req.path) {
+        if (!req.text) await this.bufferDraftDelete(req.id);
+        else await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: false, wrote: false, draft: null };
+      }
+      if (req.conflict) {
+        await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: true, wrote: false, draft };
+      }
+      const st = await this.stat(req.path);
+      if (st && req.mtimeMs !== null && Math.abs(st.mtimeMs - req.mtimeMs) > 1) {
+        await this.bufferDraftWrite(req.id, draft);
+        return { mtimeMs: null, conflict: true, wrote: false, draft };
+      }
+      const { mtimeMs } = await this.writeTextFile(req.path, encodeForDisk(req.text, req.eol, req.bom));
+      await this.bufferDraftDelete(req.id);
+      return { mtimeMs, conflict: false, wrote: true, draft: null };
+    },
+    async bufferLoad(path): Promise<BufferFile> {
+      const { text: raw, mtimeMs } = await this.readTextFile(path);
+      return { ...decodeFromDisk(raw), mtimeMs };
+    },
+
+    async bufferAutosaveTouch(request): Promise<BufferAutosaveState> {
+      const previous = pendingAutosaves.get(request.id);
+      if (previous) clearTimeout(previous.timer);
+      const idle = request.idleMs ?? 1000;
+      const maxWait = request.maxWaitMs ?? 10_000;
+      const now = Date.now();
+      const firstDirtyAt = previous?.firstDirtyAt ?? now;
+      const generation = (previous?.generation ?? 0) + 1;
+      const state: BufferAutosaveState = {
+        id: request.id,
+        status: 'dirty',
+        dirty: true,
+        conflict: false,
+        mtimeMs: request.mtimeMs,
+        lastError: null,
+      };
+      const delay = Math.max(0, Math.min(idle, maxWait - (now - firstDirtyAt)));
+      const timer = setTimeout(() => {
+        const pending = pendingAutosaves.get(request.id);
+        if (pending?.generation === generation) void flushAutosave(request.id);
+      }, delay);
+      pendingAutosaves.set(request.id, { request, firstDirtyAt, generation, timer, state });
+      return state;
+    },
+    async bufferAutosaveFlush(id): Promise<BufferAutosaveState> {
+      return flushAutosave(id);
+    },
+    async bufferAutosaveStatus(id): Promise<BufferAutosaveState | null> {
+      return pendingAutosaves.get(id)?.state ?? null;
+    },
+    async bufferAutosaveResolve(id, choice): Promise<BufferAutosaveResolveResult> {
+      const pending = pendingAutosaves.get(id);
+      if (!pending) throw new Error('No pending autosave for this document');
+      const path = pending.request.path;
+      if (!path) throw new Error('This draft has no file path');
+      const file = await this.bufferLoad(path);
+      if (choice === 'loadTheirs') {
+        await this.bufferAutosaveDispose(id);
+        const state: BufferAutosaveState = {
+          id,
+          status: 'clean',
+          dirty: false,
+          conflict: false,
+          mtimeMs: file.mtimeMs,
+          lastError: null,
+        };
+        emitAutosave({ kind: 'saved', state });
+        return { state, file };
+      }
+      pending.request.conflict = false;
+      pending.request.mtimeMs = file.mtimeMs;
+      const state = await flushAutosave(id);
+      return { state, file: null };
+    },
+    async bufferAutosaveDispose(id) {
+      const pending = pendingAutosaves.get(id);
+      if (pending) clearTimeout(pending.timer);
+      pendingAutosaves.delete(id);
+    },
+    onBufferAutosave(handler) {
+      autosaveHandlers.add(handler);
+    },
+
     async findBrowser() {
       return null;
     },
     async printPdf() {
       throw new Error('NO_BROWSER');
+    },
+    async takumiPdf(html, out, options) {
+      // The browser build has no Tauri commands, so it keeps Takumi's local WASM engine.
+      const { renderPdf } = await import('../export/takumi');
+      const bytes = await renderPdf(html, options);
+      await platform.writeBinaryFile(out, bytes);
+    },
+    async exportAssemble(request) {
+      // The browser build has no Rust command; keep the original TypeScript shell as fallback.
+      const { buildDocument } = await import('../export/build');
+      const { baseCss, fontCss, katexCss, pagedJs, pdf, ...rest } = request;
+      const html = buildDocument(
+        rest.body,
+        {
+          title: rest.title,
+          theme: rest.theme as BaseTheme,
+          userCss: rest.userCss,
+          toc: false,
+          embedImages: false,
+        },
+        { baseCss, fontCss, katexCss, pagedJs },
+        pdf
+          ? {
+              pageSize: pdf.pageSize as PageSize,
+              margins: pdf.margins as Margins,
+              header: pdf.header,
+              pageNumbers: pdf.pageNumbers,
+              breakBeforeH1: pdf.breakBeforeH1,
+              template: pdf.template as PdfTemplate,
+            }
+          : undefined,
+      );
+      return { html };
     },
     async openPath() {},
     async readImageDataUrl(path) {
@@ -207,6 +611,20 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     async spellLearn(word) {
       learned.add(word.toLowerCase());
+    },
+    async spellDictionaries() {
+      return SPELL_DICTIONARIES.map((d) => ({
+        ...d,
+        installed: d.bundled || store.getItem('spell:installed:' + d.id) === '1',
+      }));
+    },
+    async spellInstallDictionary(id) {
+      if (!SPELL_DICTIONARIES.some((d) => d.id === id && !d.bundled)) throw new Error(`Unknown optional dictionary: ${id}`);
+      store.setItem('spell:installed:' + id, '1');
+    },
+    async spellRemoveDictionary(id) {
+      if (!SPELL_DICTIONARIES.some((d) => d.id === id && !d.bundled)) throw new Error(`Built-in dictionary cannot be removed: ${id}`);
+      store.removeItem('spell:installed:' + id);
     },
     async pandocConvert() {
       throw new Error("Pandoc isn't available here");
@@ -291,6 +709,19 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     },
     onOpenPaths() {},
 
+    // The browser/memory platforms have no embedded server; the bridge stays inert there.
+    async mcpStatus(): Promise<McpConnectionInfo> {
+      return { enabled: false, url: null, token: null, windowLabel: label };
+    },
+    async mcpStart(): Promise<McpConnectionInfo> {
+      return this.mcpStatus();
+    },
+    async mcpStop(): Promise<McpConnectionInfo> {
+      return this.mcpStatus();
+    },
+    onMcpRequest() {},
+    async mcpRespond() {},
+
     async setWindowTitle(title) {
       if (typeof document !== 'undefined') document.title = title;
     },
@@ -310,6 +741,7 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
       return Object.fromEntries(keys('fs:').map((k) => [k.slice(3), store.getItem(k) ?? '']));
     },
   };
+  kvHistory = createKvHistory({ platform });
   return platform;
 }
 

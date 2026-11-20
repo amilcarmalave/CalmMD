@@ -36,9 +36,10 @@ fn key_path(dir: &Path, key: &str) -> Result<PathBuf, String> {
     Ok(dir.join(key_to_file(key)?))
 }
 
-#[tauri::command]
-pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, String> {
-    let p = key_path(&state_dir(&app)?, &key)?;
+/// Synchronous access for Rust services that need durable state (for example the personal
+/// spellcheck dictionary). The Tauri commands below use the same helpers.
+pub fn read(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
+    let p = key_path(&state_dir(app)?, key)?;
     match fs::read_to_string(&p) {
         Ok(s) => Ok(Some(s)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -46,10 +47,19 @@ pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, Strin
     }
 }
 
+pub fn write(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
+    let p = key_path(&state_dir(app)?, key)?;
+    write_atomic(&p, value.as_bytes()).map_err(|e| describe(&e))
+}
+
+#[tauri::command]
+pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    read(&app, &key)
+}
+
 #[tauri::command]
 pub async fn kv_set(app: AppHandle, key: String, value: String) -> Result<(), String> {
-    let p = key_path(&state_dir(&app)?, &key)?;
-    write_atomic(&p, value.as_bytes()).map_err(|e| describe(&e))
+    write(&app, &key, &value)
 }
 
 #[tauri::command]

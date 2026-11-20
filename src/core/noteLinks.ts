@@ -102,3 +102,68 @@ export function linksTo(text: string, fromPath: string, target: string, files: s
 }
 
 export const noteTitle = (path: string) => stem(basename(path));
+
+interface Edit {
+  from: number;
+  to: number;
+  text: string;
+}
+
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+/**
+ * Rewrites links in `text` (the note at `fromDoc`) that point at `from` so they point at `to`.
+ * Code fences, indented code and inline code are left alone. `files` is the same list used to
+ * resolve wiki links when clicking them.
+ */
+export function rewriteLinks(text: string, fromDoc: string, from: string, to: string, files: string[]): string {
+  const edits: Edit[] = [];
+  const wikiRe = new RegExp(WIKI_RE.source, 'g');
+  const mdLinkRe = /(?<!!)\[([^\]]*)\]\(\s*(<[^>]*>|[^\s)]+)([^)]*)\)/g;
+  let pos = 0;
+  let fence: string | null = null;
+  const dir = dirname(fromDoc);
+
+  for (const line of text.split('\n')) {
+    const start = pos;
+    pos += line.length + 1;
+    const f = FENCE.exec(line);
+    if (fence) {
+      if (f && f[1][0] === fence[0] && f[1].length >= fence.length && !line.slice(f[0].length).trim()) fence = null;
+      continue;
+    }
+    if (f) {
+      fence = f[1];
+      continue;
+    }
+    if (/^( {4}|\t)/.test(line)) continue;
+    // Inline code keeps its literal text. Replace it with spaces so link regexes can't match there.
+    const masked = line.replace(/(`+)[^`]*?\1/g, (m) => ' '.repeat(m.length));
+
+    for (const m of masked.matchAll(wikiRe)) {
+      const w = parseWiki(m[1]);
+      if (!w?.name) continue;
+      const target = resolveWiki(w.name, fromDoc, files);
+      if (!target || !samePath(target, from)) continue;
+      const next = `[[${stem(to)}${w.heading ? `#${w.heading}` : ''}${w.alias ? `|${w.alias}` : ''}]]`;
+      edits.push({ from: start + m.index, to: start + m.index + m[0].length, text: next });
+    }
+
+    for (const m of masked.matchAll(mdLinkRe)) {
+      const raw = m[2].startsWith('<') ? m[2].slice(1, -1) : m[2];
+      const [pathPart, ...anchorParts] = raw.split('#');
+      const target = resolveLink(pathPart, dir);
+      if (!target || !samePath(target, from)) continue;
+      const rel = relativePath(dir, to);
+      if (rel === null) continue; // across drives: can't express as a relative link
+      const anchor = anchorParts.length ? '#' + anchorParts.join('#') : '';
+      const angled = m[2].startsWith('<');
+      const url = angled ? `<${markdownUrl(rel)}${anchor}>` : `${markdownUrl(rel)}${anchor}`;
+      edits.push({ from: start + m.index, to: start + m.index + m[0].length, text: `[${m[1]}](${url}${m[3]})` });
+    }
+  }
+
+  let out = text;
+  for (const e of edits.sort((a, b) => b.from - a.from)) out = out.slice(0, e.from) + e.text + out.slice(e.to);
+  return out;
+}

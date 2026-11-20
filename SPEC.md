@@ -63,10 +63,13 @@ License: **MIT**. Status: pre-1.0, built in milestones (see bottom).
   - The pane the user is scrolling leads; the other follows on the next animation frame. Feedback loops are suppressed.
   - Cursor sync: moving the caret in source highlights and reveals the matching
     preview block, and clicking a preview block places the caret at its source line.
-- **Spellcheck** on by default, using the OS/webview spellchecker ("Toggle Spellcheck" and
-  "Spelling Language: …" in the palette). The language sets the editor's `lang` attribute, which picks
-  the dictionary on Chromium/WebView2 (the dictionary must be installed in the OS). "Automatic" uses the
-  system languages. Spelling suggestions are in the native menu: **Shift+right-click** (our menu says so).
+- **Spellcheck** on by default, using the local zspell service where a dictionary is available and
+  the OS/webview checker otherwise ("Toggle Spellcheck" and "Spelling Language: …" in the palette).
+  English (US/UK), German, French and Spanish are bundled. Italian, Portuguese, Dutch/Flemish,
+  Finnish, Norwegian, Danish, Polish, Chinese, Japanese, Korean and Russian are downloaded on
+  explicit request from Tools → Spelling Language (↓ marker) and then join the available group (●).
+  The language sets the editor's `lang` attribute. "Automatic" uses the system languages. Spelling
+  suggestions are in the native menu: **Shift+right-click** (our menu says so).
 - **Math**: `$…$` inline and `$$…$$` blocks with KaTeX, using Pandoc rules, so "$5 and $10" stays text.
   The editor grammar and renderer share one scanner. In Live mode math renders in place, and while
   editing a block a live preview sits under the source.
@@ -166,11 +169,16 @@ Options considered:
 | **Paged.js + platform webview print-to-PDF** | Very good, matches preview exactly | **Zero** | Chosen. |
 | System Chrome/Edge `--headless --print-to-pdf` | Excellent | Only if a browser is installed | Used as a fallback and on Linux. |
 
-**Choice (implemented in M7):** build one self-contained HTML page (theme CSS, embedded fonts and
-images), paginate it with **Paged.js** (MIT) for running headers, `counter(page)`/`counter(pages)`,
+**Original M7 choice:** build one self-contained HTML page (theme CSS, embedded fonts and images),
+paginate it with **Paged.js** (MIT) for running headers, `counter(page)`/`counter(pages)`,
 `target-counter` TOC page numbers and break control, and print it with a headless
 **Chromium-family browser driven over the DevTools protocol** (`Page.printToPDF`, after the page
 signals that pagination and fonts are done).
+
+**Current choice:** the same self-contained HTML is rendered by **Takumi** (MIT OR Apache-2.0),
+natively in the desktop app and from a local WASM build in the browser demo. A visual review of all
+PDF templates accepted it as the default. Set `calmmd.pdf.engine = 'browser'` to use the original
+Paged.js path; details and comparison images are in `docs/visual-reviews/takumi/`.
 - **Windows:** Microsoft Edge, which ships with Windows 10/11, so **zero install**.
 - **macOS / Linux:** any installed Chrome, Edge, Chromium or Brave. If none is found, the
   system print dialog opens ("Save as PDF"). Same layout and styles, but no running headers or

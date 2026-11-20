@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createRenderer, slugify } from './markdown';
 import { patchChildren } from './patch';
@@ -12,6 +13,14 @@ function dom(html: string) {
   div.innerHTML = html;
   return div;
 }
+
+describe('frozen extension corpus', () => {
+  const fixture = readFileSync('src-tauri/src/core/markdown/tests/fixtures/extension-corpus.md', 'utf8');
+
+  it('matches the TypeScript baseline snapshot', () => {
+    expect(render(fixture, '/notes/extension-corpus.md')).toMatchSnapshot();
+  });
+});
 
 describe('source line mapping', () => {
   it('annotates top-level blocks with 0-based [start, end) lines', () => {

@@ -96,6 +96,8 @@ export interface BodyDeps {
   readImage: (absPath: string) => Promise<string | null>;
   /** Hook for blocks that render asynchronously (math, diagrams). */
   postProcess?: (root: HTMLElement) => Promise<void>;
+  /** Optional Rust/Mordant renderer. When present it replaces the TypeScript markdown-it path. */
+  renderMarkdown?: (markdown: string, docPath: string | null, theme: BaseTheme) => Promise<string>;
 }
 
 const renderer = createRenderer();
@@ -106,7 +108,9 @@ export async function buildBody(markdown: string, docPath: string | null, opts: 
   // Code grammars and diagrams load or render asynchronously in the app. Exports need them ready.
   await Promise.all([preloadLanguages(markdown), prerenderDiagrams(markdown, 'light').catch(() => undefined)]);
   // No resolveAsset: image sources stay as written, and we embed them below.
-  const html = renderer.render(markdown, { docPath, colorScheme: 'light' });
+  const html = deps.renderMarkdown
+    ? await deps.renderMarkdown(markdown, docPath, opts.theme)
+    : renderer.render(markdown, { docPath, colorScheme: 'light' });
   const root = document.createElement('div');
   root.innerHTML = html;
 

@@ -14,6 +14,18 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 | `@codemirror/autocomplete` | MIT | Slash-command menu |
 | `tauri-plugin-single-instance` | MIT / Apache-2.0 | Opening files in the running app |
 | serde, serde_json | MIT / Apache-2.0 | Rust serialisation |
+| sha2 | MIT OR Apache-2.0 | Content hashes for Rust-owned file history |
+| Mordant (`mordant`) and its highlighting dependencies (syntect, syntect-assets, jsonc-parser) | MIT / MIT / Apache-2.0 | Rust Markdown parsing, rendering, math and fenced-code highlighting (feature-flagged) |
+| `katex-rs` | MIT | Rust-side KaTeX math rendering in Mordant (feature-flagged) |
+| Takumi (`takumi-core`, `takumi-pdf`, `@takumi-rs/helpers`) | MIT OR Apache-2.0 | Default native Rust PDF engine on desktop and local WASM fallback in the browser; `VITE_CALMMD_PDF_ENGINE=browser` selects the older engine |
+| zspell (`zspell`) | Apache-2.0 | Native Rust spellchecking (feature-flagged) |
+| en_US / en_GB Hunspell dictionaries (`wooorm/dictionaries`) | MIT AND BSD | Bundled spellcheck dictionaries and personal words; full texts beside each dictionary |
+| Generated word lists (`wordfreq` 3.1.1, Apache-2.0) | Apache-2.0 | German/French/Spanish are bundled; Italian, Portuguese, Dutch/Flemish, Finnish, Norwegian, Danish, Polish, Chinese, Japanese and Korean are downloaded on request from the repository assets; full text beside each dictionary |
+| Optional Hunspell dictionaries (`wooorm/dictionaries`) | MIT / BSD-3-Clause | Downloaded on request into app data; licences are saved with each dictionary |
+| reqwest | MIT / Apache-2.0 | HTTPS downloads for optional spellcheck dictionaries |
+| `rmcp` | Apache-2.0 | Embedded local MCP server (`2026-07-28` spec) |
+| axum, tokio | MIT | Loopback HTTP server for MCP |
+| uuid, schemars | MIT / Apache-2.0 | MCP connection tokens and tool schemas |
 | trash | MIT | Moving files to the OS trash |
 | Paged.js (`pagedjs`) | MIT | PDF pagination (inlined into PDF exports) |
 | KaTeX (`katex`) | MIT | Math rendering (fonts: SIL OFL 1.1 / MIT as shipped by KaTeX) |
@@ -34,3 +46,6 @@ Runtime dependencies shipped with CalmMD. Only permissive licenses are allowed.
 `layout: elk` mode. It's aliased to a stub (`src/render/elk-stub.ts`) so no non-permissive code ships.
 
 Dev-only tooling (Vite, Vitest, TypeScript, jsdom, tempfile) is not distributed.
+
+Phase 7 cleanup changed no runtime dependency: it only narrowed Tauri capabilities to the event,
+menu and window APIs actually used by the webview and removed unused internal Rust helpers.
