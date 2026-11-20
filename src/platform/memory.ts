@@ -302,6 +302,9 @@ export function createMemoryPlatform(opts: MemoryPlatformOptions = {}) {
     async mcpStop(): Promise<McpConnectionInfo> {
       return this.mcpStatus();
     },
+    async mcpNewToken(): Promise<McpConnectionInfo> {
+      return this.mcpStatus();
+    },
     onMcpRequest() {},
     async mcpRespond() {},
 

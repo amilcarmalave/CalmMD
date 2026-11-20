@@ -36,9 +36,10 @@ fn key_path(dir: &Path, key: &str) -> Result<PathBuf, String> {
     Ok(dir.join(key_to_file(key)?))
 }
 
-#[tauri::command]
-pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, String> {
-    let p = key_path(&state_dir(&app)?, &key)?;
+/// Reads a key, or `None` when it was never written. Other callers (the MCP server) share this
+/// store so settings written from Rust stay visible to the webview.
+pub fn read(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
+    let p = key_path(&state_dir(app)?, key)?;
     match fs::read_to_string(&p) {
         Ok(s) => Ok(Some(s)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -46,20 +47,33 @@ pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, Strin
     }
 }
 
-#[tauri::command]
-pub async fn kv_set(app: AppHandle, key: String, value: String) -> Result<(), String> {
-    let p = key_path(&state_dir(&app)?, &key)?;
+pub fn write(app: &AppHandle, key: &str, value: &str) -> Result<(), String> {
+    let p = key_path(&state_dir(app)?, key)?;
     write_atomic(&p, value.as_bytes()).map_err(|e| describe(&e))
 }
 
-#[tauri::command]
-pub async fn kv_delete(app: AppHandle, key: String) -> Result<(), String> {
-    let p = key_path(&state_dir(&app)?, &key)?;
+pub fn delete(app: &AppHandle, key: &str) -> Result<(), String> {
+    let p = key_path(&state_dir(app)?, key)?;
     match fs::remove_file(&p) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(describe(&e)),
     }
+}
+
+#[tauri::command]
+pub async fn kv_get(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    read(&app, &key)
+}
+
+#[tauri::command]
+pub async fn kv_set(app: AppHandle, key: String, value: String) -> Result<(), String> {
+    write(&app, &key, &value)
+}
+
+#[tauri::command]
+pub async fn kv_delete(app: AppHandle, key: String) -> Result<(), String> {
+    delete(&app, &key)
 }
 
 #[tauri::command]

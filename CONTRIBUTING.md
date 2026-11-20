@@ -11,7 +11,7 @@ something simpler, faster or more reliable rather than adding UI.
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture, the rules that keep things from breaking (scroll sync,
   live mode, saving, export), and the debugging tips.
 - For work on the local MCP server, also read [docs/MCP.md](docs/MCP.md),
-  [docs/MCP-CLIENT-SETUP.md](docs/MCP-CLIENT-SETUP.md) and [skills/calmmd/SKILL.md](skills/calmmd/SKILL.md).
+  [docs/MCP-CLIENT-SETUP.md](docs/MCP-CLIENT-SETUP.md); agent guidance lives in the server itself.
   The MCP bridge exposes live app state to an external client; it is not an in-app AI chat and has no built-in LLM.
 - For anything larger than a bug fix, open an issue first so we can agree on the approach.
 

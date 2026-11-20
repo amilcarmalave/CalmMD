@@ -134,6 +134,8 @@ export interface Platform {
   mcpStatus(): Promise<McpConnectionInfo>;
   mcpStart(): Promise<McpConnectionInfo>;
   mcpStop(): Promise<McpConnectionInfo>;
+  /** Replaces the bearer token; restarts the server when it is running. */
+  mcpNewToken(): Promise<McpConnectionInfo>;
   /** Called for each tool call routed to this window. */
   onMcpRequest(handler: (request: McpRequest) => void): void;
   /** Sends the tool result back to the Rust server. */

@@ -4,8 +4,9 @@ This document describes the embedded Model Context Protocol (MCP) support added 
 what it can do today, and what is still open. It is a design record, not a user guide; for the
 user-facing summary see [`README.md`](../README.md), for client setup see
 [`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md), and for the app's overall structure see
-[`ARCHITECTURE.md`](ARCHITECTURE.md). Agent workflow guidance lives in
-[`../skills/calmmd/SKILL.md`](../skills/calmmd/SKILL.md).
+[`ARCHITECTURE.md`](ARCHITECTURE.md). Agent workflow guidance is served by the server itself
+(see [Working with a connected agent](#55-working-with-a-connected-agent)) and is summarised in
+[`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md).
 
 ---
 
@@ -42,7 +43,7 @@ Implemented and building as of this document:
 | 16 live-state tools | ✅ |
 | 3 prompt templates (summary, follow-up guide, folder organisation) | ✅ |
 | 2 static resources + 2 resource templates | ✅ |
-| Client setup guide and agent skill | ✅ |
+| Client setup guide and in-server agent guidance | ✅ |
 | Multi-window/Space routing | ✅ |
 | Link-safe rename, move and content-aware folder organisation | ✅ |
 | Headless PDF/HTML export tools | ✅ |
@@ -87,17 +88,19 @@ keeps protocol concerns in Rust and application concerns in TypeScript.
 - Endpoint: `http://127.0.0.1:<random-port>/mcp`
 - Transport: MCP Streamable HTTP (POST/GET, JSON or SSE responses)
 - Authentication: `Authorization: Bearer <token>`
-- Token: generated per launch with `uuid::Uuid::new_v4()`
+- Token: generated with `uuid::Uuid::new_v4()`, then remembered in `state/mcp~endpoint.kv`
 - `Origin`: accepted only when absent/`null` or from `localhost`, `127.0.0.1`, or `::1`
-- Binding: `127.0.0.1:0` only; never `0.0.0.0`
+- Binding: `127.0.0.1` only; never `0.0.0.0`. The remembered port is reused when free,
+  otherwise the server falls back to an ephemeral port
 - Start triggers:
   - File → Start MCP Server
   - command palette: `Start MCP Server`
   - `--mcp` launch argument
   - `mcpAutostart` setting (off by default)
 
-The server does not implement OAuth. For a loopback, single-user endpoint a per-launch bearer
-token is sufficient and matches CalmMD's no-account privacy model.
+The server does not implement OAuth. For a loopback, single-user endpoint a local bearer token is
+sufficient and matches CalmMD's no-account privacy model. The token persists between launches so a
+client only has to be configured once; **New MCP Token** rotates it.
 
 ### 3.3 Request flow
 
@@ -291,12 +294,55 @@ Clients discover them through `resources/list` and `resources/templates/list`.
 
 ---
 
+### 5.5 Working with a connected agent
+
+The useful parts of agent workflow guidance live in the server, in `INSTRUCTIONS` and the tool
+descriptions (`src-tauri/src/mcp/tools.rs`). Every MCP client receives it on connect, so the rules
+below apply everywhere instead of only inside the CalmMD source tree.
+
+| Goal | Tool |
+|---|---|
+| Inspect app, root and tabs | `calmmd_status` |
+| Discover window targets | `calmmd_windows` |
+| Find notes | `calmmd_list_documents`, `calmmd_search`, `calmmd_outline` |
+| Read a note | `calmmd_read_document` |
+| Create notes or folders | `calmmd_create_document`, `calmmd_create_folder` |
+| Rename or move | `calmmd_rename_document`, `calmmd_move_document` |
+| Edit a note | `calmmd_write_document` |
+| Remove a note | `calmmd_trash_document` (explicit confirmation) |
+| Organise a folder | `calmmd_triage_folder`, then `calmmd_apply_organization` |
+| Export | `calmmd_export_pdf`, `calmmd_export_html` |
+| Summarise or plan | the three MCP prompts, then `calmmd_write_document` |
+
+Working rules:
+
+1. Read with `calmmd_read_document` before writing, so unsaved buffer text is included.
+2. Prefer `mode: "append"` or `"prepend"` for additive edits; use `"replace"` only with the full
+   intended text.
+3. Re-read after a write and confirm the result.
+4. Stop on `conflict` and ask the user to resolve it in CalmMD; never overwrite.
+5. After a rename or move, report which notes changed and surface link-rewrite failures.
+6. Preview an organisation plan with `apply: false` and apply only after the user agrees.
+7. Fetch prompts with `prompts/get`, not `tools/call`, and say the client generated the text.
+8. Trash only with `confirm: true` and explicit user agreement.
+9. Do not use raw filesystem tools on files CalmMD has open.
+
+Common mistakes: reading the file from disk instead of the live buffer; skipping the preview step;
+assuming `windowLabel` values instead of calling `calmmd_windows`; and writing through a read-only
+resource URI.
+
+---
+
 ## 6. Configuration and UI
 
 - `mcpAutostart` lives in `src/app/settings.ts`, default `false`.
-- File menu: Start MCP Server, Stop MCP Server, Auto-start MCP Server (checked state from settings).
-- Command palette: same three commands under the `MCP` category.
-- Starting copies `url · token: …` to the clipboard.
+- File menu: Start MCP Server, Stop MCP Server, New MCP Token, Auto-start MCP Server (checked
+  state from settings).
+- Command palette: the same commands under the `MCP` category.
+- Starting copies `url · token: …` to the clipboard; **New MCP Token** copies the new string after
+  restarting the server.
+- The port and token are stored in the app's local state store (`state/mcp~endpoint.kv`), never in
+  the repository or in a synced folder.
 - A small `MCP` marker appears in the status bar while the server is enabled.
 
 When `--mcp` is used, startup begins before the webview has loaded settings; that is safe because
@@ -323,6 +369,7 @@ TypeScript:
 - `src/core/noteLinks.ts` — `rewriteLinks()`
 - `src/app/settings.ts` — `mcpAutostart`
 - `src/App.tsx`, `src/app/appMenus.ts`, `src/styles/app.css` — wiring, commands, menu, indicator
+- `src-tauri/src/mcp/tools.rs` — `INSTRUCTIONS`, the agent guidance every client receives
 
 Tests/docs:
 
@@ -332,7 +379,6 @@ Tests/docs:
 - Rust `mcp::tests::only_local_origins_pass`
 - `docs/MCP.md` (this file), `docs/MCP-CLIENT-SETUP.md`, `docs/ARCHITECTURE.md`, `README.md`,
   `THIRD_PARTY_LICENSES.md`
-- `skills/calmmd/SKILL.md` and `.claude/skills/calmmd/SKILL.md` (identical copies; keep in sync)
 
 ---
 
@@ -360,8 +406,9 @@ because no `en-US` OS dictionary is installed; they are unrelated to MCP.
 
 - **No stdio transport.** Some clients only launch stdio servers. A small sidecar or a
   `--mcp-stdio` mode that forwards to the running app would help.
-- **No persisted port/token.** They change every launch. Clients must be reconfigured, or the
-  start command's clipboard payload must be used each time.
+- **Persisted endpoint is a file, not an OS keychain.** The bearer token lives in the app's local
+  state directory so clients survive a restart. A keychain-backed token would be stronger on shared
+  machines.
 - **Resources are read-only and flat.** There is no resource for a whole Space, no subscriptions,
   and no resource templates with variable routing fields beyond query parameters.
 - **No progress/cancellation notifications** for long exports or large sorts.

@@ -159,6 +159,7 @@ export function createTauriPlatform(): Platform {
     mcpStatus: () => invoke<McpConnectionInfo>('mcp_status'),
     mcpStart: () => invoke<McpConnectionInfo>('mcp_start'),
     mcpStop: () => invoke<McpConnectionInfo>('mcp_stop'),
+    mcpNewToken: () => invoke<McpConnectionInfo>('mcp_new_token'),
     onMcpRequest(handler) {
       void listen<McpRequest>('calmmd://mcp/request', (e) => handler(e.payload));
     },

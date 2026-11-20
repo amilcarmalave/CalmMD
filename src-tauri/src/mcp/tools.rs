@@ -19,6 +19,51 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc};
 
+/// Guidance every MCP client receives on connect. It replaces the old repository skill files, so
+/// agent workflow rules travel with the server instead of living in a source-tree-only skill.
+const INSTRUCTIONS: &str = "\
+CalmMD's MCP server works on the running app, not on bare files. Reads include unsaved buffer text, \
+and every write stays undoable, autosaved and snapshotted in file history, so these tools are \
+always preferable to editing, renaming or deleting the same files behind CalmMD's back.
+
+Before acting: call calmmd_status for the open folder, tabs and active document, and calmmd_windows \
+before using windowLabel or spaceId routing. Paths may be absolute or relative to the open folder; \
+'..' and anything outside the root are rejected.
+
+Reading: prefer calmmd_read_document over reading the file from disk. Use calmmd_list_documents to \
+browse, calmmd_search to find text and calmmd_outline for headings (0-based line numbers).
+
+Editing: read first, then send the complete intended text with mode 'replace', or use 'append' or \
+'prepend' for additive changes. Keep flush: true (the default) when the user expects the file on \
+disk immediately, and re-read afterwards to confirm the result. If a write reports a conflict, stop \
+and ask the user to resolve it in CalmMD; never overwrite a conflicted document.
+
+Renames and moves: calmmd_rename_document and calmmd_move_document retarget open tabs, favourites, \
+file history and links (relative Markdown and [[wiki]] links; code blocks and inline code are left \
+alone). Create the destination folder first with calmmd_create_folder. Report which notes changed \
+and surface any link-rewrite failures.
+
+Organising: calmmd_triage_folder returns live excerpts, headings, front matter and mtime. Propose a \
+plan of the form {\"moves\":[{\"from\":\"...\",\"toFolder\":\"...\",\"newName\":\"...\",\"reason\":\"...\"}]}, \
+call calmmd_apply_organization with apply: false to validate it, show the preview to the user, then \
+call again with apply: true only after they agree. Application creates missing folders and rewrites \
+links but is not transactional, so report per-move failures. Leave notes that are already sensibly \
+placed where they are.
+
+Generated text: calmmd_summarize, calmmd_follow_up_guide and calmmd_organize_folder are MCP prompts, \
+not tools; fetch them with prompts/get. CalmMD has no built-in model, so the returned text is \
+guidance for you. Save results with calmmd_write_document (usually mode 'append'), and make clear to \
+the user that the client generated the text.
+
+Export: calmmd_export_html writes a standalone HTML file and calmmd_export_pdf renders CalmMD's print \
+layout. 'out' must be inside the open folder; missing parent folders are created. 'prefs' overrides \
+CalmMD's defaults and a 'cover' object enables a cover page. PDF export needs a Chromium/Edge print \
+engine: if that fails, report it and offer HTML.
+
+Destructive actions: calmmd_trash_document requires confirm: true and explicit user agreement. \
+Read-only resources are calmmd://status, calmmd://windows, calmmd://document/{path} and \
+calmmd://folder/{path}; resources cannot edit, and there is no folder-trash tool.";
+
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PathArgs {
     /// Absolute path, or a path relative to the folder open in CalmMD.
@@ -297,7 +342,7 @@ impl CalmMdTools {
         self.bridge.call(window.as_deref(), method, params).await
     }
 
-    #[tool(description = "Status of the running CalmMD app: open folder, open tabs, active document.")]
+    #[tool(description = "Status of the running CalmMD app: open folder, open tabs, active document. Call this first.")]
     async fn calmmd_status(&self) -> Result<CallToolResult, McpError> {
         match self.call("calmmd_status", json!({})).await {
             Ok(v) => ok(v),
@@ -305,7 +350,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "List CalmMD windows with their labels and claimed Space ids.")]
+    #[tool(description = "List CalmMD windows with their labels and claimed Space ids. Call this before routing with windowLabel or spaceId.")]
     async fn calmmd_windows(&self) -> Result<CallToolResult, McpError> {
         match self.bridge.windows() {
             Ok(v) => ok(v),
@@ -313,7 +358,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "List documents in the folder currently open in CalmMD.")]
+    #[tool(description = "List documents in the folder currently open in CalmMD. Keep markdownOnly true unless the user needs every file.")]
     async fn calmmd_list_documents(&self, Parameters(args): Parameters<ListArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "markdownOnly": args.markdown_only.unwrap_or(true), "folder": args.folder });
         match self.call_for(&args.target, "calmmd_list_documents", params).await {
@@ -322,7 +367,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Read a document from the live buffer (including unsaved edits) or from disk.")]
+    #[tool(description = "Read a document from CalmMD's live buffer, including unsaved edits. Prefer this over reading the file from disk.")]
     async fn calmmd_read_document(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path });
         match self.call_for(&args.target, "calmmd_read_document", params).await {
@@ -331,7 +376,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Search all Markdown files in the open folder.")]
+    #[tool(description = "Search all Markdown files in the open folder. Returns path, line and matching text.")]
     async fn calmmd_search(&self, Parameters(args): Parameters<SearchArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({
             "query": args.query,
@@ -344,7 +389,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Headings of a document (line numbers are 0-based).")]
+    #[tool(description = "Headings of a document (line numbers are 0-based). Use this to plan section edits in long notes.")]
     async fn calmmd_outline(&self, Parameters(args): Parameters<PathArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path });
         match self.call_for(&args.target, "calmmd_outline", params).await {
@@ -353,7 +398,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Create a new Markdown document in the open folder, optionally with initial text.")]
+    #[tool(description = "Create a new Markdown document in the open folder, optionally with initial text. Fails if the name is taken.")]
     async fn calmmd_create_document(&self, Parameters(args): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "folder": args.folder, "name": args.name, "text": args.text });
         match self.call_for(&args.target, "calmmd_create_document", params).await {
@@ -362,7 +407,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Create a folder inside the folder currently open in CalmMD.")]
+    #[tool(description = "Create a folder inside the folder currently open in CalmMD. Use this before moving or exporting into a new folder.")]
     async fn calmmd_create_folder(&self, Parameters(args): Parameters<CreateArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "folder": args.folder, "name": args.name });
         match self.call_for(&args.target, "calmmd_create_folder", params).await {
@@ -371,7 +416,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Rename a document. CalmMD retargets open tabs, favorites and file history.")]
+    #[tool(description = "Rename a document. CalmMD retargets open tabs, favorites, file history and links (relative Markdown and [[wiki]] links; code is left alone).")]
     async fn calmmd_rename_document(&self, Parameters(args): Parameters<RenameArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path, "name": args.name });
         match self.call_for(&args.target, "calmmd_rename_document", params).await {
@@ -380,7 +425,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Move a document into another folder. CalmMD retargets tabs, favorites, file history and links.")]
+    #[tool(description = "Move a document into another folder. CalmMD retargets tabs, favorites, file history and links. Create the destination folder first.")]
     async fn calmmd_move_document(&self, Parameters(args): Parameters<MoveArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path, "folder": args.folder, "name": args.name });
         match self.call_for(&args.target, "calmmd_move_document", params).await {
@@ -389,7 +434,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Write to a live document. The edit is undoable, autosaved, and snapshotted in file history.")]
+    #[tool(description = "Write to a live document. Read it first; send the complete intended text with mode replace, or append/prepend for additive changes. The edit is undoable, autosaved and snapshotted in file history. A conflict means the file changed on disk: stop and ask the user.")]
     async fn calmmd_write_document(&self, Parameters(args): Parameters<WriteArgs>) -> Result<CallToolResult, McpError> {
         let content = args.content.or(args.text).unwrap_or_default();
         let params = json!({
@@ -404,7 +449,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Move a document to the OS trash. Requires confirm: true.")]
+    #[tool(description = "Move a document to the OS trash. Requires confirm: true and explicit user agreement.")]
     async fn calmmd_trash_document(&self, Parameters(args): Parameters<TrashArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path, "confirm": args.confirm.unwrap_or(false) });
         match self.call_for(&args.target, "calmmd_trash_document", params).await {
@@ -413,7 +458,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Inventory a folder's Markdown notes with live excerpts and headings for content-aware organisation.")]
+    #[tool(description = "Inventory a folder's Markdown notes with live excerpts and headings for content-aware organisation. Plan from the result; do not guess note contents.")]
     async fn calmmd_triage_folder(&self, Parameters(args): Parameters<TriageArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({
             "folder": args.folder,
@@ -426,7 +471,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Validate and apply a proposed folder organisation plan; moves and renames go through CalmMD.")]
+    #[tool(description = "Validate and apply a proposed folder organisation plan. Call with apply: false first and show the preview, then apply: true after the user agrees. Not transactional: report per-move failures.")]
     async fn calmmd_apply_organization(&self, Parameters(args): Parameters<ApplyOrganizationArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({
             "folder": args.folder,
@@ -439,7 +484,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Export a document to PDF using CalmMD's renderer and print engine. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
+    #[tool(description = "Export a document to PDF using CalmMD's renderer and print engine. out must be inside the open folder; missing parent folders are created. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
     async fn calmmd_export_pdf(&self, Parameters(args): Parameters<ExportArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path, "out": args.out, "prefs": args.prefs, "cover": args.cover });
         match self.call_for(&args.target, "calmmd_export_pdf", params).await {
@@ -448,7 +493,7 @@ impl CalmMdTools {
         }
     }
 
-    #[tool(description = "Export a document to standalone HTML using CalmMD's renderer. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
+    #[tool(description = "Export a document to standalone HTML using CalmMD's renderer. out must be inside the open folder; missing parent folders are created. Use prefs.cover or the cover argument for a cover page; omitted cover fields come from the note.")]
     async fn calmmd_export_html(&self, Parameters(args): Parameters<ExportArgs>) -> Result<CallToolResult, McpError> {
         let params = json!({ "path": args.path, "out": args.out, "prefs": args.prefs, "cover": args.cover });
         match self.call_for(&args.target, "calmmd_export_html", params).await {
@@ -647,20 +692,28 @@ impl ServerHandler for CalmMdTools {
         )
         .with_server_info(rmcp::model::Implementation::from_build_env())
         .with_protocol_version(rmcp::model::ProtocolVersion::V_2026_07_28)
-        .with_instructions(
-            "Tools operate on the live CalmMD app. Use prompts calmmd_summarize / \
-             calmmd_follow_up_guide for generated text, then calmmd_write_document to save it. \
-             Use calmmd_organize_folder with calmmd_apply_organization for content-aware folder triage. \
-             Read-only URIs: calmmd://status, calmmd://windows, calmmd://document/{path}, \
-             calmmd://folder/{path}."
-                .to_string(),
-        )
+        .with_instructions(INSTRUCTIONS.to_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn instructions_carry_the_agent_rules() {
+        for needle in [
+            "calmmd_read_document",
+            "calmmd_apply_organization",
+            "confirm: true",
+            "conflict",
+            "calmmd_export_pdf",
+            "calmmd://folder/{path}",
+        ] {
+            assert!(INSTRUCTIONS.contains(needle), "instructions should mention {needle}");
+        }
+        assert!(INSTRUCTIONS.len() > 1000);
+    }
 
     #[test]
     fn decodes_resource_paths_and_query_targets() {

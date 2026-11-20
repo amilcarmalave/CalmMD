@@ -252,9 +252,10 @@ See [`MCP.md`](MCP.md) for the full implementation record, tool reference and op
 [`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md) for client configuration and discovery.
 
 CalmMD can host a **local MCP server** (`src-tauri/src/mcp/`, official `rmcp` SDK, Streamable HTTP on
-`127.0.0.1:<random port>/mcp`). It is **off until started** from File → Start MCP Server, the command
-palette, or the `--mcp` launch flag. The connection URL and a per-launch bearer token are copied to
-the clipboard; the server validates the token and the `Origin` header and never binds beyond loopback.
+`127.0.0.1:<port>/mcp`; the port and token persist between launches). It is **off until started** from
+File → Start MCP Server, the command palette, or the `--mcp` launch flag. The connection URL and the
+local bearer token are copied to the clipboard; the server validates the token and the `Origin`
+header and never binds beyond loopback. **File → New MCP Token** rotates the token.
 
 The server never edits files itself. Each tool call becomes a Tauri event
 (`calmmd://mcp/request`) with a correlation id; `src/app/mcpBridge.ts` dispatches it to the **live**

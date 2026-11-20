@@ -118,6 +118,8 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})/;
  */
 export function rewriteLinks(text: string, fromDoc: string, from: string, to: string, files: string[]): string {
   const edits: Edit[] = [];
+  // `files` may already describe the folder after the rename, so keep the old path resolvable.
+  const wikiFiles = files.some((f) => samePath(f, from)) ? files : [...files, from];
   const wikiRe = new RegExp(WIKI_RE.source, 'g');
   const mdLinkRe = /(?<!!)\[([^\]]*)\]\(\s*(<[^>]*>|[^\s)]+)([^)]*)\)/g;
   let pos = 0;
@@ -143,7 +145,7 @@ export function rewriteLinks(text: string, fromDoc: string, from: string, to: st
     for (const m of masked.matchAll(wikiRe)) {
       const w = parseWiki(m[1]);
       if (!w?.name) continue;
-      const target = resolveWiki(w.name, fromDoc, files);
+      const target = resolveWiki(w.name, fromDoc, wikiFiles);
       if (!target || !samePath(target, from)) continue;
       const next = `[[${stem(to)}${w.heading ? `#${w.heading}` : ''}${w.alias ? `|${w.alias}` : ''}]]`;
       edits.push({ from: start + m.index, to: start + m.index + m[0].length, text: next });

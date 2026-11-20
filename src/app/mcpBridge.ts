@@ -1,5 +1,5 @@
 import { coverFromDoc, frontMatterFields, type CoverInfo } from '../core/cover';
-import { basename, isMarkdownPath, isWithin, joinPath, samePath } from '../core/paths';
+import { basename, dirname, isMarkdownPath, isWithin, joinPath, samePath } from '../core/paths';
 import { extractHeadings } from '../core/outline';
 import type { McpRequest } from '../mcp/types';
 import type { Platform } from '../platform/types';
@@ -286,6 +286,7 @@ export async function dispatchMcpRequest(req: McpRequest, deps: McpBridgeDeps): 
     case 'calmmd_export_html': {
       const path = resolvePath(deps, p);
       const out = resolvePath(deps, { path: str(p.out, 'out') }, 'path');
+      await ensureFolder(deps, dirname(out));
       const text = await readLiveText(deps, path);
       const doc = { text, path, name: basename(path) };
       const prefs = exportPrefs(p.prefs);

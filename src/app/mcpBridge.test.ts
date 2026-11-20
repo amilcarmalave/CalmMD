@@ -18,7 +18,11 @@ function deps() {
       { name: '10-old.md', path: '/root/10-old.md', isDir: false },
       { name: '2-new.md', path: '/root/2-new.md', isDir: false },
     ]),
-    stat: vi.fn(async (path: string) => ({ mtimeMs: 1, size: 1, isDir: path === '/root/topics' })),
+    stat: vi.fn(async (path: string): Promise<{ mtimeMs: number; size: number; isDir: boolean } | null> => ({
+      mtimeMs: 1,
+      size: 1,
+      isDir: path === '/root/topics',
+    })),
   };
   const docs = {
     store: { docs: [{ id: 'd1', path: '/root/open.md' }], activeId: 'd1' },
@@ -85,6 +89,21 @@ describe('MCP bridge', () => {
       path: string;
     }[];
     expect(result.map((x) => x.path)).toEqual(['/root/notes/b.md']);
+  });
+
+  it('creates the export folder before writing the file', async () => {
+    const d = deps();
+    d.platform.stat.mockImplementation(async (path: string) =>
+      path === '/root/exports' ? null : { mtimeMs: 1, size: 1, isDir: path === '/root/topics' },
+    );
+    await dispatchMcpRequest(req('calmmd_export_html', { path: 'open.md', out: 'exports/note.html' }), d.asDeps);
+    expect(d.explorer.create).toHaveBeenCalledWith('/root', 'exports', 'folder');
+    expect(d.exporter.exportHtmlData).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/root/open.md' }),
+      '/root/exports/note.html',
+      expect.anything(),
+      null,
+    );
   });
 
   it('passes cover information to the exporter', async () => {

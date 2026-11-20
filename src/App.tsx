@@ -822,6 +822,19 @@ export default function App(props: { platform: Platform }) {
       },
     },
     {
+      id: 'mcp.newToken',
+      title: 'New MCP Token',
+      category: 'MCP',
+      when: () => platform.kind === 'tauri',
+      run: async () => {
+        const s = await platform.mcpNewToken();
+        setMcpInfo(s);
+        if (!s.enabled || !s.url) return notify('Start the MCP server to use a new token');
+        await platform.writeClipboard(`${s.url} · token: ${s.token ?? ''}`).catch(() => undefined);
+        notify('New MCP token created (connection copied; update your client)');
+      },
+    },
+    {
       id: 'mcp.autostart',
       title: settings.mcpAutostart ? 'MCP Server: Don’t Auto-start' : 'MCP Server: Auto-start',
       category: 'MCP',

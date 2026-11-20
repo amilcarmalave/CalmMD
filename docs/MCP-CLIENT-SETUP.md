@@ -3,8 +3,10 @@
 CalmMD exposes a **local, opt-in MCP server**. This guide shows how to connect a client and verify
 that it can discover the tools and prompts. For the implementation details see [`MCP.md`](MCP.md).
 
-> The server is off by default. It listens only on `127.0.0.1`, and the bearer token changes on
-> every launch. Treat the connection string like a password.
+> The server is off by default. It listens only on `127.0.0.1`. The port and bearer token are
+> remembered between launches so a client is configured once; treat the connection string like a
+> password, and rotate it with **File → New MCP Token** (or **New MCP Token** in the command
+> palette).
 
 ---
 
@@ -19,7 +21,8 @@ that it can discover the tools and prompts. For the implementation details see [
    http://127.0.0.1:53123/mcp · token: 8c1f4e3a-...
    ```
 
-   Keep the app running. Stopping the server or restarting CalmMD invalidates the URL/token.
+   Keep the app running. The URL and token stay the same across restarts; only **New MCP Token**
+   invalidates them.
 
 Optionally enable **File → Auto-start MCP Server** so this happens on future launches.
 
@@ -73,8 +76,10 @@ Prefer an environment variable over a literal token in a shared config:
 }
 ```
 
-> Because the port and token change on every launch, a static config is mostly useful for quick
-> local testing. Re-copy the connection string from CalmMD after each restart.
+> The port and token persist in CalmMD's local state, so one entry keeps working across restarts.
+> If the remembered port is taken by another process, CalmMD falls back to a free port; run
+> **Start MCP Server** (or **New MCP Token**) to copy the new connection string, then update the
+> client.
 
 ---
 
@@ -266,8 +271,8 @@ remembered author and today's date.
 
 | Symptom | Check |
 |---|---|
-| `401` / “Needs authentication” | The token is stale; start the server again and copy the new connection string |
-| `404` at `/mcp` | The URL must include `/mcp`; the port changes every launch |
+| `401` / “Needs authentication” | The token was rotated; run **New MCP Token** and copy the new connection string |
+| `404` at `/mcp` | The URL must include `/mcp`; re-check the port from **Start MCP Server** if it had to rebind |
 | Connection refused | CalmMD was closed, the server was stopped, or the app is running in browser mode |
 | `Open a folder in CalmMD first` | MCP paths are resolved against the open folder's root |
 | `That path is outside the open folder` | Use a relative path inside the root, or fix the `windowLabel`/`spaceId` target |
@@ -280,14 +285,17 @@ variable or a personal config file.
 
 ---
 
-## 8. Agent skill
+## 8. Agent guidance
 
-The repository contains a ready-to-use agent skill at `skills/calmmd/SKILL.md`, plus an identical
-copy at `.claude/skills/calmmd/SKILL.md` for Claude Code. It teaches the client when to use each
-tool, why writes must go through CalmMD, how to do a two-phase sort, and how to save generated text.
+Agent guidance ships with the server rather than as a repository skill file. CalmMD returns it in the
+MCP `initialize` result (`with_instructions`) and in each tool description, so every client gets the
+same rules: read before writing, keep edits additive, preview a folder plan before applying it, save
+generated text with `calmmd_write_document`, and never overwrite a conflicted document.
+
+Nothing needs installing or copying. If your client supports project-level instructions, shorten
+them to a pointer at the CalmMD tools; the authoritative text arrives on connect.
 
 ## 9. Related documents
 
 - [`MCP.md`](MCP.md) — implementation record, tool reference, architecture, gaps and open topics
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — how the live-state bridge fits into CalmMD
-- [`../skills/calmmd/SKILL.md`](../skills/calmmd/SKILL.md) — agent workflow guidance for using the tools

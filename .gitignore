@@ -27,9 +27,7 @@ npm-debug.log*
 # Local notes and tool settings (not part of the project)
 notes/
 CLAUDE.md
-.claude/*
-!.claude/skills/
-!.claude/skills/**
+.claude/
 
 # Editors
 .vscode/*

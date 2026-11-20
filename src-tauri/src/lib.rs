@@ -101,6 +101,7 @@ pub fn run() {
             mcp::mcp_status,
             mcp::mcp_start,
             mcp::mcp_stop,
+            mcp::mcp_new_token,
             mcp::mcp_respond,
             launch_paths,
         ])
