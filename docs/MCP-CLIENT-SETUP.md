@@ -163,7 +163,7 @@ supports tools, prompts and resources, so the full CalmMD surface should appear 
 Claude Desktop chat app configurations historically centered on stdio servers. If your version
 supports remote HTTP servers, use the portable JSON above in `claude_desktop_config.json`. If it
 only offers stdio, use Claude Code's `claude mcp add-from-claude-desktop` to copy an existing
-configuration, or wait for the CalmMD stdio shim (see [open topics](MCP.md#91-transport-and-client-compatibility)).
+configuration. CalmMD doesn't offer a stdio server yet (see [Limits](MCP.md#limits)).
 
 ---
 
@@ -297,5 +297,5 @@ them to a pointer at the CalmMD tools; the authoritative text arrives on connect
 
 ## 9. Related documents
 
-- [`MCP.md`](MCP.md) — implementation record, tool reference, architecture, gaps and open topics
+- [`MCP.md`](MCP.md) — how the server works, security, tool reference and limits
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — how the live-state bridge fits into CalmMD

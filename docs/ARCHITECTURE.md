@@ -248,7 +248,7 @@ src-tauri/
 
 ### Local MCP bridge
 
-See [`MCP.md`](MCP.md) for the full implementation record, tool reference and open topics, and
+See [`MCP.md`](MCP.md) for how the server works, the tool reference and its limits, and
 [`MCP-CLIENT-SETUP.md`](MCP-CLIENT-SETUP.md) for client configuration and discovery.
 
 CalmMD can host a **local MCP server** (`src-tauri/src/mcp/`, official `rmcp` SDK, Streamable HTTP on
