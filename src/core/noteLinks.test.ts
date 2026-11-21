@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linksTo, noteLink, parseWiki, resolveWiki } from './noteLinks';
+import { linksTo, noteLink, parseWiki, resolveWiki, rewriteLinks } from './noteLinks';
 
 const files = ['/n/Ideas.md', '/n/projects/Ideas.md', '/n/projects/thesis/Chapter 1.md', '/n/journal/Today.md', '/n/a.png'];
 
@@ -44,5 +44,28 @@ describe('linksTo (Linked from)', () => {
   });
   it('ignores the note itself', () => {
     expect(linksTo('[[Ideas]]', '/n/Ideas.md', '/n/Ideas.md', files)).toEqual([]);
+  });
+});
+
+describe('rewriteLinks', () => {
+  it('retargets Markdown and wiki links, but not code', () => {
+    const text = [
+      'See [ch1](projects/thesis/Chapter%201.md#intro) and [[Chapter 1|first]].',
+      '`[ch1](projects/thesis/Chapter%201.md)`',
+      '```md',
+      '[[Chapter 1]]',
+      '```',
+    ].join('\n');
+    const out = rewriteLinks(
+      text,
+      '/n/Ideas.md',
+      '/n/projects/thesis/Chapter 1.md',
+      '/n/projects/thesis/01-Chapter 1.md',
+      files,
+    );
+    expect(out).toContain('[ch1](projects/thesis/01-Chapter%201.md#intro)');
+    expect(out).toContain('[[01-Chapter 1|first]]');
+    expect(out).toContain('`[ch1](projects/thesis/Chapter%201.md)`');
+    expect(out).toContain('```md\n[[Chapter 1]]\n```');
   });
 });

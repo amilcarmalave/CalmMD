@@ -61,6 +61,8 @@ export interface Settings {
   spellcheck: boolean;
   /** "auto" (the system's languages) or a BCP 47 tag such as "en-GB". */
   spellLang: string;
+  /** Start the loopback-only MCP server on launch (desktop only). */
+  mcpAutostart: boolean;
 }
 
 /** Languages offered for spellcheck. The OS must have the dictionary installed. */
@@ -136,6 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
   updateCheck: 'ask',
   spellcheck: true,
   spellLang: 'auto',
+  mcpAutostart: false,
 };
 
 /** View modes in cycle order (Mod+E) and in the status bar control. */
@@ -193,6 +196,7 @@ export function parseSettings(raw: string | null): Settings {
     if ((TEXT_WIDTHS as readonly string[]).includes(s.textWidth as string)) out.textWidth = s.textWidth!;
     if (typeof s.spellcheck === 'boolean') out.spellcheck = s.spellcheck;
     if (typeof s.spellLang === 'string' && /^(auto|[a-z]{2,3}(-[A-Z]{2})?)$/.test(s.spellLang)) out.spellLang = s.spellLang;
+    if (typeof s.mcpAutostart === 'boolean') out.mcpAutostart = s.mcpAutostart;
   } catch {
     // Corrupt settings fall back to defaults.
   }

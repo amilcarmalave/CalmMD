@@ -69,6 +69,7 @@ account, no tracking and no paid tier: every feature is free, for everyone.
 | **Spaces** | Save a window (folder, tabs, layout) as a Space and switch with `Ctrl/⌘+Alt+O`, or open Spaces in their own windows |
 | **Finding things** | Command palette (`Ctrl/⌘+Shift+P`), go to file (`Ctrl/⌘+P`), line (`:`), heading (`@`), and `/` on an empty line to insert anything |
 | **Export and share** | PDF with templates (Standard, Report, Academic, Minimal) and cover pages, standalone HTML, Copy as HTML, a note with its images as one file or a `.zip`, and Word/ODT/EPUB when [Pandoc](https://pandoc.org) is installed |
+| **Local MCP server** | Opt-in, loopback-only MCP endpoint so an AI client can read, rename, reorganise, write and export notes through CalmMD’s live document state (no account, no cloud). See [`docs/MCP.md`](docs/MCP.md) and [client setup](docs/MCP-CLIENT-SETUP.md) |
 | **Looks** | Fifteen colour themes, from Snow and Paper to Solarized, Fjord and Nightshade, with separate light and dark choices; five document styles (Book, Studio, Clear, GitHub, Typewriter); text width from narrow to full; your own CSS themes |
 | **Paste** | Formatted text from a web page, Word or Google Docs becomes Markdown (headings, bold, links, lists, tables); Paste as Plain Text (`Ctrl/⌘+Shift+V`) keeps just the text |
 | **Safety** | Autosave with crash-safe atomic writes, drafts for untitled notes, and it never overwrites changes made by other apps |

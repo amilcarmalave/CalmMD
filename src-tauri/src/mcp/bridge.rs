@@ -1,0 +1,140 @@
+use crate::windows::SpaceClaims;
+use schemars::JsonSchema;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::{oneshot, Mutex};
+
+type Reply = Result<Value, String>;
+
+/// Optional routing fields every tool accepts. Flattened into each tool's arguments.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct TargetArgs {
+    /// Window label to run the call in (default: main).
+    #[serde(rename = "windowLabel")]
+    pub window_label: Option<String>,
+    /// Space id; resolved to the window that currently holds it.
+    #[serde(rename = "spaceId")]
+    pub space_id: Option<String>,
+}
+
+/// Correlates MCP tool calls with responses from the running webview.
+pub struct McpBridge {
+    app: AppHandle,
+    pending: Mutex<HashMap<String, oneshot::Sender<Reply>>>,
+    next: AtomicU64,
+}
+
+impl McpBridge {
+    pub fn new(app: AppHandle) -> Arc<Self> {
+        Arc::new(Self {
+            app,
+            pending: Mutex::new(HashMap::new()),
+            next: AtomicU64::new(0),
+        })
+    }
+
+    /// Resolves an optional target to a concrete window label.
+    pub fn window_for(&self, target: &TargetArgs) -> Result<Option<String>, String> {
+        if let Some(label) = &target.window_label {
+            return Ok(Some(label.clone()));
+        }
+        if let Some(space) = &target.space_id {
+            let claims = self
+                .app
+                .try_state::<SpaceClaims>()
+                .ok_or("Space state is not available")?;
+            return Ok(claims.holder(space));
+        }
+        Ok(None)
+    }
+
+    /// Window labels, titles and claimed Space ids for discovery.
+    pub fn windows(&self) -> Result<Value, String> {
+        let claims = self
+            .app
+            .try_state::<SpaceClaims>()
+            .ok_or("Space state is not available")?;
+        let windows = self
+            .app
+            .webview_windows()
+            .into_values()
+            .map(|window| {
+                let label = window.label().to_string();
+                let title = window.title().unwrap_or_else(|_| label.clone());
+                json!({
+                    "label": label,
+                    "title": title,
+                    "spaceId": claims.space_for_window(&label),
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(json!({ "windows": windows }))
+    }
+
+    pub async fn call(&self, window: Option<&str>, method: &str, params: Value) -> Result<Value, String> {
+        let id = format!(
+            "mcp-{}-{}",
+            std::process::id(),
+            self.next.fetch_add(1, Ordering::Relaxed)
+        );
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id.clone(), tx);
+
+        let label = window.unwrap_or("main");
+        let payload = json!({
+            "id": id,
+            "windowLabel": label,
+            "method": method,
+            "params": params,
+        });
+        if let Err(e) = self.app.emit_to(label, "calmmd://mcp/request", payload) {
+            self.pending.lock().await.remove(&id);
+            return Err(e.to_string());
+        }
+
+        // A trash tool may wait for the user to confirm in the UI.
+        let answered = tokio::time::timeout(Duration::from_secs(120), rx).await;
+        self.pending.lock().await.remove(&id);
+        match answered {
+            Ok(Ok(reply)) => reply,
+            Ok(Err(_)) => Err("CalmMD closed the response channel".into()),
+            Err(_) => Err("CalmMD did not respond in time".into()),
+        }
+    }
+
+    pub async fn respond(&self, response: Value) -> Result<(), String> {
+        let id = response
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or("Missing response id")?
+            .to_string();
+        let ok = response.get("ok").and_then(Value::as_bool).unwrap_or(false);
+        let reply = if ok {
+            Ok(response.get("result").cloned().unwrap_or(Value::Null))
+        } else {
+            Err(
+                response
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("MCP request failed")
+                    .to_string(),
+            )
+        };
+        let tx = self
+            .pending
+            .lock()
+            .await
+            .remove(&id)
+            .ok_or_else(|| format!("Unknown response id: {id}"))?;
+        tx.send(reply).map_err(|_| "Response was no longer needed".into())
+    }
+}

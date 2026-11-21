@@ -623,6 +623,13 @@ button {
 .status-selection {
   color: var(--fg-muted);
 }
+.mcp-indicator {
+  margin-right: 10px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
 .status-controls {
   display: flex;
   align-items: center;

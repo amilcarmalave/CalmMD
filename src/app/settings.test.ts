@@ -13,6 +13,11 @@ describe('settings', () => {
     expect(s).toEqual({ ...DEFAULT_SETTINGS, scrollSync: false, previewTheme: 'studio' });
   });
 
+  it('reads the MCP auto-start setting', () => {
+    expect(parseSettings(JSON.stringify({ v: 3, mcpAutostart: true })).mcpAutostart).toBe(true);
+    expect(parseSettings(JSON.stringify({ v: 3, mcpAutostart: 'yes' })).mcpAutostart).toBe(false);
+  });
+
   it('validates toolbar items and font scale', () => {
     const s = parseSettings(JSON.stringify({ v: 2, toolbarItems: ['a', 'a', 3, '|', 'b', '|', 'c'], fontScale: 9 }));
     expect(s.toolbarItems).toEqual(['a', '|', 'b', '|', 'c']);

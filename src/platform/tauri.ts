@@ -6,6 +6,7 @@ import { readText, writeHtml, writeText } from '@tauri-apps/plugin-clipboard-man
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import type { SearchHit } from '../core/search';
+import type { McpConnectionInfo, McpRequest } from '../mcp/types';
 import type { DirEntry, NativeMenu, NativeMenuItem, Platform, ReadResult, SaveKind, StatResult } from './types';
 
 const MARKDOWN_FILTERS = [
@@ -154,6 +155,15 @@ export function createTauriPlatform(): Platform {
     onOpenPaths(handler) {
       void getCurrentWindow().listen<string[]>('calmmd://open-paths', (e) => handler(e.payload));
     },
+
+    mcpStatus: () => invoke<McpConnectionInfo>('mcp_status'),
+    mcpStart: () => invoke<McpConnectionInfo>('mcp_start'),
+    mcpStop: () => invoke<McpConnectionInfo>('mcp_stop'),
+    mcpNewToken: () => invoke<McpConnectionInfo>('mcp_new_token'),
+    onMcpRequest(handler) {
+      void listen<McpRequest>('calmmd://mcp/request', (e) => handler(e.payload));
+    },
+    mcpRespond: (response) => invoke<void>('mcp_respond', { response }),
 
     setWindowTitle: (title) => getCurrentWindow().setTitle(title),
     onCloseRequested(handler) {

@@ -56,7 +56,14 @@ export interface DocumentsDeps {
    * opened and now, for file history. Only called when the two differ.
    */
   onClosing?: (path: string, opened: string, current: string) => Promise<void>;
+  /**
+   * Text is being changed by a tool (MCP), not by keystrokes. Snapshot it for file history
+   * before applying the change so an agent edit is always reversible.
+   */
+  onExternalEdit?: (path: string, before: string, after: string) => Promise<void>;
 }
+
+export type WriteMode = 'replace' | 'append' | 'prepend';
 
 const DRAFT_PREFIX = 'draft/';
 interface DraftRecord {
@@ -453,6 +460,46 @@ export function createDocuments(deps: DocumentsDeps) {
     }
   }
 
+  /**
+   * Applies a tool-driven edit to the live document state (not directly to disk), so autosave,
+   * conflict detection, drafts and undo all keep working. Opens the file first if needed.
+   */
+  async function setContentByPath(
+    path: string,
+    text: string,
+    opts: { mode?: WriteMode; flush?: boolean } = {},
+  ): Promise<{ id: string; changed: boolean }> {
+    let d = store.docs.find((x) => x.path && samePath(x.path, path));
+    if (!d) {
+      await openPaths([path]);
+      d = store.docs.find((x) => x.path && samePath(x.path, path));
+    }
+    if (!d) throw new Error(`No document open at ${path}`);
+    if (d.conflict) throw new Error('This document has a conflict. Resolve it in CalmMD before editing it.');
+
+    const current = textOf(d.id);
+    const mode = opts.mode ?? 'replace';
+    const next = mode === 'append' ? current + text : mode === 'prepend' ? text + current : text;
+    if (next === current) return { id: d.id, changed: false };
+
+    await deps.onExternalEdit?.(path, current, next).catch(() => undefined);
+    const change = minimalChange(current, next);
+    const r = runtime.get(d.id)!;
+    if (change) {
+      if (view && store.activeId === d.id) view.dispatch({ changes: change, userEvent: 'input.mcp' });
+      else r.state = r.state.update({ changes: change, userEvent: 'input.mcp' }).state;
+    }
+    r.autosaver.touch();
+
+    if (opts.flush !== false) {
+      const ok = await r.autosaver.flush();
+      if (!ok || find(d.id)?.conflict) {
+        throw new Error(find(d.id)?.lastError || 'The file changed on disk; the edit is kept as a draft.');
+      }
+    }
+    return { id: d.id, changed: true };
+  }
+
   /** A file or folder was moved to the trash: close clean documents inside it, keep edited ones. */
   function closeWithin(path: string) {
     for (const d of [...store.docs]) {
@@ -568,6 +615,7 @@ export function createDocuments(deps: DocumentsDeps) {
     newDoc,
     openPaths,
     openWithDialog,
+    setContentByPath,
     save,
     saveAs,
     close,

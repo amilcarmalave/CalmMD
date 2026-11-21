@@ -21,7 +21,7 @@ export interface ExplorerDeps {
   confirm: ConfirmFn;
   notify: (msg: string) => void;
   /** Hooks into open documents. */
-  onRenamed: (from: string, to: string) => void;
+  onRenamed: (from: string, to: string) => void | Promise<void>;
   onTrashed: (path: string) => void;
   openFile: (path: string) => void;
   /** Called when the user switches between all files and notes only (the app persists it). */
@@ -236,9 +236,32 @@ export function createExplorer(deps: ExplorerDeps) {
       return null;
     }
     fileCache = null;
-    deps.onRenamed(path, to);
+    await deps.onRenamed(path, to);
     retarget(path, to);
     await load(dirname(path));
+    return to;
+  }
+
+  async function move(path: string, dir: string, rawName?: string): Promise<string | null> {
+    const name = rawName?.trim() || basename(path);
+    const to = joinPath(dir, name);
+    if (samePath(path, to)) return path;
+    const err = validateName(name);
+    if (err) {
+      deps.notify(err);
+      return null;
+    }
+    try {
+      await platform.renamePath(path, to);
+    } catch (e) {
+      deps.notify(errText(e));
+      return null;
+    }
+    fileCache = null;
+    await deps.onRenamed(path, to);
+    retarget(path, to);
+    await load(dirname(path));
+    if (!samePath(dir, dirname(path))) await load(dir);
     return to;
   }
 
@@ -339,6 +362,7 @@ export function createExplorer(deps: ExplorerDeps) {
     moveFavorite,
     create,
     rename,
+    move,
     trash,
     setEditing: (e: Editing) => setState('editing', e),
     setShowAllFiles: (on: boolean) => {

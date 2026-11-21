@@ -1,5 +1,6 @@
 mod cdp;
 mod export;
+mod mcp;
 mod fsops;
 mod kv;
 mod search;
@@ -31,6 +32,17 @@ fn launch_paths() -> Vec<String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let manager = mcp::McpManager::new(app.handle().clone());
+            app.manage(manager.clone());
+            // `--mcp` starts the loopback server at launch for clients that expect it.
+            if std::env::args().any(|a| a == "--mcp") {
+                tauri::async_runtime::spawn(async move {
+                    let _ = manager.start().await;
+                });
+            }
+            Ok(())
+        })
         // Opening a file while CalmMD is running hands it to the running instance instead of
         // starting a second one.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -86,6 +98,11 @@ pub fn run() {
             spell::spell_check,
             spell::spell_check_text,
             spell::spell_learn,
+            mcp::mcp_status,
+            mcp::mcp_start,
+            mcp::mcp_stop,
+            mcp::mcp_new_token,
+            mcp::mcp_respond,
             launch_paths,
         ])
         .run(tauri::generate_context!())
